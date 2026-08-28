@@ -618,6 +618,43 @@ export class QualityService extends BaseService {
   }
 
   /**
+   * A shift cannot be inspected before the worker starts it.
+   *
+   * Owner decision, 2026-08-29, after a checker recorded a completed
+   * inspection against a shift still sitting in CONFIRMED -- the worker had
+   * not begun, so there was nothing in the room to look at, and the record
+   * said otherwise.
+   *
+   * **This deliberately supersedes ADR-072 §2.5**, which had check-in state
+   * explicitly NOT filtering the inspectable-worker list, reasoning that a
+   * checker "may need to inspect, or record the absence of, work by someone
+   * whose attendance is missing". That case is real but it is the lesser one:
+   * it costs a checker a second attempt after the worker checks in, whereas
+   * the behaviour it allowed produced a scored, photographed inspection of
+   * work that had not happened -- which feeds WorkerOverallRating and the
+   * leaderboard, and is indistinguishable afterwards from a real one.
+   *
+   * COMPLETED is admitted alongside IN_PROGRESS: the common case is
+   * inspecting a room after the worker has checked out, and refusing that
+   * would leave nearly every finished shift uninspectable. CANCELLED,
+   * NO_SHOW and REASSIGNED are refused -- there is no work to inspect, and
+   * the picker has never offered them.
+   */
+  private assertShiftHasStarted(assignment: { status: AssignmentStatus }): void {
+    if (
+      assignment.status === AssignmentStatus.IN_PROGRESS ||
+      assignment.status === AssignmentStatus.COMPLETED
+    ) {
+      return;
+    }
+    throw new ValidationError(
+      assignment.status === AssignmentStatus.CONFIRMED
+        ? 'This shift has not started yet. The worker must check in before it can be inspected.'
+        : `A ${assignment.status.toLowerCase().replace(/_/g, ' ')} shift cannot be inspected.`
+    );
+  }
+
+  /**
    * One inspection, one request (2026-08-29).
    *
    * The checker app used to make three sequential calls to end an inspection
@@ -660,6 +697,9 @@ export class QualityService extends BaseService {
     }
 
     await this.assertCanInspect(assignment, actor, 'Cannot inspect for this hotel');
+    // Authorization first, business rule second -- an actor who may not inspect
+    // this assignment gets that answer, not a hint about its state.
+    this.assertShiftHasStarted(assignment);
 
     // CRR §15: the photo accompanies the rating. After authorization, so an
     // actor who may not inspect gets that answer rather than a validation hint.
@@ -850,6 +890,8 @@ export class QualityService extends BaseService {
       }
     }
 
+    this.assertShiftHasStarted(assignment);
+
     // CRR §15 enforcement (2026-08-24). The comment on the `photos` parameter
     // above has stated this requirement since the parameter was added, but
     // nothing checked it: a rating with no photo returned 201 and stored
@@ -976,7 +1018,10 @@ export class QualityService extends BaseService {
     // transaction — and its row locks — is open.
     const assignment = await this.prisma.workerAssignment.findUnique({
       where: { id: assignment_id },
-      select: { id: true, hotel_id: true, worker_id: true, day: true },
+      // `status` added 2026-08-29 for assertShiftHasStarted(); the narrow
+      // select is why the compiler caught its absence rather than the guard
+      // silently reading undefined.
+      select: { id: true, hotel_id: true, worker_id: true, day: true, status: true },
     });
     if (!assignment) {
       throw new NotFoundError('Assignment not found');
@@ -1007,6 +1052,8 @@ export class QualityService extends BaseService {
         throw new ForbiddenError('Checker must have an active assignment at the same hotel on the same day');
       }
     }
+
+    this.assertShiftHasStarted(assignment);
 
     // CRR §15 enforcement. Placed AFTER authorization, same reasoning as
     // createVerification's identical guard: an actor who may not rate this
@@ -1319,7 +1366,12 @@ export class QualityService extends BaseService {
       where: {
         ...hotelFilter,
         day: dayStart,
-        status: { in: [...ACTIVE_ASSIGNMENT_STATUSES, AssignmentStatus.COMPLETED] },
+        // IN_PROGRESS and COMPLETED only -- NOT the full active set, which
+        // includes CONFIRMED. Offering a not-yet-started shift here and then
+        // refusing it at submit time would waste the whole form; the picker
+        // and assertShiftHasStarted() must agree. See that method for why
+        // this supersedes ADR-072 §2.5.
+        status: { in: [AssignmentStatus.IN_PROGRESS, AssignmentStatus.COMPLETED] },
         rework_of_assignment_id: null,
         worker_id: { not: actor.userId },
       },

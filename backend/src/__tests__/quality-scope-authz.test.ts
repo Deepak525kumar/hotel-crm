@@ -32,9 +32,15 @@ let testAuth:
   | null = null;
 
 // assignment_id -> hotel it belongs to.
-const assignments: Record<string, { id: string; hotel_id: string; worker_id: string }> = {
-  asg_h1: { id: 'asg_h1', hotel_id: 'h1', worker_id: 'w1' },
-  asg_h2: { id: 'asg_h2', hotel_id: 'h2', worker_id: 'w1' },
+// `status` is IN_PROGRESS because assertShiftHasStarted() (2026-08-29) refuses
+// a shift the worker has not begun. These cases are about SCOPE, so they need
+// a shift that clears the unrelated business rule.
+const assignments: Record<
+  string,
+  { id: string; hotel_id: string; worker_id: string; status: string }
+> = {
+  asg_h1: { id: 'asg_h1', hotel_id: 'h1', worker_id: 'w1', status: 'IN_PROGRESS' },
+  asg_h2: { id: 'asg_h2', hotel_id: 'h2', worker_id: 'w1', status: 'IN_PROGRESS' },
 };
 
 jest.mock('../config/feature-flags.js', () => ({

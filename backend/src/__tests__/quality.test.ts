@@ -267,6 +267,9 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
+      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
+      // shift the worker has not begun (owner decision 2026-08-29).
+      status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
@@ -327,6 +330,9 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
+      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
+      // shift the worker has not begun (owner decision 2026-08-29).
+      status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
@@ -460,6 +466,9 @@ describe('Quality createRating — duplicate rating handling (P1-02)', () => {
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
+      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
+      // shift the worker has not begun (owner decision 2026-08-29).
+      status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
@@ -494,6 +503,9 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
+      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
+      // shift the worker has not begun (owner decision 2026-08-29).
+      status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
@@ -539,6 +551,9 @@ describe('Quality createRating — WorkerOverallRating single-writer aggregate (
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
+      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
+      // shift the worker has not begun (owner decision 2026-08-29).
+      status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
