@@ -21,7 +21,62 @@ export const VIEW_OPTIONS: { value: CalendarView; labelKey: string }[] = [
   { value: "month", labelKey: "calendar.viewMonth" },
 ];
 
-/** YYYY-MM-DD in the local timezone (matches the backend's date-only day field). */
+/**
+ * The platform's calendar timezone.
+ *
+ * Every date-only field the API accepts or returns (`CalendarEntry.day`,
+ * `WorkerAssignment.day`, absence days, shift dates) is interpreted by the
+ * backend in this zone -- `todayInCalendarTimezone()` in
+ * `backend/src/lib/utils.ts`, which every "is this today / in the past"
+ * server-side rule is written against. Frankfurt is in Europe/Berlin, so this
+ * is the operating timezone of the business, not a developer convenience.
+ */
+export const CALENDAR_TIMEZONE = "Europe/Berlin";
+
+/**
+ * Today's date key in the calendar timezone -- NOT the browser's.
+ *
+ * The difference is not cosmetic and it is not rare. A manager in IST
+ * (UTC+5:30) between midnight and 03:30 local is still on the PREVIOUS day in
+ * Frankfurt. Placing a shift on the cell their calendar called "today" then
+ * sent tomorrow's date to a backend that disagreed, and the worker was
+ * refused at check-in with "this calendar shift is scheduled for a future
+ * day" -- for a shift they could see, on a day the app told them was today.
+ * Reported from the field on 2026-08-29 at 03:12 IST, when Frankfurt was
+ * still on 2026-08-28.
+ *
+ * The mobile apps have always done this correctly
+ * (see each app's `src/lib/calendar-dates.ts`); only the web read the browser.
+ */
+export function todayKeyInCalendarTimezone(): string {
+  // en-CA formats as YYYY-MM-DD, the shape every date-only API field uses.
+  return new Intl.DateTimeFormat("en-CA", { timeZone: CALENDAR_TIMEZONE }).format(new Date());
+}
+
+/**
+ * Today in the calendar timezone, as a Date whose LOCAL y/m/d are that day.
+ *
+ * Deliberately not "the current instant": the grid navigates by local date
+ * arithmetic (startOfWeek, startOfMonthGrid, +DAY_MS) and reads cells back
+ * with toDateKey, so an anchor has to be a local midnight whose calendar day
+ * is the one we mean. Passing a raw `new Date()` is what put the grid a day
+ * ahead of the server.
+ */
+export function todayInCalendarTimezone(): Date {
+  const [y, m, d] = todayKeyInCalendarTimezone().split("-").map(Number);
+  return new Date(y!, m! - 1, d!);
+}
+
+/**
+ * The calendar day `d` represents, as YYYY-MM-DD.
+ *
+ * Reads the Date's own local y/m/d ON PURPOSE, and must keep doing so: grid
+ * cells are constructed as local midnights standing for calendar days, so
+ * re-projecting them through a timezone here would shift every cell by a day
+ * for any viewer west or far east of Frankfurt. Use
+ * todayKeyInCalendarTimezone() to ask what day it is NOW; this function only
+ * names a day you already have.
+ */
 export function toDateKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
