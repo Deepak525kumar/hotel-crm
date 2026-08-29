@@ -1038,7 +1038,11 @@ model WorkerAssignment {
   // Relations — each assignment yields at most one attendance record, one QV, one rating,
   // one rooms-completed entry (ADR-028)
   attendance            Attendance?
-  quality_verification  QualityVerification?
+  // Many since 2026-08-29 -- a checker inspects room by room, so one shift
+  // carries one check per room. Renamed from `quality_verification` so every
+  // reader has to acknowledge the change rather than silently getting the
+  // first of many.
+  quality_verifications QualityVerification[]
   rooms_completed_entry RoomsCompletedEntry?
   // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): 1:1 with the CalendarEntry created by
   // placeOnCalendar() in the same transaction — present only for
@@ -1165,7 +1169,12 @@ model Attendance {
 
 model QualityVerification {
   id                  String             @id @default(cuid())
-  assignment_id       String             @unique // 1-to-1 with WorkerAssignment
+  // NOT unique since 2026-08-29: a checker inspects a shift room by room, so
+  // one assignment carries MANY checks (owner decision: "he should be able to
+  // mark ... at least 100 per shift so that he can upload it for multiple
+  // rooms"). Indexed instead -- the worker's shift screen and the checker's
+  // history both read every check for one assignment.
+  assignment_id       String
   assignment          WorkerAssignment   @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
   hotel_id            String
   hotel               Hotel              @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
@@ -1181,6 +1190,13 @@ model QualityVerification {
   // WorkerAssignment.day.
   worker_id           String
   worker              User               @relation("inspected_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  // Which room this check is about. Required (owner decision, 2026-08-29):
+  // with many checks per shift, a check nobody can locate is not evidence of
+  // anything, and it is a primary search key. Free text rather than an Int --
+  // real hotels have "412a", "Suite 3" and floor labels -- but the field is
+  // mandatory, so a check always says where it happened. Rows written before
+  // the column existed carry 'UNKNOWN' from the backfill.
+  room_number         String
   score               Int // 0–100; CHECK constraint in migration
   // TREQ-005 inspection checklist, each item 0-100 and optional:
   //   dust, bathroom, bed_linen, mirror, floor, minibar_restocking,
@@ -1207,6 +1223,12 @@ model QualityVerification {
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 
+  // Every check for one shift: the worker's shift screen lists them and the
+  // checker's history groups by them. Was implied by @unique until a shift
+  // could carry more than one.
+  @@index([assignment_id])
+  // Free-text search matches on this alongside worker/hotel/notes.
+  @@index([room_number])
   @@index([hotel_id])
   @@index([verified_by_id])
   // Carried over from the retired Rating model, which indexed worker_id and

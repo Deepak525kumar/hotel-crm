@@ -136,6 +136,37 @@ export interface Notification {
 // pick the correct APNs topic, since the two apps have distinct bundle IDs
 // (PR 7.8). Android ignores it; it is sent unconditionally so the backend row
 // is complete regardless of platform.
+/** Mirrors the backend's VerificationStatus enum. */
+export type VerificationStatus = 'PASSED' | 'FAILED' | 'NEEDS_REWORK';
+
+/**
+ * One CHECK — a single room the checker inspected on a shift.
+ *
+ * The worker sees these below their shift detail (owner decision, 2026-08-29),
+ * and opens one to the same screen the checker sees.
+ */
+export interface QualityCheck {
+  id: string;
+  assignment_id: string;
+  day: string | null;
+  assignment_status: AssignmentStatus | null;
+  room_number: string;
+  score: number;
+  status: VerificationStatus;
+  notes: string | null;
+  criteria_scores: Record<string, number> | null;
+  photo_count: number;
+  rework_required: boolean;
+  rework_notes: string | null;
+  rework_completed_at: string | null;
+  created_at: string;
+  worker: { id: string; first_name: string; last_name: string } | null;
+  hotel: { id: string; name: string; city: string } | null;
+  checked_by: { id: string; first_name: string; last_name: string } | null;
+  /** Present when this check sent work back; drives the "go to your rework" button. */
+  rework_assignment: { id: string; status: AssignmentStatus; day: string } | null;
+}
+
 export type PushPlatform = 'IOS' | 'ANDROID';
 export type PushApp = 'WORKER' | 'CHECKER';
 

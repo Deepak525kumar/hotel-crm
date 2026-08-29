@@ -1,6 +1,15 @@
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { useTranslation } from 'react-i18next';
 import { SymbolView } from 'expo-symbols';
@@ -9,12 +18,12 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NotificationBell } from '@/components/NotificationBell';
 import { Badge, Card, EmptyState, ScreenHeader } from '@/components/ui';
+import { Radius, Spacing } from '@/constants/theme';
 import { api } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
 import { calendarDateOf } from '@/lib/calendar-dates';
-import { inspectionHistoryRows } from '@/lib/inspection-history-rows';
 import { useTheme } from '@/hooks/use-theme';
-import { Spacing } from '@/constants/theme';
+
 import type { OwnInspection, VerificationStatus } from '@/types/api';
 
 /**
@@ -58,7 +67,7 @@ const STATUS_LABEL_KEY: Record<VerificationStatus, string> = {
   FAILED: 'quality.outcomeFAILED',
 };
 
-function InspectionCard({ item }: { item: OwnInspection }) {
+function CheckCard({ item }: { item: OwnInspection }) {
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
@@ -67,28 +76,29 @@ function InspectionCard({ item }: { item: OwnInspection }) {
     ? `${item.worker.first_name} ${item.worker.last_name}`.trim()
     : t('quality.workerUnavailable');
 
-  // Which rows to draw is decided by a pure function so it is actually
-  // tested -- see lib/inspection-history-rows.ts. This screen renders that
-  // answer rather than re-deriving it from the same nullable fields, so the
-  // test governs what ships instead of describing a parallel copy of it.
-  const rows = inspectionHistoryRows(item);
-
   const styles = StyleSheet.create({
     card: { gap: Spacing.two },
     head: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
     flex: { flex: 1 },
+    room: {
+      alignSelf: 'flex-start',
+      borderRadius: Radius.sm,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      backgroundColor: theme.backgroundSelected,
+    },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: Spacing.two,
-      paddingVertical: Spacing.two,
+      paddingTop: Spacing.two,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderColor: theme.border,
     },
     rowText: { flex: 1, gap: 2 },
     pill: {
       alignSelf: 'flex-start',
-      borderRadius: 8,
+      borderRadius: Radius.sm,
       paddingHorizontal: 10,
       paddingVertical: 4,
       backgroundColor: theme.warningSubtle,
@@ -97,46 +107,48 @@ function InspectionCard({ item }: { item: OwnInspection }) {
   });
 
   return (
-    <Card style={styles.card}>
-      <View style={styles.head}>
-        <View style={styles.flex}>
-          <ThemedText type="smallBold" numberOfLines={1}>
-            {workerName}
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-            {[calendarDateOf(item.day), item.hotel?.name].filter(Boolean).join('  ·  ')}
-          </ThemedText>
-        </View>
-      </View>
-
-      {/* The check. One record per inspection since the Rating merge
-          (2026-08-29), so this is the whole card -- and the road to the
-          evidence screen, which is where rework is assigned. The old
-          "record a pass/fail check" branch existed only for shifts that had a
-          rating and no verification, which can no longer happen. */}
-      {rows.includes('verification') && item.verification ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push(`/verification/${item.verification!.id}`)}
-          style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
-        >
-          <View style={styles.rowText}>
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.push(`/verification/${item.id}`)}
+      style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+    >
+      <Card style={styles.card}>
+        <View style={styles.head}>
+          <View style={styles.flex}>
+            {/* Room first: with many checks on one shift it is the only thing
+                that tells two rows apart at a glance. */}
             <View style={styles.head}>
-              <ThemedText type="smallBold">
-                {t('quality.verificationLabel')} · {item.verification.score}
-              </ThemedText>
+              <View style={styles.room}>
+                <ThemedText type="smallBold">
+                  {t('quality.roomLabel')} {item.room_number}
+                </ThemedText>
+              </View>
               <Badge
-                label={t(STATUS_LABEL_KEY[item.verification.status])}
-                tone={STATUS_TONE[item.verification.status]}
+                label={t(STATUS_LABEL_KEY[item.status])}
+                tone={STATUS_TONE[item.status]}
               />
             </View>
-            <ThemedText type="small" themeColor="textSecondary">
-              {t('quality.photoCount', { count: item.verification.photo_count })}
+            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+              {workerName}
             </ThemedText>
-            {item.verification.rework_required ? (
+            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+              {[item.day ? calendarDateOf(item.day) : null, item.hotel?.name]
+                .filter(Boolean)
+                .join('  ·  ')}
+            </ThemedText>
+          </View>
+          <ThemedText type="title">{item.score}</ThemedText>
+        </View>
+
+        <View style={styles.row}>
+          <View style={styles.rowText}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.photoCount', { count: item.photo_count })}
+            </ThemedText>
+            {item.rework_required ? (
               <View style={styles.pill}>
                 <ThemedText type="small" style={styles.pillText}>
-                  {item.verification.rework_completed_at
+                  {item.rework_completed_at
                     ? t('quality.reworkCompleted')
                     : t('quality.reworkPending')}
                 </ThemedText>
@@ -148,20 +160,49 @@ function InspectionCard({ item }: { item: OwnInspection }) {
             tintColor={theme.textSecondary}
             size={18}
           />
-        </Pressable>
-      ) : null}
-    </Card>
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 
 export default function HistoryScreen() {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const [query, setQuery] = useState('');
+  // Debounced so a five-column LIKE does not run on every keystroke. 300ms is
+  // the usual "finished a word" pause; shorter makes the list flicker while
+  // typing a room number, longer feels unresponsive.
+  const [debounced, setDebounced] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(query), 300);
+    return () => clearTimeout(id);
+  }, [query]);
 
-  const { data, isLoading, isValidating, mutate, error } = useSWR('/quality/my-inspections', () =>
-    api.quality.myInspections()
+  const { data, isLoading, isValidating, mutate, error } = useSWR(
+    ['/quality/my-inspections', debounced],
+    () => api.quality.myInspections(1, 20, debounced)
   );
 
-  const items = data?.inspections ?? [];
+  const items = data?.checks ?? [];
+
+  const styles = StyleSheet.create({
+    container: { flex: 1 },
+    safeArea: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
+    loader: { marginTop: Spacing.five },
+    list: { gap: Spacing.two, paddingBottom: Spacing.six },
+    search: {
+      backgroundColor: theme.backgroundElement,
+      borderRadius: Radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.border,
+      color: theme.text,
+      paddingHorizontal: Spacing.three,
+      paddingVertical: Spacing.two,
+      fontSize: 15,
+      marginBottom: Spacing.two,
+    },
+  });
 
   return (
     <ThemedView style={styles.container}>
@@ -172,25 +213,48 @@ export default function HistoryScreen() {
           action={<NotificationBell />}
         />
 
+        {/* One box across room, notes, worker and hotel. Searching server-side
+            rather than filtering the loaded page: the list is paginated, so a
+            client-side filter would only ever search the twenty rows already
+            on screen and quietly miss the rest. */}
+        <TextInput
+          style={styles.search}
+          placeholder={t('quality.searchPlaceholder')}
+          placeholderTextColor={theme.textSecondary}
+          value={query}
+          onChangeText={setQuery}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          accessibilityLabel={t('quality.searchPlaceholder')}
+        />
+
         {isLoading && !items.length ? (
           <ActivityIndicator style={styles.loader} />
         ) : (
           <FlatList
             data={items}
-            keyExtractor={(i) => i.assignment_id}
+            keyExtractor={(i) => i.id}
             initialNumToRender={10}
             maxToRenderPerBatch={10}
             windowSize={5}
             removeClippedSubviews
-            renderItem={({ item }) => <InspectionCard item={item} />}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => <CheckCard item={item} />}
             ListEmptyComponent={
-              // A load failure is NOT reported as "no inspections yet": that
-              // reads as data loss to someone who knows they scored a room
-              // this morning, and sends them to record it again.
               error ? (
                 <EmptyState
                   title={t('errors.title')}
                   body={translateApiError(error, t, 'errors.generic')}
+                />
+              ) : debounced ? (
+                // A search that found nothing is NOT "you have no history" --
+                // that reads as data loss to someone who knows they checked a
+                // room this morning.
+                <EmptyState
+                  title={t('quality.searchNoResults')}
+                  body={t('quality.searchNoResultsBody')}
                 />
               ) : (
                 <EmptyState
@@ -210,10 +274,3 @@ export default function HistoryScreen() {
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  safeArea: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
-  loader: { marginTop: Spacing.five },
-  list: { gap: Spacing.two, paddingBottom: Spacing.six },
-});

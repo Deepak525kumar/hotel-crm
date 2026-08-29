@@ -23,6 +23,8 @@ describe('RecordInspectionSchema (multipart)', () => {
   const base = {
     assignment_id: 'a1',
     worker_id: 'w1',
+    // Required since 2026-08-29: a check always says which room.
+    room_number: '412',
     score: '82',
     outcome: 'rework',
   };
@@ -128,6 +130,27 @@ describe('recordInspection writes one inspection, once', () => {
     // objects, and after the transaction leaves a half-recorded inspection.
     expect(guard).toBeLessThan(src.indexOf('this.uploadPhotos('));
     expect(guard).toBeLessThan(write);
+  });
+
+  it('refuses an empty or whitespace-only room in the SERVICE, not only in zod', () => {
+    // The schema trims and requires the room, so HTTP was already safe. This
+    // asserts the service does it too: every other rule on this path -- shift
+    // started, photo present, rework notes -- lives here, and leaving one to
+    // the transport alone lets an internal caller (a job, a script, a chatbot
+    // tool) write a check nobody can locate by room. Found by calling the
+    // service directly with '' and '   ': both were accepted.
+    const src = body();
+    const guard = src.search(/room_number\.trim\(\) === ''/);
+    expect(guard).toBeGreaterThan(-1);
+    // Before the upload and before the write, like the rework-notes guard --
+    // failing later orphans an S3 object or half-records the inspection.
+    expect(guard).toBeLessThan(src.indexOf('this.uploadPhotos('));
+    expect(guard).toBeLessThan(src.indexOf('$transaction'));
+  });
+
+  it('stores the room trimmed, so \' 412 \' and \'412\' are one room', () => {
+    // Untrimmed, search and grouping disagree with what the checker typed.
+    expect(body()).toMatch(/room_number:\s*room_number\.trim\(\)/);
   });
 
   it('authorizes before it validates', () => {

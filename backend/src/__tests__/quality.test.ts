@@ -266,7 +266,7 @@ describe('Quality Zod validation — recordInspection (P2-03)', () => {
   });
 });
 
-describe('Quality createVerification — concurrent duplicate handling (P2-04)', () => {
+describe('Quality createVerification — many checks per shift (P2-04)', () => {
   let service: QualityService;
 
   beforeEach(() => {
@@ -282,21 +282,29 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
     });
   });
 
-  it('returns ConflictError when the pre-check finds an existing verification', async () => {
+  it('allows a SECOND check on a shift that already has one', async () => {
+    // Inverted 2026-08-29. This asserted a ConflictError, because a shift
+    // could carry exactly one check; a checker now inspects room by room, so
+    // the second one is the normal case and refusing it was the defect.
     mockQualityVerification.findUnique.mockResolvedValue({ id: 'qv1' });
+    mockQualityVerification.create.mockResolvedValue({ id: 'qv2' });
 
     await expect(
       service.createVerification(
-        { assignment_id: 'a1', score: 80 } as any,
+        { assignment_id: 'a1', score: 80, room_number: '413' } as any,
         { userId: 'u1', role: 'admin' },
         PHOTO_FIXTURE
       )
-    ).rejects.toMatchObject({ name: 'ConflictError' });
+    ).resolves.toBeDefined();
 
-    expect(mockQualityVerification.create).not.toHaveBeenCalled();
+    expect(mockQualityVerification.create).toHaveBeenCalled();
   });
 
-  it('maps a P2002 race on create() to ConflictError (409) instead of 500', async () => {
+  it('re-throws a P2002 rather than mistranslating it as a duplicate check', async () => {
+    // There is no unique constraint on assignment_id any more, so a P2002 here
+    // would mean a NEW one added without updating the handler. Reporting it as
+    // "already inspected" would send a checker hunting a duplicate that does
+    // not exist.
     mockQualityVerification.findUnique.mockResolvedValue(null);
 
     mockQualityVerification.create.mockRejectedValue(
@@ -308,11 +316,11 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
 
     await expect(
       service.createVerification(
-        { assignment_id: 'a1', score: 80 } as any,
+        { assignment_id: 'a1', score: 80, room_number: '412' } as any,
         { userId: 'u1', role: 'admin' },
         PHOTO_FIXTURE
       )
-    ).rejects.toMatchObject({ name: 'ConflictError' });
+    ).rejects.toMatchObject({ code: 'P2002' });
   });
 
   it('re-throws non-P2002 errors from create() unchanged', async () => {
@@ -321,7 +329,7 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
 
     await expect(
       service.createVerification(
-        { assignment_id: 'a1', score: 80 } as any,
+        { assignment_id: 'a1', score: 80, room_number: '412' } as any,
         { userId: 'u1', role: 'admin' },
         PHOTO_FIXTURE
       )
@@ -352,7 +360,7 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
     mockQualityVerification.create.mockResolvedValue({ id: 'qv1', status: 'PASSED' });
 
     await service.createVerification(
-      { assignment_id: 'a1', score: 80 } as any,
+      { assignment_id: 'a1', score: 80, room_number: '412' } as any,
       { userId: 'u1', role: 'admin' },
         PHOTO_FIXTURE
     );
@@ -369,7 +377,7 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
     mockQualityVerification.create.mockResolvedValue({ id: 'qv2', status: 'NEEDS_REWORK' });
 
     await service.createVerification(
-      { assignment_id: 'a1', score: 50 } as any,
+      { assignment_id: 'a1', room_number: '412', score: 50 } as any,
       { userId: 'u1', role: 'admin' },
         PHOTO_FIXTURE
     );
@@ -383,7 +391,7 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
 
     await expect(
       service.createVerification(
-        { assignment_id: 'a1', score: 80 } as any,
+        { assignment_id: 'a1', score: 80, room_number: '412' } as any,
         { userId: 'u1', role: 'admin' },
         PHOTO_FIXTURE
       )
@@ -448,6 +456,7 @@ describe('Quality Zod validation — recordInspection (P2-03)', () => {
     const result = RecordInspectionSchema.safeParse({
       assignment_id: 'a1',
       worker_id: 'w1',
+      room_number: '412',
       score: 0,
       outcome: 'complete',
     });
@@ -459,6 +468,7 @@ describe('Quality Zod validation — recordInspection (P2-03)', () => {
     const result = RecordInspectionSchema.safeParse({
       assignment_id: 'a1',
       worker_id: 'w1',
+      room_number: '412',
       score: 100,
       outcome: 'complete',
     });
@@ -483,7 +493,11 @@ describe('Quality recordInspection — duplicate handling (P1-02)', () => {
     });
   });
 
-  it('maps a Prisma P2002 from the inspection write to a ConflictError', async () => {
+  it('re-throws a P2002 from the inspection write rather than mistranslating it', async () => {
+    // Same reasoning as the createVerification case above: recordInspection
+    // writes to a table with no unique constraint on assignment_id since
+    // 2026-08-29, so a P2002 is a signal about the schema, not a duplicate the
+    // checker can do anything about.
     mockQualityVerification.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
@@ -493,16 +507,11 @@ describe('Quality recordInspection — duplicate handling (P1-02)', () => {
 
     await expect(
       service.recordInspection(
-        { assignment_id: 'a1', worker_id: 'w1', score: 80, outcome: 'complete' } as any,
+        { assignment_id: 'a1', worker_id: 'w1', score: 80, outcome: 'complete', room_number: '412' } as any,
         { userId: 'u1', role: 'admin' },
         RATING_PHOTO
       )
-    ).rejects.toMatchObject({
-      name: 'ConflictError',
-      // One record per assignment since the Rating merge (2026-08-29), so one
-      // message rather than one per model.
-      message: 'This assignment has already been inspected',
-    });
+    ).rejects.toMatchObject({ code: 'P2002' });
   });
 });
 
@@ -511,37 +520,31 @@ describe('Quality recordInspection — worker notification (GAP-1)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // Not just clearAllMocks: that resets call history, NOT an implementation
-    // a previous describe installed with mockRejectedValue. Without this the
+    // Not just clearAllMocks: it resets call history, NOT an implementation a
+    // previous describe installed with mockRejectedValue. Without this the
     // P2002 fixture above leaks forward and fails this block for the wrong
-    // reason.
+    // reason -- which it did, twice.
     mockQualityVerification.create.mockReset();
     mockQualityVerification.create.mockResolvedValue({ id: 'qv1' });
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
-      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
-      // shift the worker has not begun (owner decision 2026-08-29).
       status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
     mockWorkerAssignment.count.mockResolvedValue(1);
     mockWorkerAssignment.findFirst.mockResolvedValue(null);
-    mockAttendance_count();
-    mockRating.create.mockResolvedValue({ id: 'r1' });
-    mockRating.aggregate.mockResolvedValue({ _avg: { score: 80 }, _count: 1 });
-    mockPrisma.workerOverallRating.upsert.mockResolvedValue({});
-    mockNotification.create.mockResolvedValue({ id: 'n1' });
+    mockQualityVerification.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
+    mockQualityVerification.findMany.mockResolvedValue([]);
+    mockWorkerOverallRating.upsert.mockResolvedValue({});
+    mockWorkerOverallRating.findUnique.mockResolvedValue(null);
+    mockPrisma.attendance.count.mockResolvedValue(0 as never);
   });
-
-  function mockAttendance_count() {
-    (mockPrisma.attendance.count as jest.Mock).mockResolvedValue(1 as never);
-  }
 
   it('emits one notification to the inspected worker after a successful inspection', async () => {
     await service.recordInspection(
-      { assignment_id: 'a1', worker_id: 'w1', score: 80, outcome: 'complete' } as any,
+      { assignment_id: 'a1', worker_id: 'w1', score: 80, outcome: 'complete', room_number: '412' } as any,
       { userId: 'u1', role: 'admin' },
         RATING_PHOTO
     );
@@ -603,7 +606,7 @@ describe('Quality recordInspection — WorkerOverallRating single-writer aggrega
     mockWorkerAssignment.findFirst.mockResolvedValue({ completed_at: lastCompletedAt });
 
     await service.recordInspection(
-      { assignment_id: 'a1', worker_id: 'w1', score: 72, outcome: 'complete' } as any,
+      { assignment_id: 'a1', worker_id: 'w1', room_number: '412', score: 72, outcome: 'complete' } as any,
       { userId: 'u1', role: 'admin' },
         RATING_PHOTO
     );

@@ -49,6 +49,8 @@ export default function QualityVerificationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const router = useRouter();
+  // Required since 2026-08-29, same rule as the main inspection flow.
+  const [roomNumber, setRoomNumber] = useState('');
   const [score, setScore] = useState(80);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -61,6 +63,10 @@ export default function QualityVerificationScreen() {
     // CRR §15: the photo accompanies the rating. Checked here so the checker
     // is told before a round-trip over hotel wifi; the server enforces it too
     // and stays authoritative.
+    if (roomNumber.trim() === '') {
+      Alert.alert(t('errors.title'), t('quality.roomRequired'));
+      return;
+    }
     if (picker.photos.length === 0) {
       Alert.alert(t('errors.title'), t('quality.photoRequired'));
       return;
@@ -68,7 +74,7 @@ export default function QualityVerificationScreen() {
     setSaving(true);
     try {
       const verification = await api.quality.createVerification(
-        { assignment_id: id, score, notes: notes || undefined },
+        { assignment_id: id, room_number: roomNumber.trim(), score, notes: notes || undefined },
         picker.photos
       );
       // Route to the evidence screen rather than just dismissing. Two reasons:
@@ -169,6 +175,25 @@ export default function QualityVerificationScreen() {
     <>
       <Stack.Screen options={{ title: t('nav.qualityCheck'), headerShown: true }} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {/* NOTE: this screen is a second, older inspection writer, reachable
+            only by deep link -- the live flow is inspection/select-worker ->
+            rating/[id], which also captures the checklist and the
+            complete/rework decision. Kept correct rather than left to 422,
+            but it should be retired: two writers producing different shapes of
+            the same record is how inconsistent data gets in. */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t('quality.roomTitle')}</Text>
+          <TextInput
+            style={styles.notesInput}
+            placeholder={t('quality.roomPlaceholder')}
+            placeholderTextColor={theme.textSecondary}
+            value={roomNumber}
+            onChangeText={setRoomNumber}
+            maxLength={64}
+            autoCapitalize="characters"
+          />
+        </View>
+
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t('fields.score0to100')}</Text>
           <View style={styles.scoreRow}>

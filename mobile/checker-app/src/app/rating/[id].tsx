@@ -46,6 +46,9 @@ export default function RatingScreen() {
   const [error, setError] = useState<string | null>(null);
   const picker = usePhotoPicker();
 
+  // Required (owner decision, 2026-08-29): a shift carries one check per room,
+  // so a check that does not say which room cannot be acted on or found.
+  const [roomNumber, setRoomNumber] = useState('');
   const [overallRaw, setOverallRaw] = useState('');
   const overall = overallRaw.trim() === '' ? null : Number(overallRaw);
 
@@ -79,6 +82,13 @@ export default function RatingScreen() {
       setError(t('quality.workerUnknown'));
       return;
     }
+    // Checked before the photos are read: a missing room is the cheapest
+    // failure to surface, and finding out after a multi-megabyte upload over
+    // hotel wifi is the expensive one.
+    if (roomNumber.trim() === '') {
+      setError(t('quality.roomRequired'));
+      return;
+    }
     // The rework gate, re-checked at submit rather than trusted from the
     // disabled button: `overall` and `comment` are free-text state and the
     // button's disabled prop is a render-time snapshot.
@@ -102,6 +112,7 @@ export default function RatingScreen() {
         {
           assignment_id: id,
           worker_id: workerId,
+          room_number: roomNumber.trim(),
           score: overall,
           comment: comment || undefined,
           criteria_scores,
@@ -148,6 +159,21 @@ export default function RatingScreen() {
                 : t('quality.overallScore', { score: overall })
             }
           />
+
+          <SectionHeader title={t('quality.roomTitle')} />
+          <Card>
+            <TextInput
+              value={roomNumber}
+              onChangeText={setRoomNumber}
+              placeholder={t('quality.roomPlaceholder')}
+              placeholderTextColor={theme.textSecondary}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={64}
+              accessibilityLabel={t('quality.roomTitle')}
+              style={[styles.scoreInput, { color: theme.text, borderColor: theme.border }]}
+            />
+          </Card>
 
           <SectionHeader title={t('quality.checklistTitle')} />
           <Card style={styles.checklist}>

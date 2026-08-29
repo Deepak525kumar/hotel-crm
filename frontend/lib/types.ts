@@ -994,6 +994,13 @@ export interface QualityVerification {
 /** Body of `POST /quality/verifications`. */
 export interface CreateVerificationInput {
   assignment_id: string;
+  /**
+   * REQUIRED since 2026-08-29. Not optional-with-a-default: the server rejects
+   * a check without one, and leaving it optional here is what let the web's
+   * own verification modal stop working silently -- tsc had nothing to say,
+   * and no test exercises the real schema from this side.
+   */
+  room_number: string;
   score: number;
   notes?: string;
   /** TREQ-005 checklist. Lives on the check since the Rating merge (2026-08-29). */
@@ -1029,39 +1036,7 @@ export type RatingCriteriaScores = Partial<Record<InspectionChecklistItem, numbe
   /** @deprecated legacy, read-only */ attitude?: number;
 };
 
-/**
- * Matches backend `Rating` (Prisma model) exactly, returned raw. `score` is
- * 0-100 (rescaled from 1-5 stars by ADR-026). One entry per assignment; a
- * second POST 409s (ConflictError).
- */
-export interface Rating {
-  id: string;
-  assignment_id: string;
-  hotel_id: string;
-  worker_id: string;
-  rated_by_id: string;
-  score: number;
-  comment: string | null;
-  criteria_scores: RatingCriteriaScores | null;
-  /**
-   * CRR §15 photo evidence (2026-08-24). S3 KEYS, not URLs — presigned URLs
-   * expire in 15 minutes, so they are minted on demand by
-   * `qualityApi.ratingPhotos()` rather than stored. Same shape and same
-   * reasoning as `QualityVerification.photo_urls`.
-   */
-  photo_urls: string[];
-  created_at: string;
-  updated_at: string;
-}
 
-/** Body of `POST /quality/ratings`. */
-export interface CreateRatingInput {
-  assignment_id: string;
-  worker_id: string;
-  score: number;
-  comment?: string;
-  criteria_scores?: RatingCriteriaScores;
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Attendance                                                                */
