@@ -77,8 +77,6 @@ export default function AssignmentDetailPage() {
   const [verificationOpen, setVerificationOpen] = useState(false);
   const [reworkOpen, setReworkOpen] = useState(false);
   const [loggedVerification, setLoggedVerification] = useState<QualityVerification | null>(null);
-  const [ratingOpen, setRatingOpen] = useState(false);
-  const [loggedRating, setLoggedRating] = useState<Rating | null>(null);
 
   const start = () => {
     // Workers must use the Attendance module (Bug 35): calling
@@ -502,22 +500,11 @@ export default function AssignmentDetailPage() {
           )}
         </Card>
 
-        <Card>
-          <CardContent className="flex items-center justify-between gap-4">
-            <div className="text-sm text-gray-600 dark:text-gray-300">
-              {loggedRating
-                ? `Rated — score ${loggedRating.score}/100.`
-                : "Rate the worker's performance for this assignment."}
-            </div>
-            {loggedRating ? (
-              <Badge tone="success">{t("status.rated")}</Badge>
-            ) : (
-              <Button variant="outline" onClick={() => setRatingOpen(true)} className="shrink-0">
-                {t("common.rate")}
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+        {/* The separate "Rate worker" card was removed 2026-08-29 with the
+            Rating model. One visit wrote two records carrying the same score
+            and the same photographs; the checklist that made the rating
+            distinct now travels with the verification above, so this page has
+            one inspection action instead of two that could disagree. */}
       </RoleGate>
 
       <FormError>{action.error}</FormError>
@@ -594,13 +581,6 @@ export default function AssignmentDetailPage() {
         />
       )}
 
-      <CreateRatingModal
-        assignmentId={id}
-        workerId={assignment.worker_id}
-        open={ratingOpen}
-        onClose={() => setRatingOpen(false)}
-        onCreated={setLoggedRating}
-      />
     </div>
   );
 }
@@ -969,6 +949,14 @@ function CreateVerificationModal({
   const { t } = useTranslation();
   const [score, setScore] = useState("");
   const [notes, setNotes] = useState("");
+  // TREQ-005: one entry per confirmed checklist item, driven off the shared
+  // constant rather than hand-declared hooks -- adding or removing an item is
+  // then a one-line change and cannot leave the form and the API disagreeing.
+  //
+  // Moved here from the separate rating modal when Rating was merged into
+  // QualityVerification (2026-08-29). Without it the web would have lost the
+  // ability to record a checklist at all, which the mobile app still can.
+  const [criteria, setCriteria] = useState<Partial<Record<InspectionChecklistItem, string>>>({});
   const [photos, setPhotos] = useState<File[]>([]);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const create = useAsyncAction();
@@ -976,6 +964,7 @@ function CreateVerificationModal({
   const reset = () => {
     setScore("");
     setNotes("");
+    setCriteria({});
     setPhotos([]);
     setFieldError(null);
   };
@@ -1018,6 +1007,20 @@ function CreateVerificationModal({
       return;
     }
 
+    // Each checklist entry is optional, but one that IS filled in must be a
+    // whole 0-100 -- the server rejects anything else, and finding that out
+    // after a multi-megabyte photo upload is a poor trade.
+    const criteriaScores: Partial<Record<InspectionChecklistItem, number>> = {};
+    for (const [item, raw] of Object.entries(criteria)) {
+      if (raw === undefined || raw === "") continue;
+      const value = Number(raw);
+      if (!Number.isInteger(value) || value < 0 || value > 100) {
+        setFieldError(t("quality.checklistItemRange"));
+        return;
+      }
+      criteriaScores[item as InspectionChecklistItem] = value;
+    }
+
     create.run(
       () =>
         qualityApi.createVerification(
@@ -1025,6 +1028,7 @@ function CreateVerificationModal({
             assignment_id: assignmentId,
             score: parsed,
             notes: notes.trim() || undefined,
+            criteria_scores: criteriaScores,
           },
           photos,
         ),
@@ -1064,6 +1068,24 @@ function CreateVerificationModal({
           value={score}
           onChange={(e) => setScore(e.target.value)}
         />
+
+        {/* TREQ-005 checklist. Moved here from the separate rating modal
+            when the two records merged (2026-08-29); every item is
+            optional. */}
+          {INSPECTION_CHECKLIST_ITEMS.map((item) => (
+            <Input
+              key={item}
+              label={t(`checklist.${item}`)}
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={criteria[item] ?? ""}
+              onChange={(e) =>
+                setCriteria((prev) => ({ ...prev, [item]: e.target.value }))
+              }
+            />
+          ))}
         <p className="text-xs text-gray-500 dark:text-gray-400">
           {t("assignments.scoreDerivedHint")}
         </p>
@@ -1116,209 +1138,7 @@ function CreateVerificationModal({
   );
 }
 
-function CreateRatingModal({
-  assignmentId,
-  workerId,
-  open,
-  onClose,
-  onCreated,
-}: {
-  assignmentId: string;
-  workerId: string;
-  open: boolean;
-  onClose: () => void;
-  onCreated: (rating: Rating) => void;
-}) {
-  const { t } = useTranslation();
-  const [score, setScore] = useState("");
-  const [comment, setComment] = useState("");
-  // TREQ-005: one entry per confirmed checklist item, driven off the shared
-  // constant rather than three hand-declared useState hooks -- adding or
-  // removing an item is then a one-line change in lib/types.ts and cannot
-  // leave the form and the API disagreeing about the set.
-  const [criteria, setCriteria] = useState<Partial<Record<InspectionChecklistItem, string>>>({});
-  // CRR §15 (2026-08-24): the rating carries its own photo evidence. Same
-  // limits and same picker shape as CreateVerificationModal above.
-  const [photos, setPhotos] = useState<File[]>([]);
-  const [fieldError, setFieldError] = useState<string | null>(null);
-  const create = useAsyncAction();
+// CreateRatingModal was removed 2026-08-29 with the Rating model. Its
+// checklist and comment now live in CreateVerificationModal above, which
+// writes the single record an inspection produces.
 
-  const reset = () => {
-    setScore("");
-    setComment("");
-    setCriteria({});
-    setPhotos([]);
-    setFieldError(null);
-  };
-
-  const onPickPhotos = (files: FileList | null) => {
-    setFieldError(null);
-    if (!files) return;
-    const next = [...photos, ...Array.from(files)];
-    if (next.length > MAX_VERIFICATION_PHOTOS) {
-      setFieldError(t("quality.tooManyPhotos", { max: MAX_VERIFICATION_PHOTOS }));
-      return;
-    }
-    const tooBig = next.find((f) => f.size > MAX_VERIFICATION_PHOTO_BYTES);
-    if (tooBig) {
-      setFieldError(
-        t("quality.photoTooLarge", {
-          name: tooBig.name,
-          mb: Math.floor(MAX_VERIFICATION_PHOTO_BYTES / (1024 * 1024)),
-        }),
-      );
-      return;
-    }
-    setPhotos(next);
-  };
-
-  const handleClose = () => {
-    if (create.pending) return;
-    reset();
-    onClose();
-  };
-
-  const onSubmit = () => {
-    setFieldError(null);
-    const parsed = Number(score);
-    if (score === "" || !Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
-      setFieldError(t("assignments.scoreWholeNumber"));
-      return;
-    }
-
-    const criteriaScores: Partial<Record<InspectionChecklistItem, number>> = {};
-    for (const item of INSPECTION_CHECKLIST_ITEMS) {
-      const raw = criteria[item];
-      if (raw === undefined || raw === "") continue;
-      const value = Number(raw);
-      // Mirrors the API's own bounds (0-100 integers). Submitting an
-      // out-of-range item used to 400 with a message naming a field the
-      // checker cannot see, after they had filled the whole form in.
-      if (!Number.isInteger(value) || value < 0 || value > 100) {
-        setFieldError(t("assignments.checklistItemRange"));
-        return;
-      }
-      criteriaScores[item] = value;
-    }
-
-    // CRR §15: the photo accompanies the rating. Checked client-side so the
-    // checker is told before a round-trip; the server enforces it too and
-    // stays authoritative.
-    if (photos.length === 0) {
-      setFieldError(t("quality.photoRequired"));
-      return;
-    }
-
-    create.run(
-      () =>
-        qualityApi.createRating(
-          {
-            assignment_id: assignmentId,
-            worker_id: workerId,
-            score: parsed,
-            comment: comment.trim() || undefined,
-            criteria_scores: Object.keys(criteriaScores).length > 0 ? criteriaScores : undefined,
-          },
-          photos,
-        ),
-      {
-        onSuccess: (rating) => {
-          onCreated(rating);
-          reset();
-          onClose();
-        },
-      },
-    );
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t("assignments.rateWorkerTitle")}
-      footer={
-        <>
-          <Button variant="outline" onClick={handleClose} disabled={create.pending}>
-            {t("common.cancel")}
-          </Button>
-          <Button onClick={onSubmit} loading={create.pending}>
-            {t("common.rate")}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Input
-          label={t("fields.score0to100")}
-          type="number"
-          min={0}
-          max={100}
-          step={1}
-          value={score}
-          onChange={(e) => setScore(e.target.value)}
-        />
-        <div className="grid grid-cols-2 gap-3">
-          {INSPECTION_CHECKLIST_ITEMS.map((item) => (
-            <Input
-              key={item}
-              label={t(`checklist.${item}`)}
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={criteria[item] ?? ""}
-              onChange={(e) =>
-                setCriteria((prev) => ({ ...prev, [item]: e.target.value }))
-              }
-            />
-          ))}
-        </div>
-        {/* CRR §15: photo evidence accompanies the rating. Unlike the
-            verification modal's picker, this one is REQUIRED -- Rating is the
-            score that feeds WorkerOverallRating, so an unevidenced rating
-            would move a worker's standing with nothing backing it. */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium">{t("quality.photos")}</label>
-          <input
-            type="file"
-            accept={ACCEPTED_PHOTO_TYPES}
-            multiple
-            // Same rationale as the verification picker: honoured on mobile
-            // browsers, ignored on desktop, so one control serves a checker
-            // standing in the room and a manager at a desk.
-            capture="environment"
-            onChange={(e) => onPickPhotos(e.target.files)}
-            className="block w-full text-sm"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {t("quality.photosHint", { max: MAX_VERIFICATION_PHOTOS })}
-          </p>
-          {photos.length > 0 && (
-            <ul className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-              {photos.map((f, i) => (
-                <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2">
-                  <span className="truncate">{f.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => setPhotos(photos.filter((_, j) => j !== i))}
-                    className="shrink-0 text-red-600 hover:underline dark:text-red-400"
-                  >
-                    {t("common.remove")}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <Textarea
-          label={t("fields.commentOptional")}
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          maxLength={1000}
-          rows={3}
-        />
-        <FormError>{fieldError ?? create.error}</FormError>
-      </div>
-    </Modal>
-  );
-}

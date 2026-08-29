@@ -133,7 +133,7 @@ import {
   ABSENCE_CANCEL_REASON_SELF,
   ABSENCE_CANCEL_REASON_MANAGER,
 } from '../config/constants.js';
-import { CreateRatingSchema } from '../modules/quality/types.js';
+import { RecordInspectionSchema } from '../modules/quality/types.js';
 import { Prisma } from '@prisma/client';
 
 function makeReq(
@@ -224,7 +224,7 @@ describe('Quality Zod validation — createVerification (B3)', () => {
   });
 });
 
-describe('Quality Zod validation — createRating (P2-03)', () => {
+describe('Quality Zod validation — recordInspection (P2-03)', () => {
   let controller: QualityController;
 
   beforeEach(() => {
@@ -233,33 +233,33 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
   });
 
   it('rejects missing worker_id with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', score: 80 });
+    const req = makeReq({ assignment_id: 'a1', score: 80, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('rejects score out of range (>100) with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 101 });
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 101, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('rejects non-integer score with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 85.5 });
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 85.5, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
@@ -393,7 +393,7 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
   });
 });
 
-describe('Quality Zod validation — createRating (P2-03)', () => {
+describe('Quality Zod validation — recordInspection (P2-03)', () => {
   let controller: QualityController;
 
   beforeEach(() => {
@@ -402,40 +402,40 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
   });
 
   it('rejects missing worker_id with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', score: 80 });
+    const req = makeReq({ assignment_id: 'a1', score: 80, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('rejects score out of range (>100) with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 101 });
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 101, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('rejects non-integer score with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 85.5 });
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 85.5, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('rejects score below range (boundary score = -1) at the schema level', () => {
-    const result = CreateRatingSchema.safeParse({
+    const result = RecordInspectionSchema.safeParse({
       assignment_id: 'a1',
       worker_id: 'w1',
       score: -1,
@@ -445,27 +445,29 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
   });
 
   it('accepts score at the boundary (score = 0) at the schema level', () => {
-    const result = CreateRatingSchema.safeParse({
+    const result = RecordInspectionSchema.safeParse({
       assignment_id: 'a1',
       worker_id: 'w1',
       score: 0,
+      outcome: 'complete',
     });
 
     expect(result.success).toBe(true);
   });
 
   it('accepts score at the boundary (score = 100) at the schema level', () => {
-    const result = CreateRatingSchema.safeParse({
+    const result = RecordInspectionSchema.safeParse({
       assignment_id: 'a1',
       worker_id: 'w1',
       score: 100,
+      outcome: 'complete',
     });
 
     expect(result.success).toBe(true);
   });
 });
 
-describe('Quality createRating — duplicate rating handling (P1-02)', () => {
+describe('Quality recordInspection — duplicate handling (P1-02)', () => {
   let service: QualityService;
 
   beforeEach(() => {
@@ -481,8 +483,8 @@ describe('Quality createRating — duplicate rating handling (P1-02)', () => {
     });
   });
 
-  it('maps a Prisma P2002 from rating.create() to a ConflictError', async () => {
-    mockRating.create.mockRejectedValue(
+  it('maps a Prisma P2002 from the inspection write to a ConflictError', async () => {
+    mockQualityVerification.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
         clientVersion: 'test',
@@ -490,23 +492,31 @@ describe('Quality createRating — duplicate rating handling (P1-02)', () => {
     );
 
     await expect(
-      service.createRating(
-        { assignment_id: 'a1', worker_id: 'w1', score: 80 } as any,
+      service.recordInspection(
+        { assignment_id: 'a1', worker_id: 'w1', score: 80, outcome: 'complete' } as any,
         { userId: 'u1', role: 'admin' },
         RATING_PHOTO
       )
     ).rejects.toMatchObject({
       name: 'ConflictError',
-      message: 'Rating already exists for this assignment',
+      // One record per assignment since the Rating merge (2026-08-29), so one
+      // message rather than one per model.
+      message: 'This assignment has already been inspected',
     });
   });
 });
 
-describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => {
+describe('Quality recordInspection — worker notification (GAP-1)', () => {
   let service: QualityService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Not just clearAllMocks: that resets call history, NOT an implementation
+    // a previous describe installed with mockRejectedValue. Without this the
+    // P2002 fixture above leaks forward and fails this block for the wrong
+    // reason.
+    mockQualityVerification.create.mockReset();
+    mockQualityVerification.create.mockResolvedValue({ id: 'qv1' });
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
@@ -529,9 +539,9 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
     (mockPrisma.attendance.count as jest.Mock).mockResolvedValue(1 as never);
   }
 
-  it('emits RATING_RECEIVED to the rated worker after a successful rating', async () => {
-    await service.createRating(
-      { assignment_id: 'a1', worker_id: 'w1', score: 80 } as any,
+  it('emits one notification to the inspected worker after a successful inspection', async () => {
+    await service.recordInspection(
+      { assignment_id: 'a1', worker_id: 'w1', score: 80, outcome: 'complete' } as any,
       { userId: 'u1', role: 'admin' },
         RATING_PHOTO
     );
@@ -539,7 +549,10 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
     expect(mockNotification.create).toHaveBeenCalledTimes(1);
     const payload = mockNotification.create.mock.calls[0][0].data;
     expect(payload.user_id).toBe('w1');
-    expect(payload.type).toBe('RATING_RECEIVED');
+    // RATING_RECEIVED went with the Rating model. One inspection now emits
+    // ONE notification carrying the outcome, rather than a rating message plus
+    // a verification message about the same visit.
+    expect(payload.type).toBe('QUALITY_VERIFICATION_SUBMITTED');
 
     // ADR-029 (GD-01, Epic 7 PR 7.3): the enqueue joins the same
     // transaction as the rating write and aggregate refresh — no more
@@ -550,11 +563,17 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
   });
 });
 
-describe('Quality createRating — WorkerOverallRating single-writer aggregate (GD-04)', () => {
+describe('Quality recordInspection — WorkerOverallRating single-writer aggregate (GD-04)', () => {
   let service: QualityService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Not just clearAllMocks: that resets call history, NOT an implementation
+    // a previous describe installed with mockRejectedValue. Without this the
+    // P2002 fixture above leaks forward and fails this block for the wrong
+    // reason.
+    mockQualityVerification.create.mockReset();
+    mockQualityVerification.create.mockResolvedValue({ id: 'qv1' });
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
@@ -583,8 +602,8 @@ describe('Quality createRating — WorkerOverallRating single-writer aggregate (
     const lastCompletedAt = new Date('2026-07-20T00:00:00Z');
     mockWorkerAssignment.findFirst.mockResolvedValue({ completed_at: lastCompletedAt });
 
-    await service.createRating(
-      { assignment_id: 'a1', worker_id: 'w1', score: 72 } as any,
+    await service.recordInspection(
+      { assignment_id: 'a1', worker_id: 'w1', score: 72, outcome: 'complete' } as any,
       { userId: 'u1', role: 'admin' },
         RATING_PHOTO
     );

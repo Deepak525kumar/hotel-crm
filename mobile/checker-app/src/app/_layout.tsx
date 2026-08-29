@@ -80,12 +80,6 @@ export default function RootLayout() {
               options={{ title: t('nav.qualityCheck'), headerShown: true }}
             />
             <Stack.Screen name="verification/[id]" options={{ headerShown: false }} />
-            {/* The rating's own evidence. Separate from verification/[id]
-                because the two are keyed by different records: rework is
-                assigned against a QualityVerification, never against a
-                Rating, so folding them together would give one screen a
-                primary action that is absent half the time. */}
-            <Stack.Screen name="rating-evidence/[id]" options={{ headerShown: false }} />
             {/* ADR-065: the onboarding gate is universal for non-Admin roles.
                 AuthGuard redirects a non-ACTIVE checker here. */}
             <Stack.Screen name="onboarding" options={{ headerShown: false }} />

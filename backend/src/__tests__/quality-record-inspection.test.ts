@@ -69,13 +69,14 @@ describe('RecordInspectionSchema (multipart)', () => {
 });
 
 describe('recordInspection writes one inspection, once', () => {
-  it('uploads the photos exactly once and shares the keys', () => {
-    // The whole point. Two uploadPhotos calls would restore the double upload
-    // the three-call client had; two different key arrays would mean two
-    // copies of the same photographs of the same room.
+  it('uploads the photos exactly once', () => {
+    // Two uploadPhotos calls would restore the double upload the three-call
+    // client had. The assertion that photoKeys was written to TWO records went
+    // with the Rating merge (2026-08-29) -- there is one record now, which is
+    // the stronger form of the same guarantee.
     const src = body();
     expect(src.match(/this\.uploadPhotos\(/g)).toHaveLength(1);
-    expect(src.match(/photo_urls: photoKeys/g)).toHaveLength(2);
+    expect(src.match(/photo_urls: photoKeys/g)).toHaveLength(1);
   });
 
   it('writes both records inside ONE transaction', () => {
@@ -83,7 +84,9 @@ describe('recordInspection writes one inspection, once', () => {
     expect(src.match(/\$transaction/g)).toHaveLength(1);
     const tx = src.slice(src.indexOf('$transaction'));
     expect(tx).toContain('tx.qualityVerification.create');
-    expect(tx).toContain('tx.rating.create');
+    // Was also `tx.rating.create` -- one visit wrote two rows until the models
+    // merged (2026-08-29).
+    expect(tx).not.toContain('tx.rating.create');
   });
 
   it('refreshes the rating aggregate inside that transaction (GD-04)', () => {

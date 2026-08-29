@@ -164,7 +164,10 @@ const CAPABILITY_ROUTES: Record<string, string[]> = {
   'C-22': ['employee-management:POST /hotels/:hotel_id/blocklist'],
   'C-23': ['job-requests:POST /', 'job-requests:PATCH /:id'],
   'C-24': ['assignments:POST /:id/rooms-completed'],
-  'C-27': ['quality:POST /verifications', 'quality:POST /ratings'],
+  // 'quality:POST /ratings' was removed 2026-08-29 with the Rating model;
+  // 'quality:POST /inspections' is the endpoint that replaced it and carries
+  // the identical C-27 gate.
+  'C-27': ['quality:POST /verifications', 'quality:POST /inspections'],
   'C-28': ['quality:GET /leaderboard'],
   'C-29': ['hr:POST /contracts', 'hr:POST /payroll'],
   'C-30': ['hr:GET /contracts'],

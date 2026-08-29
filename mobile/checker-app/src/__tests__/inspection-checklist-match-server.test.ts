@@ -6,7 +6,7 @@ import { INSPECTION_CHECKLIST_ITEMS } from '@/lib/inspection-checklist';
 /**
  * The client's checklist must equal the server's enum.
  *
- * CreateRatingSchema validates criteria_scores with z.enum(...), so any key
+ * RecordInspectionSchema validates criteria_scores with z.enum(...), so any key
  * this app invents is a 400 naming a field the checker cannot see, after they
  * have filled in the whole form. The identical drift already shipped once in
  * DocumentCategory -- reading both files is the only check that couples them.

@@ -1,8 +1,9 @@
-import {
-  INSPECTION_CHECKLIST_ITEMS,
-  type InspectionChecklistItem,
-} from './inspection-checklist.js';
+import { INSPECTION_CHECKLIST_ITEMS } from './inspection-checklist.js';
 import { z } from 'zod';
+
+const criteriaScoresShape = z
+  .record(z.enum(INSPECTION_CHECKLIST_ITEMS), z.coerce.number().int().min(0).max(100))
+  .optional();
 
 export const CreateQualityVerificationSchema = z.object({
   assignment_id: z.string().min(1),
@@ -18,9 +19,32 @@ export const CreateQualityVerificationSchema = z.object({
   // number through unchanged, and .int() still rejects "50.5" or "abc".
   score: z.coerce.number().int().min(0).max(100),
   notes: z.string().optional(),
+  // TREQ-005 checklist, accepted here since the Rating merge (2026-08-29):
+  // this endpoint is the web's inspection write, and without it the web could
+  // no longer record a checklist at all while mobile still could.
+  //
+  // Accepts BOTH shapes on purpose. The web posts multipart (a photo travels
+  // with it) and so JSON-stringifies the object into one field; a JSON caller
+  // sends the object itself. `.pipe` runs the same key/range validation over
+  // whichever arrived.
+  criteria_scores: z
+    .union([
+      z.string().transform((raw, ctx) => {
+        try {
+          return JSON.parse(raw) as unknown;
+        } catch {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'criteria_scores must be valid JSON' });
+          return z.NEVER;
+        }
+      }),
+      z.record(z.string(), z.unknown()),
+    ])
+    .pipe(criteriaScoresShape)
+    .optional(),
 });
 
 export interface CreateQualityVerificationRequest {
+  criteria_scores?: Record<string, number>;
   assignment_id: string;
   score: number; // 0-100
   notes?: string;
@@ -33,46 +57,10 @@ export interface CreateQualityVerificationRequest {
 // all, so the client JSON-stringifies it into one field. Mirrors
 // CreateQualityVerificationSchema's z.coerce.number() fix for `score` (that
 // endpoint hit the identical "multipart sends strings" defect first).
-const criteriaScoresShape = z
-  .record(z.enum(INSPECTION_CHECKLIST_ITEMS), z.coerce.number().int().min(0).max(100))
-  .optional();
+// CreateRatingSchema / CreateRatingRequest were removed 2026-08-29 with the
+// Rating model. The checklist they validated (`criteria_scores`) is now part
+// of RecordInspectionSchema below and lands on QualityVerification.
 
-export const CreateRatingSchema = z.object({
-  assignment_id: z.string().min(1),
-  worker_id: z.string().min(1),
-  score: z.coerce.number().int().min(0).max(100),
-  comment: z.string().optional(),
-  // TREQ-005: keys are the confirmed inspection checklist, not free-form.
-  // This was `z.record(z.string(), z.number())`, which accepted any key at
-  // all -- so the pre-pivot {punctuality, quality, attitude} triple validated
-  // happily and nothing ever surfaced the divergence from CONFIRMED §15.
-  // Values are 0-100 to match Rating.score's scale (ADR-026); the old schema
-  // accepted any number, including negatives and 5000.
-  criteria_scores: z.preprocess((val) => {
-    // JSON callers already send a real object; multipart callers send the
-    // same object JSON.stringify'd into one field. A malformed string is
-    // passed through unchanged so the record/enum validation below produces
-    // a normal field-level error instead of this preprocessor swallowing it.
-    if (typeof val === 'string') {
-      try {
-        return JSON.parse(val);
-      } catch {
-        return val;
-      }
-    }
-    return val;
-  }, criteriaScoresShape),
-});
-
-export interface CreateRatingRequest {
-  assignment_id: string;
-  worker_id: string;
-  score: number; // 0-100 (rescaled from 1-5 by ADR-026)
-  comment?: string;
-  criteria_scores?: Partial<Record<InspectionChecklistItem, number>>;
-}
-
-// ADR-035 (GD-11): leaderboard pagination is a MUST, default 25, max 100.
 export const ListLeaderboardQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   per_page: z.coerce.number().int().min(1).max(100).default(25),
@@ -109,6 +97,12 @@ export const RecordInspectionSchema = z.object({
   worker_id: z.string().min(1),
   score: z.coerce.number().int().min(0).max(100),
   comment: z.string().optional(),
+  // Piped through criteriaScoresShape, NOT a bare z.record(z.string(), ...).
+  // That shape restricts keys to INSPECTION_CHECKLIST_ITEMS; a permissive
+  // record would let a client invent checklist keys that then sit in the
+  // database forever, unreadable by any label the apps know how to render.
+  // It is also what mobile's inspection-checklist-match-server test reads to
+  // pin the two lists together.
   criteria_scores: z
     .string()
     .transform((raw, ctx) => {
@@ -119,7 +113,7 @@ export const RecordInspectionSchema = z.object({
         return z.NEVER;
       }
     })
-    .pipe(z.record(z.string(), z.coerce.number().int().min(0).max(100)))
+    .pipe(criteriaScoresShape)
     .optional(),
   outcome: z.enum(['complete', 'rework']),
   // Defaults to `comment` in the service: the checker app asks the question

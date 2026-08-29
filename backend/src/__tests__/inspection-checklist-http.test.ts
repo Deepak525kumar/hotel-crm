@@ -25,7 +25,7 @@ jest.mock('../modules/documents/storage.js', () => ({
  * failed, because the transport delivered a string (PR #495, multipart).
  *
  * So this drives Express -- real router, real express.json(), real validation,
- * real controller -- rather than calling the schema. POST /quality/ratings has
+ * real controller -- rather than calling the schema. POST /quality/inspections has
  * no multer on it (unlike /quality/verifications), so criteria_scores arrives
  * as genuine JSON numbers; this test is what makes that claim checkable
  * instead of a comment, and it fails if the route is ever moved to multipart
@@ -61,15 +61,17 @@ jest.mock('../lib/db.js', () => ({
         status: 'COMPLETED',
       }),
     },
+    // The duplicate pre-check recordInspection runs before writing.
+    qualityVerification: { findUnique: async () => null },
     $transaction: async (fn: any) =>
       fn({
-        // refreshWorkerOverallRating() reads QualityVerification for the quality
-        // half of the rating (2026-08-29). Neutral fixture: no checks recorded.
-        qualityVerification: { aggregate: async () => ({ _avg: { score: null }, _count: 0 }), findMany: async () => [] },
-        rating: {
+        // The checklist is captured off qualityVerification.create since the
+        // Rating merge (2026-08-29) -- this used to watch rating.create, which
+        // is the write that no longer happens.
+        qualityVerification: {
           create: async ({ data }: any) => {
             created.push(data);
-            return { id: 'rt_1', ...data, created_at: new Date(), updated_at: new Date() };
+            return { id: 'qv_1', ...data, created_at: new Date(), updated_at: new Date() };
           },
           aggregate: async () => ({ _avg: { score: 80 }, _count: 1 }),
           findMany: async () => [{ score: 80 }],
@@ -139,13 +141,14 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
 
   it('accepts the confirmed checklist and persists it verbatim', async () => {
     const res = await request(makeApp())
-      .post('/quality/ratings')
+      .post('/quality/inspections')
       // Multipart, and criteria_scores JSON-stringified into one field:
       // CRR §15's photo is enforced on ratings as of 2026-08-24, and
       // multipart's flat field model cannot carry a nested object.
       .field('assignment_id', 'asg_1')
       .field('worker_id', 'w1')
       .field('score', '80')
+      .field('outcome', 'complete')
       .field('criteria_scores', JSON.stringify({ dust: 90, bathroom: 70, bed_linen: 100 }))
       .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
 
@@ -157,11 +160,12 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
 
   it('rejects the pre-pivot keys at the HTTP boundary', async () => {
     const res = await request(makeApp())
-      .post('/quality/ratings')
+      .post('/quality/inspections')
       .send({
         assignment_id: 'asg_1',
         worker_id: 'w1',
         score: 80,
+        outcome: 'complete',
         criteria_scores: { punctuality: 90 },
       });
 
@@ -171,11 +175,12 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
 
   it('rejects an out-of-range checklist value', async () => {
     const res = await request(makeApp())
-      .post('/quality/ratings')
+      .post('/quality/inspections')
       .send({
         assignment_id: 'asg_1',
         worker_id: 'w1',
         score: 80,
+        outcome: 'complete',
         criteria_scores: { dust: 5000 },
       });
 
@@ -184,10 +189,11 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
 
   it('still accepts a rating with no checklist at all', async () => {
     const res = await request(makeApp())
-      .post('/quality/ratings')
+      .post('/quality/inspections')
       .field('assignment_id', 'asg_1')
       .field('worker_id', 'w1')
       .field('score', '80')
+      .field('outcome', 'complete')
       .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(201);
@@ -195,7 +201,7 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
 
   it('rejects a rating with no photo (CRR §15)', async () => {
     const res = await request(makeApp())
-      .post('/quality/ratings')
+      .post('/quality/inspections')
       .send({ assignment_id: 'asg_1', worker_id: 'w1', score: 80 });
 
     expect(res.status).toBe(422);

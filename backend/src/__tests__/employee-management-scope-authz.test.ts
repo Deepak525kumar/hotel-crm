@@ -160,6 +160,9 @@ const mockDb = {
     findUnique: async ({ where }: any) => hotelGroups[where.id] ?? null,
   },
   attendance: { findMany: async () => [] },
+  // The worker's inspection history reads checks since the Rating merge
+  // (2026-08-29).
+  qualityVerification: { findMany: async () => [] },
   rating: { findMany: async () => [] },
   workerAssignment: { findMany: async () => [] },
   auditLog: {

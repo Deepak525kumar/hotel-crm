@@ -36,7 +36,10 @@ describe('the started-shift guard exists and is applied everywhere', () => {
     expect(head).not.toContain('ACTIVE_ASSIGNMENT_STATUSES');
   });
 
-  it.each(['recordInspection', 'createVerification', 'createRating'])(
+  // createRating was removed with the Rating model (2026-08-29); the two
+  // remaining writers are the combined mobile path and the web's single-record
+  // one.
+  it.each(['recordInspection', 'createVerification'])(
     '%s calls it',
     (method) => {
       expect(bodyOf(method)).toContain('this.assertShiftHasStarted(assignment)');

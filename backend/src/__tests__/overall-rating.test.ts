@@ -106,9 +106,16 @@ describe('the aggregate reads checks, and only settled shifts', () => {
   });
 
   it('scopes checks to the inspected WORKER, not the checker', () => {
-    // QualityVerification has no worker_id; the worker is reached through the
-    // assignment. Filtering on verified_by_id would score the checker.
-    expect(refresh()).toContain('assignment: { worker_id }');
+    // worker_id is a real column since the Rating merge (2026-08-29), which
+    // denormalized it precisely so this stays index-backed instead of joining
+    // through the assignment on a hot path. Filtering on verified_by_id would
+    // score the checker instead of the person inspected.
+    // Matched as a query FIELD, not as the bare word: the function's own
+    // comment explains why verified_by_id is deliberately NOT filtered, and a
+    // substring check turns that explanation into a failure.
+    const body = refresh();
+    expect(body).toContain('where: { worker_id }');
+    expect(body).not.toMatch(/verified_by_id:\s/);
   });
 
   it('counts only COMPLETED and NO_SHOW as due', () => {

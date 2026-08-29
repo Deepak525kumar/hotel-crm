@@ -88,7 +88,7 @@ describe('leaderboard tier never contradicts the score shown beside it', () => {
 });
 
 describe('recency window has an index that makes it bounded', () => {
-  it('declares the compound (worker_id, created_at) index on Rating', () => {
+  it('declares the compound (worker_id, created_at) index on QualityVerification', () => {
     // refreshWorkerOverallRating() runs
     //   WHERE worker_id = ? ORDER BY created_at DESC LIMIT 10
     // inside a transaction holding FOR UPDATE on the worker's User row.
@@ -107,15 +107,19 @@ describe('recency window has an index that makes it bounded', () => {
       'utf8'
     );
     // Sliced on a line that is exactly `}` rather than the next `}`
-    // character: model Rating carries a field comment containing a literal
-    // brace, which silently truncated an earlier version of this assertion to
-    // a fragment that excluded the indexes -- a test that failed for the wrong
+    // character: the model carries field comments containing literal braces,
+    // which silently truncated an earlier version of this assertion to a
+    // fragment that excluded the indexes -- a test that failed for the wrong
     // reason and would equally have PASSED for the wrong reason.
+    //
+    // Reads QualityVerification since the Rating merge (2026-08-29). The index
+    // was carried across with the worker_id column in that migration, for the
+    // identical query on the identical hot path.
     const lines = schema.split('\n');
-    const start = lines.findIndex((l) => l.trim() === 'model Rating {');
+    const start = lines.findIndex((l) => l.trim() === 'model QualityVerification {');
     expect(start).toBeGreaterThan(-1);
     const end = lines.findIndex((l, i) => i > start && l.trim() === '}');
-    const ratingModel = lines.slice(start, end).join('\n');
-    expect(ratingModel).toContain('@@index([worker_id, created_at])');
+    const model = lines.slice(start, end).join('\n');
+    expect(model).toContain('@@index([worker_id, created_at])');
   });
 });

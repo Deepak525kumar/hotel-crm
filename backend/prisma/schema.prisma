@@ -392,8 +392,10 @@ model User {
   attendance_records                             Attendance[]                       @relation("attendee")
   attendance_verified                            Attendance[]                       @relation("attendance_verifier")
   verifications_performed                        QualityVerification[]              @relation("verifier")
-  ratings_received                               Rating[]                           @relation("rated_worker")
-  ratings_given                                  Rating[]                           @relation("rater")
+  // Was ratings_received/ratings_given on the Rating model, merged into
+  // QualityVerification 2026-08-29. `verifications_performed` above is the
+  // other side (the checker); this is the worker being inspected.
+  inspections_received                           QualityVerification[]              @relation("inspected_worker")
   overall_rating                                 WorkerOverallRating?
   notifications                                  Notification[]
   push_tokens                                    PushToken[]
@@ -624,7 +626,6 @@ model Hotel {
   assignments                WorkerAssignment[]
   attendance                 Attendance[]
   verifications              QualityVerification[]
-  ratings                    Rating[]
   notifications              Notification[]
   // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-005 / RULE-EMP-07): hotel blocklist entries.
   blocklist_entries          EmployeeBlocklistEntry[]        @relation("hotel_blocklist")
@@ -1038,7 +1039,6 @@ model WorkerAssignment {
   // one rooms-completed entry (ADR-028)
   attendance            Attendance?
   quality_verification  QualityVerification?
-  rating                Rating?
   rooms_completed_entry RoomsCompletedEntry?
   // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): 1:1 with the CalendarEntry created by
   // placeOnCalendar() in the same transaction — present only for
@@ -1171,7 +1171,25 @@ model QualityVerification {
   hotel               Hotel              @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
   verified_by_id      String
   verified_by         User               @relation("verifier", fields: [verified_by_id], references: [id], onDelete: Restrict)
+  // Denormalized from the assignment (2026-08-29), when Rating was folded into
+  // this model. Every consumer of the old Rating filtered or grouped by
+  // worker_id -- the leaderboard aggregate, analytics, the employee history --
+  // and reaching the worker through `assignment` would turn each of those into
+  // a join on a hot path. Safe to denormalize: an assignment's worker never
+  // changes (a reassignment creates a NEW assignment row) and assignment_id is
+  // @unique here, so there is exactly one source for it. Same precedent as
+  // WorkerAssignment.day.
+  worker_id           String
+  worker              User               @relation("inspected_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   score               Int // 0–100; CHECK constraint in migration
+  // TREQ-005 inspection checklist, each item 0-100 and optional:
+  //   dust, bathroom, bed_linen, mirror, floor, minibar_restocking,
+  //   fragrance_amenities, other
+  // Moved here from Rating (2026-08-29) when the two records were merged: one
+  // visit wrote two rows carrying the same score and the same photographs, and
+  // the checklist was the only thing the other row held that this one did not.
+  // Validated in quality/types.ts, not by the database: this is Json.
+  criteria_scores     Json?
   status              VerificationStatus @default(PASSED)
   notes               String?
   photo_urls          String[] // evidence uploaded to object storage
@@ -1191,6 +1209,13 @@ model QualityVerification {
 
   @@index([hotel_id])
   @@index([verified_by_id])
+  // Carried over from the retired Rating model, which indexed worker_id and
+  // (worker_id, created_at) for exactly these reads: the recency window
+  // (WHERE worker_id = ? ORDER BY created_at DESC LIMIT 10) and the analytics
+  // per-worker aggregates. Without them every one degrades to a scan on a
+  // table that only grows.
+  @@index([worker_id])
+  @@index([worker_id, created_at])
   @@index([status])
   @@index([score])
   // ADR-069 / CRR §14: supports the 20-minute escalation job's predicate
@@ -1199,67 +1224,20 @@ model QualityVerification {
   @@index([rework_required, rework_completed_at, rework_escalated_at], map: "QualityVerification_rework_pending_idx")
 }
 
-model Rating {
-  id              String           @id @default(cuid())
-  assignment_id   String           @unique // 1-to-1 with WorkerAssignment
-  assignment      WorkerAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
-  hotel_id        String
-  hotel           Hotel            @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
-  worker_id       String
-  worker          User             @relation("rated_worker", fields: [worker_id], references: [id], onDelete: Cascade)
-  rated_by_id     String
-  rated_by        User             @relation("rater", fields: [rated_by_id], references: [id], onDelete: Restrict)
-  score           Int // 0–100; rescaled from 1–5 stars by ADR-026; CHECK constraint in migration
-  comment         String?
-  // TREQ-005 (CONFIRMED §15) inspection checklist, each 0-100 and optional:
-  //   dust, bathroom, bed_linen, mirror, floor, minibar_restocking,
-  //   fragrance_amenities, other
-  // Rows written before 2026-08-20 instead carry the pre-pivot
-  // { punctuality, quality, attitude } -- readable, never written again.
-  // Validated in quality/types.ts, not by the database: this is Json.
-  criteria_scores Json?
-  // CRR §15 (2026-08-24): "the Checker/supervisor uploads a photo WITH the
-  // rating" applies to this model too — Rating is the checklist-based
-  // inspection score that actually feeds WorkerOverallRating, and it had no
-  // photo column at all, so the requirement was unenforceable here even
-  // though QualityVerification.photo_urls already existed for the same CRR
-  // clause. Same shape as QualityVerification.photo_urls: keys, not URLs — a
-  // presigned URL lives 15 minutes, so persisting one would store a value
-  // that is dead almost immediately.
-  photo_urls      String[]         @default([])
-  created_at      DateTime         @default(now())
-  updated_at      DateTime         @updatedAt
 
-  @@index([hotel_id])
-  @@index([worker_id])
-  @@index([rated_by_id])
-  @@index([score])
-  @@index([created_at])
-  // TREQ-004's recency window: `WHERE worker_id = ? ORDER BY created_at DESC
-  // LIMIT 10`, run inside refreshWorkerOverallRating()'s transaction on every
-  // rating write AND every assignment status change.
-  //
-  // The separate worker_id and created_at indexes are NOT enough, and the
-  // planner picks badly rather than merely suboptimally: for a worker whose
-  // ratings are not the newest rows in the table, it scans `created_at`
-  // backwards filtering on worker_id, walking the whole table to find ten
-  // rows. Measured on 210k rows -- 27.3ms vs 0.063ms with this index, a ~430x
-  // difference, and it degrades with TOTAL table size rather than with the
-  // worker's own rating count. The planner's own cost estimate (17) does not
-  // reflect it, so it will not correct itself as data grows.
-  //
-  // That cost is paid while holding the FOR UPDATE lock on the worker's User
-  // row, so it is lock-hold time, not just query time.
-  @@index([worker_id, created_at])
-}
-
-// Materialised aggregate — updated by DB trigger after each Rating write.
+// Materialised aggregate. The DB trigger this comment describes was dropped in
+// 20260727020000_drop_rating_overall_trigger; refreshWorkerOverallRating() in
+// quality/service.ts is the single writer (GD-04), and since 2026-08-29 it
+// reads QualityVerification rather than the retired Rating model.
 // Avoids expensive AVG() scans on marketplace listing pages.
 model WorkerOverallRating {
   id                   String    @id @default(cuid())
   worker_id            String    @unique
   worker               User      @relation(fields: [worker_id], references: [id], onDelete: Cascade)
-  average_score        Float // rolling average of Rating.score
+  // 0.7 x quality + 0.3 x attendance (see quality/overall-rating.ts). Quality
+  // is the recency-weighted QualityVerification.score; attendance is
+  // completed / (completed + no-show). 0 with total_ratings 0 means unrated.
+  average_score        Float
   total_ratings        Int       @default(0)
   total_assignments    Int       @default(0)
   completion_rate      Float     @default(0.0) // completed / total assignments
@@ -1272,7 +1250,7 @@ model WorkerOverallRating {
   worker_cancellations Int       @default(0)
   last_worked_at       DateTime?
   
-  // TRULE-005 Rating Threshold Tracking
+  // TRULE-005 rating threshold tracking
   warning_70_sent_at   DateTime?
   warning_50_sent_at   DateTime?
 
@@ -1287,7 +1265,7 @@ model WorkerOverallRating {
 // §33 rules out any room-level task layer ("Task"/"Work Request" do NOT need
 // separating; full-day employment model). Instead this is a manager-entered daily
 // count tied 1-to-1 to the worker's full-day WorkerAssignment, mirroring the
-// Attendance/QualityVerification/Rating precedent (denormalised hotel_id/worker_id,
+// Attendance/QualityVerification precedent (denormalised hotel_id/worker_id,
 // one row per assignment, entered_by is the acting manager). Deliberately NOT added
 // to ReceptionData (PIVOT §9.3: "Manager-entered checkout / long-stay data" only,
 // out of scope for this field per its own definition).

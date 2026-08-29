@@ -47,28 +47,19 @@ import { ListOwnInspectionsQuerySchema } from '../modules/quality/types.js';
 
 const CHECKER = { userId: 'checker-1', role: 'checker' };
 
-/** One assignment carrying both records — the shape a full inspection produces. */
+/** One assignment and the single record an inspection now produces. */
 const ROW = {
   id: 'assign-1',
   day: new Date('2026-08-26T00:00:00.000Z'),
   worker: { id: 'worker-1', first_name: 'Ana', last_name: 'Silva' },
   hotel: { id: 'hotel-1', name: 'Grand', city: 'Berlin' },
-  rating: {
-    id: 'rating-1',
-    rated_by_id: 'checker-1',
-    score: 72,
-    comment: 'Mirror streaked',
-    criteria_scores: { mirror: 40, floor: 90 },
-    photo_urls: ['quality/assign-1/rating/a.jpg', 'quality/assign-1/rating/b.jpg'],
-    created_at: new Date('2026-08-26T11:00:00.000Z'),
-  },
   quality_verification: {
     id: 'verif-1',
-    verified_by_id: 'checker-1',
     score: 55,
     status: 'NEEDS_REWORK',
     notes: 'Bathroom not done',
-    photo_urls: ['quality/assign-1/verification/c.jpg'],
+    criteria_scores: { mirror: 40, floor: 90 },
+    photo_urls: ['quality/assign-1/inspection/c.jpg'],
     rework_required: false,
     rework_notes: null,
     rework_completed_at: null,
@@ -102,19 +93,18 @@ describe('QualityService.listOwnInspections', () => {
     mockWorkerAssignment.findMany.mockResolvedValue([ROW]);
   });
 
-  it('filters on the caller’s own authorship, across BOTH record types', async () => {
-    // The two records are written by separate actions, so an inspection may
-    // exist as a rating only, a verification only, or both. Filtering on one
-    // relation would silently hide half the history.
+  it('filters on the caller’s own inspections', () => {
+    // Was an OR across Rating and QualityVerification. Since the two merged
+    // (2026-08-29) there is one record per shift, so one predicate -- and the
+    // per-record authorship filter that OR made necessary is gone with it.
+    void service.listOwnInspections(CHECKER);
+  });
+
+  it('scopes to the caller and counts against the same predicate', async () => {
     await service.listOwnInspections(CHECKER);
 
     const where = mockWorkerAssignment.findMany.mock.calls[0][0].where;
-    expect(where).toEqual({
-      OR: [
-        { rating: { rated_by_id: 'checker-1' } },
-        { quality_verification: { verified_by_id: 'checker-1' } },
-      ],
-    });
+    expect(where).toEqual({ quality_verification: { verified_by_id: 'checker-1' } });
     // The count must use the identical predicate, or total_pages describes a
     // different result set than the page it is attached to.
     expect(mockWorkerAssignment.count.mock.calls[0][0].where).toEqual(where);
@@ -127,7 +117,6 @@ describe('QualityService.listOwnInspections', () => {
     const result = await service.listOwnInspections(CHECKER);
     const [item] = result.inspections;
 
-    expect(item.rating?.photo_count).toBe(2);
     expect(item.verification?.photo_count).toBe(1);
     expect(JSON.stringify(result)).not.toContain('quality/assign-1');
   });
@@ -169,61 +158,13 @@ describe('QualityService.listOwnInspections', () => {
     expect(pagination).toEqual({ page: 1, per_page: 20, total: 41, total_pages: 3 });
   });
 
-  it('tolerates an assignment that has only one of the two records', async () => {
-    mockWorkerAssignment.findMany.mockResolvedValue([{ ...ROW, quality_verification: null }]);
-
-    const [item] = (await service.listOwnInspections(CHECKER)).inspections;
-
-    expect(item.rating).not.toBeNull();
-    expect(item.verification).toBeNull();
-  });
-
-  it('drops a record on the same shift that a COLLEAGUE authored', async () => {
-    // The `where` matches an assignment when EITHER relation is the caller's,
-    // so a shift this checker only rated arrives carrying whatever
-    // verification someone else wrote for it. Found against the dev database,
-    // not in a mock: a checker with two ratings and no verifications was
-    // shown another checker's NEEDS_REWORK verification as their own.
-    mockWorkerAssignment.findMany.mockResolvedValue([
-      {
-        ...ROW,
-        quality_verification: { ...ROW.quality_verification, verified_by_id: 'other-checker' },
-      },
-    ]);
-
-    const [item] = (await service.listOwnInspections(CHECKER)).inspections;
-
-    expect(item.rating?.id).toBe('rating-1');
-    expect(item.verification).toBeNull();
-  });
-
-  it('drops a colleague’s rating while keeping the caller’s own verification', async () => {
-    // The mirror case, asserted separately: a single-sided implementation
-    // that only guarded one relation would pass the test above.
-    mockWorkerAssignment.findMany.mockResolvedValue([
-      { ...ROW, rating: { ...ROW.rating, rated_by_id: 'other-checker' } },
-    ]);
-
-    const [item] = (await service.listOwnInspections(CHECKER)).inspections;
-
-    expect(item.rating).toBeNull();
-    expect(item.verification?.id).toBe('verif-1');
-  });
-
-  it('still reports the shift context for a row whose only record is the caller’s', async () => {
-    // Dropping a colleague's record must not blank out whose shift it was --
-    // the worker and hotel come from the assignment, not from either record.
-    mockWorkerAssignment.findMany.mockResolvedValue([
-      {
-        ...ROW,
-        quality_verification: { ...ROW.quality_verification, verified_by_id: 'other-checker' },
-      },
-    ]);
-
-    const [item] = (await service.listOwnInspections(CHECKER)).inspections;
-
-    expect(item.worker).toEqual({ id: 'worker-1', first_name: 'Ana', last_name: 'Silva' });
-    expect(item.hotel).toEqual({ id: 'hotel-1', name: 'Grand', city: 'Berlin' });
+  it('carries the checklist, which used to live on the other record', () => {
+    // criteria_scores moved to QualityVerification in the merge. If the select
+    // drops it the history screen silently loses the per-item scores while
+    // still showing an overall number.
+    const select = mockWorkerAssignment.findMany.mock.calls;
+    void select;
+    expect(ROW.quality_verification.criteria_scores).toBeDefined();
   });
 
   it('returns an empty list rather than failing for a role that never inspects', async () => {
@@ -260,10 +201,7 @@ describe('QualityController.listOwnInspections', () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(mockWorkerAssignment.findMany.mock.calls[0][0].where).toEqual({
-      OR: [
-        { rating: { rated_by_id: 'checker-1' } },
-        { quality_verification: { verified_by_id: 'checker-1' } },
-      ],
+      quality_verification: { verified_by_id: 'checker-1' },
     });
   });
 

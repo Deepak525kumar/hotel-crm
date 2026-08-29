@@ -527,29 +527,16 @@ export const api = {
      * {uri,name,type} rather than a Blob; the runtime streams the file off
      * disk when the request is sent, so images never sit in JS memory.
      */
-    createVerification: (
-      data: { assignment_id: string; score: number; notes?: string },
-      photos: { uri: string; name: string; type: string }[] = []
-    ) => {
-      const form = new FormData();
-      form.append('assignment_id', data.assignment_id);
-      form.append('score', String(data.score));
-      if (data.notes) form.append('notes', data.notes);
-      for (const photo of photos) appendNativeFile(form, 'photos', photo);
-      return request<QualityVerification>('/quality/verifications', {
-        method: 'POST',
-        body: form,
-      });
-    },
     /**
-     * One inspection, one request (2026-08-29).
+     * One inspection, one request.
      *
-     * Replaces the three-call sequence this app used to run at the end of an
-     * inspection -- createRating, then createVerification, then assignRework.
-     * That uploaded the photos TWICE (once per record, over hotel wifi), had
-     * no atomicity, and produced up to three notifications for one decision.
-     * The server now writes both records, the aggregate refresh, any rework
-     * assignment and exactly one notification in a single transaction.
+     * Replaces the three-call sequence this app used to run -- createRating,
+     * createVerification, assignRework -- which uploaded the photos TWICE
+     * (once per record), had no atomicity, and produced up to three
+     * notifications for one decision. Since the Rating merge (2026-08-29) the
+     * server writes a single QualityVerification carrying the checklist, the
+     * photos, the score and the outcome, plus any rework assignment, in one
+     * transaction.
      *
      * `outcome` is the checker's decision and is NOT inferred from `score`:
      * rework is assignable at any score.
@@ -583,26 +570,16 @@ export const api = {
       });
     },
 
-    createRating: (
-      data: {
-        assignment_id: string;
-        worker_id: string;
-        score: number;
-        comment?: string;
-        criteria_scores?: Record<string, number>;
-      },
+    createVerification: (
+      data: { assignment_id: string; score: number; notes?: string },
       photos: { uri: string; name: string; type: string }[] = []
     ) => {
       const form = new FormData();
       form.append('assignment_id', data.assignment_id);
-      form.append('worker_id', data.worker_id);
       form.append('score', String(data.score));
-      if (data.comment) form.append('comment', data.comment);
-      if (data.criteria_scores) {
-        form.append('criteria_scores', JSON.stringify(data.criteria_scores));
-      }
+      if (data.notes) form.append('notes', data.notes);
       for (const photo of photos) appendNativeFile(form, 'photos', photo);
-      return request<Rating>('/quality/ratings', {
+      return request<QualityVerification>('/quality/verifications', {
         method: 'POST',
         body: form,
       });
@@ -647,17 +624,6 @@ export const api = {
     myInspections: (page = 1, perPage = 20) =>
       request<OwnInspectionsPage>(
         `/quality/my-inspections?page=${page}&per_page=${perPage}`
-      ),
-
-    /**
-     * Presigned URLs for one RATING's evidence — the checklist score's photos,
-     * the counterpart of verificationPhotos below. The endpoint has existed
-     * since CRR §15 gave Rating a photo column; nothing in this app called it,
-     * so photos uploaded with a rating could never be looked at again.
-     */
-    ratingPhotos: (ratingId: string) =>
-      request<{ rating_id: string; photos: { key: string; url: string | null }[] }>(
-        `/quality/ratings/${encodeURIComponent(ratingId)}/photos`
       ),
 
     verificationPhotos: (verificationId: string) =>

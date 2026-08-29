@@ -109,53 +109,11 @@ function InspectionCard({ item }: { item: OwnInspection }) {
         </View>
       </View>
 
-      {/* The checklist score. Present whenever this checker rated the shift;
-          its photos are viewable nowhere else in the app. */}
-      {rows.includes('rating') && item.rating ? (
-        <Pressable
-          accessibilityRole="button"
-          // Score, comment and checklist ride along as params rather than
-          // being re-fetched: there is no GET /quality/ratings/:id, and the
-          // caller already holds every field.
-          //
-          // Object form because typedRoutes cannot type a concatenated query
-          // string (it needs one literal). route-targets-exist.test.ts was
-          // extended to read this form too -- it previously saw only string
-          // pushes, which left every object-form link in the app unchecked,
-          // including the one that starts an inspection.
-          onPress={() =>
-            router.push({
-              pathname: '/rating-evidence/[id]',
-              params: {
-                id: item.rating!.id,
-                score: String(item.rating!.score),
-                comment: item.rating!.comment ?? '',
-                criteria: JSON.stringify(item.rating!.criteria_scores ?? {}),
-              },
-            })
-          }
-          style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
-        >
-          <View style={styles.rowText}>
-            <ThemedText type="smallBold">
-              {t('quality.ratingLabel')} · {item.rating.score}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {t('quality.photoCount', { count: item.rating.photo_count })}
-            </ThemedText>
-          </View>
-          <SymbolView
-            name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
-            tintColor={theme.textSecondary}
-            size={18}
-          />
-        </Pressable>
-      ) : null}
-
-      {/* The pass/fail check. When it exists this is the road to the evidence
-          screen, which is where rework is assigned; when it does not, the row
-          offers to record one, which is the only way to make rework possible
-          for a shift that was merely rated. */}
+      {/* The check. One record per inspection since the Rating merge
+          (2026-08-29), so this is the whole card -- and the road to the
+          evidence screen, which is where rework is assigned. The old
+          "record a pass/fail check" branch existed only for shifts that had a
+          rating and no verification, which can no longer happen. */}
       {rows.includes('verification') && item.verification ? (
         <Pressable
           accessibilityRole="button"
@@ -191,27 +149,7 @@ function InspectionCard({ item }: { item: OwnInspection }) {
             size={18}
           />
         </Pressable>
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push(`/quality/${item.assignment_id}`)}
-          style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
-        >
-          <View style={styles.rowText}>
-            <ThemedText type="smallBold" themeColor="primary">
-              {t('quality.recordVerification')}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {t('quality.notChecked')}
-            </ThemedText>
-          </View>
-          <SymbolView
-            name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
-            tintColor={theme.textSecondary}
-            size={18}
-          />
-        </Pressable>
-      )}
+      ) : null}
     </Card>
   );
 }

@@ -112,8 +112,6 @@ export class AnalyticsService extends BaseService {
       qualityAgg,
       qualityPassed,
       totalQuality,
-      ratingAgg,
-      totalRatings,
       roomsCompletedAgg,
     ] = await Promise.all([
       this.prisma.jobRequest.count({ where: scope }),
@@ -142,11 +140,6 @@ export class AnalyticsService extends BaseService {
         where: { ...scope, status: VerificationStatus.PASSED },
       }),
       this.prisma.qualityVerification.count({ where: scope }),
-      this.prisma.rating.aggregate({
-        where: scope,
-        _avg: { score: true },
-      }),
-      this.prisma.rating.count({ where: scope }),
       // ADR-028 (OQ-ANALYTICS-03): basic-analytics "rooms completed per worker",
       // derived from the manager-entered RoomsCompletedEntry.
       this.prisma.roomsCompletedEntry.aggregate({
@@ -177,7 +170,13 @@ export class AnalyticsService extends BaseService {
 
     const onTimeCount = attMap.get(AttendanceStatus.PRESENT) ?? 0;
     const qualityAvg = (qualityAgg as { _avg: { score: number | null } })._avg.score;
-    const ratingAvg = (ratingAgg as { _avg: { score: number | null } })._avg.score;
+    // Since the Rating merge (2026-08-29) the average score and the pass rate
+    // are two readings of ONE table, so this reuses the aggregate above rather
+    // than running an identical second query. Both tiles the UI draws from
+    // them stay populated -- and, unlike before, they can no longer disagree
+    // about the same inspections.
+    const ratingAvg = (qualityAgg as { _avg: { score: number | null } })._avg.score;
+    const totalRatings = totalQuality;
 
     return {
       work_requests: {
@@ -301,11 +300,15 @@ export class AnalyticsService extends BaseService {
           rework_of_assignment_id: null,
         },
       }),
-      this.prisma.rating.aggregate({
+      // Reads checks since the Rating merge (2026-08-29). `worker_id` is a
+      // real column on QualityVerification -- denormalized in that migration
+      // precisely so these per-worker reads stay index-backed instead of
+      // becoming joins through the assignment.
+      this.prisma.qualityVerification.aggregate({
         where: { worker_id: workerId, created_at: { gte: monthStart } },
         _avg: { score: true },
       }),
-      this.prisma.rating.findMany({
+      this.prisma.qualityVerification.findMany({
         where: { worker_id: workerId },
         select: { assignment_id: true, score: true, created_at: true },
         orderBy: { created_at: 'desc' },

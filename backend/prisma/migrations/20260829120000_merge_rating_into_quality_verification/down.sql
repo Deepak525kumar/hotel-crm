@@ -1,0 +1,9 @@
+-- Irreversible in practice, and saying so is more honest than a script that
+-- appears to restore the table.
+--
+-- Recreating "Rating" is mechanical; repopulating it is not. After the merge
+-- there is no way to tell a QualityVerification that was always a check from
+-- one promoted out of a Rating in step 4, so a down migration would either
+-- fabricate Rating rows for native checks or silently drop the promoted ones.
+--
+-- Restore from a backup taken before this migration ran.

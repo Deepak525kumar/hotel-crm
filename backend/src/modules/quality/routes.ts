@@ -66,26 +66,14 @@ router.post(
   photoUpload.array('photos', MAX_PHOTOS_PER_VERIFICATION),
   (req, res, next) => qualityController.completeRework(req, res, next)
 );
-// CRR §15: same "checker/supervisor uploads a photo WITH the rating"
-// requirement as /verifications above — Rating is the checklist-based score
-// that actually feeds WorkerOverallRating (see quality/service.ts
-// refreshWorkerOverallRating), so the requirement is enforced here too
-// (2026-08-24). A request with no files still succeeds at the transport
-// layer; the service enforces at least one.
-router.post(
-  '/ratings',
-  requirePermission('quality:write'),
-  photoUpload.array('photos', MAX_PHOTOS_PER_VERIFICATION),
-  (req, res, next) => qualityController.createRating(req, res, next)
-);
-
-// One inspection, one request (2026-08-29). Writes the Rating AND the
-// QualityVerification -- plus the rework assignment when the checker asks for
-// one -- in a single transaction from a single photo upload.
+// One inspection, one request. Writes the QualityVerification -- checklist,
+// photos, score and outcome -- plus the rework assignment when the checker
+// asks for one, in a single transaction from a single upload.
 //
-// The two single-record routes above are deliberately kept: the web still uses
-// them, and POST /verifications remains the way to add a pass/fail check to an
-// inspection that was only rated.
+// POST /ratings and GET /ratings/:id/photos were removed 2026-08-29 when
+// Rating was merged into this model: one visit no longer writes two records,
+// so there is no second record to create or to fetch photos for. The checklist
+// those routes carried now lives on the verification and arrives here.
 router.post(
   '/inspections',
   requirePermission('quality:write'),
@@ -93,13 +81,6 @@ router.post(
   (req, res, next) => qualityController.recordInspection(req, res, next)
 );
 
-// Presigned URLs for one rating's evidence — same shape as
-// /verifications/:id/photos above, quality:read rather than quality:write for
-// the identical reason (managers/RMs hold read and must be able to see what
-// a rating recorded).
-router.get('/ratings/:rating_id/photos', requirePermission('quality:read'), (req, res, next) =>
-  qualityController.getRatingPhotos(req, res, next)
-);
 // ADR-072 §2.5: the worker picker that starts an inspection. quality:write,
 // not quality:read — this is the entry point to inspecting, and a manager (who
 // holds read but not write) does not run inspections. Scope is resolved in the

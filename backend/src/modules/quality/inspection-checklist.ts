@@ -31,7 +31,7 @@ export type InspectionChecklistItem = (typeof INSPECTION_CHECKLIST_ITEMS)[number
  * Ratings written before this change still carry these, and they are real
  * assessments of real people -- silently dropping them from a historical
  * record would be worse than showing a legacy label. They are rejected on
- * write (see CreateRatingSchema) so the set stops growing, but never deleted.
+ * write (see RecordInspectionSchema) so the set stops growing, but never deleted.
  */
 export const LEGACY_CRITERIA_KEYS = ['punctuality', 'quality', 'attitude'] as const;
 

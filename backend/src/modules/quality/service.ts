@@ -26,7 +26,6 @@ import type {
   AssignReworkRequest,
   RecordInspectionRequest,
   CreateQualityVerificationRequest,
-  CreateRatingRequest,
   UploadedPhoto,
 } from './types.js';
 import {
@@ -133,7 +132,10 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
       // the worker is through the assignment, since QualityVerification has no
       // worker_id column of its own.
       tx.qualityVerification.aggregate({
-        where: { assignment: { worker_id } },
+        // Direct column since the Rating merge (2026-08-29) -- previously this
+        // reached the worker through `assignment`, a join on the hot path that
+        // every rating write and every assignment status change runs.
+        where: { worker_id },
         _avg: { score: true },
         _count: true,
       }),
@@ -146,7 +148,7 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
       // half of the blend stays an aggregate, computed DB-side above.
       typeof tx.qualityVerification?.findMany === 'function'
         ? tx.qualityVerification.findMany({
-            where: { assignment: { worker_id } },
+            where: { worker_id },
             // id is a tiebreak, not decoration. created_at ties are
             // possible (several ratings written in one transaction share a
             // now()), and with a tie straddling the 10th position the window
@@ -745,18 +747,14 @@ export class QualityService extends BaseService {
       throw new ValidationError('Rework notes are required to assign rework');
     }
 
-    // Both tables carry `assignment_id @unique`. Pre-checked together so a
-    // half-recorded inspection reports which half already exists, rather than
-    // failing on the second write after the first has committed.
-    const [existingVerification, existingRating] = await Promise.all([
-      this.prisma.qualityVerification.findUnique({ where: { assignment_id } }),
-      this.prisma.rating.findUnique({ where: { assignment_id } }),
-    ]);
+    // One record per assignment since the Rating merge (2026-08-29), so one
+    // pre-check. `assignment_id` is @unique, and the create below translates a
+    // concurrent P2002 to the same 409.
+    const existingVerification = await this.prisma.qualityVerification.findUnique({
+      where: { assignment_id },
+    });
     if (existingVerification) {
-      throw new ConflictError('Verification already exists for this assignment');
-    }
-    if (existingRating) {
-      throw new ConflictError('Rating already exists for this assignment');
+      throw new ConflictError('This assignment has already been inspected');
     }
 
     // ONE upload, shared by both records. They are the same photographs of the
@@ -785,34 +783,24 @@ export class QualityService extends BaseService {
 
     const result = await this.prisma.$transaction(async (tx) => {
       let verification;
-      let rating;
       try {
         verification = await tx.qualityVerification.create({
           data: {
             assignment_id,
             hotel_id: assignment.hotel_id,
             verified_by_id: actor.userId,
+            worker_id,
             score,
             status,
             notes: comment ?? null,
-            photo_urls: photoKeys,
-            ...(outcome === 'rework'
-              ? { rework_required: true, rework_notes: reworkNotes }
-              : {}),
-          },
-        });
-        rating = await tx.rating.create({
-          data: {
-            assignment_id,
-            hotel_id: assignment.hotel_id,
-            worker_id,
-            rated_by_id: actor.userId,
-            score,
-            comment: comment ?? null,
+            // The checklist lives here since the Rating merge (2026-08-29).
             criteria_scores: criteria_scores
               ? (criteria_scores as Prisma.InputJsonValue)
               : Prisma.JsonNull,
             photo_urls: photoKeys,
+            ...(outcome === 'rework'
+              ? { rework_required: true, rework_notes: reworkNotes }
+              : {}),
           },
         });
       } catch (error) {
@@ -841,7 +829,7 @@ export class QualityService extends BaseService {
           notes: reworkNotes,
           actorId: actor.userId,
         });
-        return { verification, rating, reworkAssignment };
+        return { verification, reworkAssignment };
       }
 
       // Exactly one notification for the "complete" outcome. The old
@@ -853,7 +841,7 @@ export class QualityService extends BaseService {
           type: 'QUALITY_VERIFICATION_SUBMITTED',
           title: 'Quality check recorded',
           message: `Your work was inspected and scored ${score} out of 100.`,
-          data: { verification_id: verification.id, rating_id: rating.id, assignment_id, score, status },
+          data: { verification_id: verification.id, assignment_id, score, status },
           hotelId: assignment.hotel_id,
           transports: [OutboxTransport.PUSH],
           sourceModule: OutboxSourceModule.QUALITY,
@@ -862,7 +850,7 @@ export class QualityService extends BaseService {
         tx
       );
 
-      return { verification, rating, reworkAssignment: null };
+      return { verification, reworkAssignment: null };
     });
 
     await this.logAudit(
@@ -876,7 +864,6 @@ export class QualityService extends BaseService {
 
     return {
       verification: result.verification,
-      rating: result.rating,
       rework_assignment: result.reworkAssignment,
     };
   }
@@ -887,7 +874,7 @@ export class QualityService extends BaseService {
     // CRR §15: "the Checker/supervisor uploads a photo WITH the rating."
     photos: UploadedPhoto[] = []
   ) {
-    const { assignment_id, score, notes } = data;
+    const { assignment_id, score, notes, criteria_scores } = data;
 
     const assignment = await this.prisma.workerAssignment.findUnique({
       where: { id: assignment_id },
@@ -972,9 +959,19 @@ export class QualityService extends BaseService {
             assignment_id,
             hotel_id: assignment.hotel_id,
             verified_by_id: actor.userId,
+            // Denormalized since the Rating merge (2026-08-29). Read from the
+            // assignment rather than accepted from the client: the caller does
+            // not get to say whose inspection this is.
+            worker_id: assignment.worker_id,
             score: numScore,
             status: derivedStatus,
             notes: notes ?? null,
+            // TREQ-005 checklist, persisted here since the Rating merge
+            // (2026-08-29). Accepting it in the schema without writing it
+            // would silently drop every checklist the web records.
+            criteria_scores: criteria_scores
+              ? (criteria_scores as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
             photo_urls: photoKeys,
           },
         });
@@ -1026,209 +1023,6 @@ export class QualityService extends BaseService {
     return verification;
   }
 
-  async createRating(
-    data: CreateRatingRequest,
-    actor: Actor,
-    // CRR §15: "the Checker/supervisor uploads a photo WITH the rating."
-    // Added 2026-08-24 — Rating is the checklist-based score that actually
-    // feeds WorkerOverallRating (see refreshWorkerOverallRating below), and it
-    // had no photo capability at all until now, unlike QualityVerification.
-    photos: UploadedPhoto[] = []
-  ) {
-    const { assignment_id, worker_id, score, comment, criteria_scores } = data;
-
-    if (!assignment_id || !worker_id) {
-      throw new ValidationError('assignment_id and worker_id are required');
-    }
-    if (!Number.isInteger(score) || score < 0 || score > 100) {
-      throw new ValidationError('score must be an integer between 0 and 100');
-    }
-
-    // Restructured 2026-08-24 to mirror createVerification's shape: the
-    // assignment lookup and authorization now happen OUTSIDE the transaction
-    // (this.prisma, not tx), so the S3 upload below never runs while a DB
-    // transaction — and its row locks — is open.
-    const assignment = await this.prisma.workerAssignment.findUnique({
-      where: { id: assignment_id },
-      // `status` added 2026-08-29 for assertShiftHasStarted(); the narrow
-      // select is why the compiler caught its absence rather than the guard
-      // silently reading undefined.
-      select: { id: true, hotel_id: true, worker_id: true, day: true, status: true },
-    });
-    if (!assignment) {
-      throw new NotFoundError('Assignment not found');
-    }
-    if (assignment.worker_id !== worker_id) {
-      throw new ForbiddenError('worker_id does not match the assignment worker');
-    }
-
-    // Epic 5 PR 5.5 (ADR-024, retired M-4): a scope-bound manager may only
-    // rate for hotels in their scope claim. Admin/checker unchanged.
-    // regional_manager included as defense-in-depth — see verifyAttendance()
-    // above for why (C-27 denies RM `quality:write` today).
-    if (isScopedManagerRole(actor.role)) {
-      const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
-      if (!inScope) {
-        throw new ForbiddenError('Cannot rate for this hotel');
-      }
-    } else if (actor.role === 'checker') {
-      const checkerAssignment = await this.prisma.workerAssignment.findFirst({
-        where: {
-          worker_id: actor.userId,
-          hotel_id: assignment.hotel_id,
-          day: assignment.day,
-          status: { in: ACTIVE_ASSIGNMENT_STATUSES }
-        }
-      });
-      if (!checkerAssignment) {
-        throw new ForbiddenError('Checker must have an active assignment at the same hotel on the same day');
-      }
-    }
-
-    this.assertShiftHasStarted(assignment);
-
-    // CRR §15 enforcement. Placed AFTER authorization, same reasoning as
-    // createVerification's identical guard: an actor who may not rate this
-    // assignment must get that answer (403), not a validation hint.
-    if (photos.length === 0) {
-      throw new ValidationError('A photo is required to submit a rating');
-    }
-
-    // Uploaded BEFORE the transaction opens — see uploadPhotos' own comment on
-    // createVerification's identical call for why (an S3 round-trip inside a
-    // transaction holds row locks for the duration of a network upload).
-    const photoKeys = await this.uploadPhotos(photos, assignment_id, 'rating');
-
-    const rating = await this.prisma.$transaction(async (tx) => {
-      let created;
-      try {
-        created = await tx.rating.create({
-          data: {
-            assignment_id,
-            hotel_id: assignment.hotel_id,
-            worker_id,
-            rated_by_id: actor.userId,
-            score,
-            comment: comment ?? null,
-            criteria_scores: criteria_scores
-              ? (criteria_scores as Prisma.InputJsonValue)
-              : Prisma.JsonNull,
-            photo_urls: photoKeys,
-          },
-        });
-      } catch (error) {
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === 'P2002'
-        ) {
-          throw new ConflictError('Rating already exists for this assignment');
-        }
-        throw error;
-      }
-
-      await refreshWorkerOverallRating(tx, worker_id);
-
-      // ADR-029 (GD-01, Epic 7 PR 7.3): joins the same transaction as the
-      // rating write and aggregate refresh — single commit.
-      await notificationService.enqueue(
-        {
-          recipientId: worker_id,
-          type: 'RATING_RECEIVED',
-          title: 'You Received a Rating',
-          message: `You received a rating of ${score} out of 100.`,
-          data: { rating_id: created.id, assignment_id, score },
-          hotelId: assignment.hotel_id,
-          transports: [OutboxTransport.PUSH],
-          sourceModule: OutboxSourceModule.QUALITY,
-          producerService: 'QualityService',
-        },
-        tx
-      );
-
-      return created;
-    });
-
-    await this.logAudit(actor.userId, actor.role, 'CREATE_RATING', 'Rating', rating.id, {
-      assignment_id,
-      worker_id,
-      score,
-    });
-
-    return rating;
-  }
-
-  /**
-   * Presigned URLs for one rating's evidence. Mirrors getVerificationPhotos
-   * exactly, including its 2026-08-24 checker fix: the checker branch is
-   * gated on an active assignment at that hotel, NOT on JWT scope — a
-   * checker's JWT never carries one (resolveScope mints scope only for
-   * admin/RM/manager), so a scope-based gate here would deny every checker
-   * unconditionally, same defect as the verification-photos endpoint had.
-   */
-  async getRatingPhotos(ratingId: string, actor: Actor) {
-    const rating = await this.prisma.rating.findUnique({
-      where: { id: ratingId },
-      select: { id: true, hotel_id: true, worker_id: true, photo_urls: true },
-    });
-    if (!rating) throw new NotFoundError('Rating not found');
-
-    const isSubject = rating.worker_id === actor.userId;
-    const role = actor.role.toLowerCase();
-
-    if (isSubject) {
-      // The worker the rating is about — they have every reason to see the
-      // evidence used to score them.
-    } else if (role === 'admin') {
-      // Unscoped by design, matching every other admin read.
-    } else if (role === 'checker') {
-      const checkerAssignment = await this.prisma.workerAssignment.findFirst({
-        where: {
-          worker_id: actor.userId,
-          hotel_id: rating.hotel_id,
-          status: { in: ACTIVE_ASSIGNMENT_STATUSES },
-        },
-        select: { id: true },
-      });
-      if (!checkerAssignment) {
-        throw new ForbiddenError('Cannot view evidence for this hotel');
-      }
-    } else if (isScopedManagerRole(role)) {
-      const inScope = await isHotelInScope(actor.scope ?? null, rating.hotel_id);
-      if (!inScope) throw new ForbiddenError('Cannot view evidence for this hotel');
-    } else {
-      throw new ForbiddenError('Cannot view evidence for this rating');
-    }
-
-    const storage = await getStorageClient();
-    const photos = await Promise.all(
-      rating.photo_urls.map(async (key) => ({
-        key,
-        url: await storage.getPresignedUrl(key),
-      }))
-    );
-
-    return { rating_id: rating.id, photos };
-  }
-
-  /**
-   * Presigned URLs for one inspection's photo evidence (CRR §14/§15).
-   *
-   * Keys are useless to a client on their own -- the bucket is private -- so
-   * this is the only way the checker can actually SEE what CRR §14 says they
-   * are "notified with". Without it the photos are write-only.
-   *
-   * URLs are minted per request and expire in 15 minutes; they are never
-   * persisted, which is why the column stores keys.
-   */
-  /**
-   * IF-QUAL-GetVerification — the inspection record itself.
-   *
-   * Added 2026-08-24: the evidence screen could fetch photos but not the
-   * verification they belong to, so it could not show the score, the derived
-   * status, or whether rework had already been assigned — which is what a
-   * checker needs in order to decide whether to assign it. Same authorization
-   * as the photos endpoint, via the shared helper below.
-   */
   async getVerification(verificationId: string, actor: Actor) {
     const verification = await this.prisma.qualityVerification.findUnique({
       where: { id: verificationId },
@@ -1474,11 +1268,11 @@ export class QualityService extends BaseService {
    * gain.
    */
   async listOwnInspections(actor: Actor, page = 1, perPage = 20) {
+    // One record per inspection since the Rating merge (2026-08-29), so one
+    // predicate. This was an OR across two relations, which is also why the
+    // per-record authorship filter below existed.
     const where: Prisma.WorkerAssignmentWhereInput = {
-      OR: [
-        { rating: { rated_by_id: actor.userId } },
-        { quality_verification: { verified_by_id: actor.userId } },
-      ],
+      quality_verification: { verified_by_id: actor.userId },
     };
 
     const [total, assignments] = await Promise.all([
@@ -1490,26 +1284,13 @@ export class QualityService extends BaseService {
           day: true,
           worker: { select: { id: true, first_name: true, last_name: true } },
           hotel: { select: { id: true, name: true, city: true } },
-          rating: {
-            select: {
-              id: true,
-              // Selected only so the mapping below can drop a record this
-              // caller did not write — see the authorship note there.
-              rated_by_id: true,
-              score: true,
-              comment: true,
-              criteria_scores: true,
-              photo_urls: true,
-              created_at: true,
-            },
-          },
           quality_verification: {
             select: {
               id: true,
-              verified_by_id: true,
               score: true,
               status: true,
               notes: true,
+              criteria_scores: true,
               photo_urls: true,
               rework_required: true,
               rework_notes: true,
@@ -1532,23 +1313,10 @@ export class QualityService extends BaseService {
 
     return {
       inspections: assignments.map((a) => {
-        // Authorship is re-applied per record, not just per assignment. The
-        // `where` above matches an assignment when EITHER relation is the
-        // caller's, so a shift this checker only RATED still arrives carrying
-        // whatever verification a colleague wrote for the same shift — both
-        // models hang off the same assignment, and the two actions have
-        // different authors as often as not.
-        //
-        // Caught against the dev database, where exactly that happened: a
-        // checker who had authored two ratings and no verifications got back a
-        // row presenting another checker's NEEDS_REWORK verification as their
-        // own. Not a disclosure — anyone who may rate an assignment already
-        // passes assertCanViewVerification for it — but wrong for a screen
-        // that answers "what did I score, and what did I upload", and actively
-        // misleading where it drives the rework decision.
-        const rating = a.rating?.rated_by_id === actor.userId ? a.rating : null;
-        const verification =
-          a.quality_verification?.verified_by_id === actor.userId ? a.quality_verification : null;
+        // The `where` already restricts to this checker's own inspections, and
+        // there is now exactly one record per shift, so the per-record
+        // authorship filter this used to need is gone with the second model.
+        const verification = a.quality_verification;
 
         return {
           assignment_id: a.id,
@@ -1557,22 +1325,13 @@ export class QualityService extends BaseService {
             ? { id: a.worker.id, first_name: a.worker.first_name, last_name: a.worker.last_name }
             : null,
           hotel: a.hotel ? { id: a.hotel.id, name: a.hotel.name, city: a.hotel.city } : null,
-          rating: rating
-            ? {
-                id: rating.id,
-                score: rating.score,
-                comment: rating.comment,
-                criteria_scores: rating.criteria_scores,
-                photo_count: rating.photo_urls.length,
-                created_at: rating.created_at,
-              }
-            : null,
           verification: verification
             ? {
                 id: verification.id,
                 score: verification.score,
                 status: verification.status,
                 notes: verification.notes,
+                criteria_scores: verification.criteria_scores,
                 photo_count: verification.photo_urls.length,
                 rework_required: verification.rework_required,
                 rework_notes: verification.rework_notes,
