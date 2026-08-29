@@ -24,11 +24,14 @@ import { useTheme } from '@/hooks/use-theme';
 /**
  * TREQ-005 inspection checklist and worker rating.
  *
- * This is the score that feeds WorkerOverallRating -- distinct from the
- * pass/fail QualityVerification on /quality/[id], and the web has had both as
- * separate actions since TREQ-005. The mobile app had only the verification,
- * so `criteria_scores` was reachable from the API client and from nowhere in
- * the UI: a checker could not produce the checklist-based score at all.
+ * The checker's ONLY inspection writer, and the score that feeds
+ * WorkerOverallRating. This was once "distinct from the pass/fail
+ * QualityVerification on /quality/[id]" -- two records for one visit, carrying
+ * the same score and the same photographs. They were merged into
+ * QualityVerification on 2026-08-29, and the second screen was deleted on
+ * 2026-08-30: two writers producing different shapes of one record is how
+ * inconsistent data gets in, and only this one captures the checklist and the
+ * complete/rework decision.
  *
  * The overall score is DERIVED from the items rather than typed separately.
  * The web asks for both and lets them disagree, which lets the headline number

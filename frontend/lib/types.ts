@@ -791,6 +791,8 @@ export interface ListAssignmentsQuery {
   job_request_id?: string;
   worker_id?: string;
   status?: AssignmentStatus;
+  /** Free-text search across worker name, hotel name and city. */
+  q?: string;
   page?: number;
   per_page?: number;
 }

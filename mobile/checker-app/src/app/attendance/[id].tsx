@@ -55,7 +55,14 @@ export default function AttendanceDetailScreen() {
       Alert.alert(t("attendance.verifiedMark"), t('attendance.verifiedBody'), [
         {
           text: t('nav.qualityCheck'),
-          onPress: () => router.push(`/quality/${record!.assignment_id}`),
+          // The live inspection flow (2026-08-30). This used to open
+          // /quality/[id], a second writer that captured no checklist and no
+          // complete/rework decision; that screen is gone.
+          onPress: () =>
+            router.push({
+              pathname: '/rating/[id]',
+              params: { id: record!.assignment_id, worker_id: record!.worker_id },
+            }),
         },
         { text: t('common.done'), style: 'cancel' },
       ]);
@@ -201,16 +208,13 @@ export default function AttendanceDetailScreen() {
           </View>
         )}
 
-        {/* Two distinct records, as on the web: the verification is the
-            pass/fail decision, the rating is the TREQ-005 checklist score that
-            feeds WorkerOverallRating. The app previously offered only the
-            first, so the checklist was unreachable. */}
-        <Button
-          label={t('nav.qualityCheck')}
-          variant="secondary"
-          onPress={() => router.push(`/quality/${record.assignment_id}`)}
-          style={styles.action}
-        />
+        {/* ONE record, one button (2026-08-30). This offered two -- "quality
+            check" to /quality/[id] and "rate worker" to /rating/[id] -- back
+            when a verification and a rating were separate rows. They were
+            merged into QualityVerification on 2026-08-29, so the two buttons
+            wrote the same record by two different paths, and only one of them
+            captured the checklist and the complete/rework decision. The other
+            screen has been deleted; this is the inspection flow. */}
         <Button
           label={t('quality.rateWorker')}
           variant="secondary"

@@ -310,7 +310,12 @@
     "calendarPlacementsDescription": "Employés placés directement sur le calendrier d'un hôtel — sans diffusion, sans étape d'acceptation.",
     "calendarPlacementsLink": "Placements au calendrier",
     "scoreDerivedHint": "Le statut découle du score : 70+ réussi, 40–69 à retravailler, en dessous de 40 échoué.",
-    "checklistItemRange": "Les éléments de la liste doivent être des nombres entiers entre 0 et 100."
+    "checklistItemRange": "Les éléments de la liste doivent être des nombres entiers entre 0 et 100.",
+    "searchLabel": "Rechercher",
+    "searchPlaceholder": "Employé, hôtel ou ville",
+    "searchNoMatch": "Aucune affectation ne correspond à cette recherche.",
+    "filterNoMatch": "Essayez d’ajuster vos filtres.",
+    "noneYet": "Les affectations apparaissent une fois les employés placés sur un service."
   },
   "settings": {
     "language": {
@@ -422,7 +427,10 @@
     "openInMaps": "Ouvrir dans Plans",
     "mapsUnavailable": "Aucune application de cartes n’est disponible sur cet appareil.",
     "callHotel": "Appeler l’hôtel",
-    "emailHotel": "Envoyer un e-mail à l’hôtel"
+    "emailHotel": "Envoyer un e-mail à l’hôtel",
+    "searchPlaceholder": "Rechercher par hôtel, ville, date ou statut",
+    "searchNoMatch": "Aucun service correspondant",
+    "searchNoMatchBody": "Aucun service ne correspond à cette recherche. Essayez un autre hôtel, une autre date ou un autre statut."
   },
   "jobs": {
     "none": "Aucune offre disponible.",
@@ -1081,7 +1089,9 @@
     "noInspectableWorkers": "Aucun employé à contrôler",
     "noInspectableWorkersBody": "Personne n'est en service aujourd'hui dans les hôtels où vous travaillez.",
     "workerUnavailable": "Employé indisponible",
-    "overallScoreTitle": "Overall Score (0-100)"
+    "overallScoreTitle": "Overall Score (0-100)",
+    "searchChecksPlaceholder": "Rechercher par chambre, note ou résultat",
+    "searchChecksNoMatch": "Aucun contrôle ne correspond à cette recherche."
   },
   "ratings": {
     "comment": "Commentaire",

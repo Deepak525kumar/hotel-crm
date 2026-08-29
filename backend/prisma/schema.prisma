@@ -1185,9 +1185,11 @@ model QualityVerification {
   // worker_id -- the leaderboard aggregate, analytics, the employee history --
   // and reaching the worker through `assignment` would turn each of those into
   // a join on a hot path. Safe to denormalize: an assignment's worker never
-  // changes (a reassignment creates a NEW assignment row) and assignment_id is
-  // @unique here, so there is exactly one source for it. Same precedent as
-  // WorkerAssignment.day.
+  // changes (a reassignment creates a NEW assignment row), so every check on an
+  // assignment denormalizes the same worker and there is exactly one source for
+  // it. Same precedent as WorkerAssignment.day. (This once read "assignment_id
+  // is @unique here"; that stopped being true when a shift gained many checks,
+  // and the reasoning does not depend on it.)
   worker_id           String
   worker              User               @relation("inspected_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   // Which room this check is about. Required (owner decision, 2026-08-29):
@@ -1218,6 +1220,14 @@ model QualityVerification {
   // the claim target -- the job sets it in the same transaction as the
   // notifications, so two worker processes cannot both escalate one row.
   rework_escalated_at DateTime?
+  // Set when this check has been included in the worker's end-of-shift digest
+  // (owner decision, 2026-08-30: rework pushes immediately, everything else
+  // arrives as one summary). Same role as rework_escalated_at above: the
+  // scheduler re-runs every tick, so without a marker a shift would be
+  // re-summarized forever, and it is the claim target that stops two worker
+  // processes both sending the digest. Null on a rework check -- those never
+  // enter a digest because they were pushed at once.
+  digest_notified_at  DateTime?
   // ADR-069: the rework assignment(s) this inspection produced.
   rework_assignments  WorkerAssignment[] @relation("VerificationRework")
   created_at          DateTime           @default(now())
@@ -1231,6 +1241,9 @@ model QualityVerification {
   @@index([room_number])
   @@index([hotel_id])
   @@index([verified_by_id])
+  // The digest job's scan: undigested, non-rework checks that have gone quiet.
+  // Without this it scans every check ever written on every tick.
+  @@index([digest_notified_at, rework_required, created_at])
   // Carried over from the retired Rating model, which indexed worker_id and
   // (worker_id, created_at) for exactly these reads: the recency window
   // (WHERE worker_id = ? ORDER BY created_at DESC LIMIT 10) and the analytics
@@ -1245,7 +1258,6 @@ model QualityVerification {
   // the whole verification table on every scheduler tick.
   @@index([rework_required, rework_completed_at, rework_escalated_at], map: "QualityVerification_rework_pending_idx")
 }
-
 
 // Materialised aggregate. The DB trigger this comment describes was dropped in
 // 20260727020000_drop_rating_overall_trigger; refreshWorkerOverallRating() in
@@ -1271,12 +1283,12 @@ model WorkerOverallRating {
   // still see a pattern without it being silently priced into the leaderboard.
   worker_cancellations Int       @default(0)
   last_worked_at       DateTime?
-  
-  // TRULE-005 rating threshold tracking
-  warning_70_sent_at   DateTime?
-  warning_50_sent_at   DateTime?
 
-  updated_at           DateTime  @updatedAt
+  // TRULE-005 rating threshold tracking
+  warning_70_sent_at DateTime?
+  warning_50_sent_at DateTime?
+
+  updated_at DateTime @updatedAt
 
   @@index([average_score])
   @@index([total_ratings])
@@ -1659,14 +1671,14 @@ model Contract {
   expires_at           DateTime?
   reminder_1yr_sent_at DateTime?
   reminder_2yr_sent_at DateTime?
-  
+
   // 7-day worker expiry reminder tracking
   last_worker_expiry_reminder_at DateTime?
-  worker_expiry_reminder_count   Int             @default(0)
+  worker_expiry_reminder_count   Int       @default(0)
 
-  contract_pdf_s3_key  String?
-  created_at           DateTime        @default(now())
-  updated_at           DateTime        @updatedAt
+  contract_pdf_s3_key String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
 
   @@index([worker_id])
   @@index([status])
@@ -2011,7 +2023,7 @@ model ChatbotToolCall {
 // the architecture doc §10 for why a pure interval-poller is the wrong
 // failure direction for a hard cap.
 model ChatbotBudgetCounter {
-  year_month    String   @id // "2026-08"
-  tokens_spent  Int      @default(0)
-  updated_at    DateTime @updatedAt
+  year_month   String   @id // "2026-08"
+  tokens_spent Int      @default(0)
+  updated_at   DateTime @updatedAt
 }

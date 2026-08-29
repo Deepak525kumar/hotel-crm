@@ -135,6 +135,22 @@ describe('registerForPushNotificationsAsync', () => {
 // extracted from the listener callback — tested directly here without
 // mocking expo-notifications' response shape.
 describe('resolvePushTapRoute', () => {
+  it('opens the shift when the end-of-shift digest is tapped', () => {
+    // The digest is about a whole shift, so it lands where the per-room checks
+    // are listed rather than on the Alerts tab.
+    expect(
+      resolvePushTapRoute({ type: 'QUALITY_VERIFICATION_SUBMITTED', assignment_id: 'a1' })
+    ).toBe('/shift/a1');
+  });
+
+  it('falls back to Alerts when the digest payload has no assignment', () => {
+    // A malformed or older payload must not produce '/shift/undefined'.
+    expect(resolvePushTapRoute({ type: 'QUALITY_VERIFICATION_SUBMITTED' })).toBe('/notifications');
+    expect(
+      resolvePushTapRoute({ type: 'QUALITY_VERIFICATION_SUBMITTED', assignment_id: 42 })
+    ).toBe('/notifications');
+  });
+
   it('routes a JOB_REQUEST_BROADCAST payload to its offer detail screen', () => {
     const route = resolvePushTapRoute({ type: 'JOB_REQUEST_BROADCAST', work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' });
     expect(route).toBe('/offer/jr1');

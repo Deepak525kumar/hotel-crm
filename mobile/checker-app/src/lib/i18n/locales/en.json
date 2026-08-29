@@ -310,7 +310,12 @@
     "calendarPlacementsDescription": "Workers placed directly on a hotel's calendar — no broadcast, no accept step.",
     "calendarPlacementsLink": "Calendar placements",
     "scoreDerivedHint": "Status is derived from the score: 70+ passes, 40–69 needs rework, below 40 fails.",
-    "checklistItemRange": "Checklist items must be whole numbers between 0 and 100."
+    "checklistItemRange": "Checklist items must be whole numbers between 0 and 100.",
+    "searchLabel": "Search",
+    "searchPlaceholder": "Worker, hotel or city",
+    "searchNoMatch": "No assignments match that search.",
+    "filterNoMatch": "Try adjusting your filters.",
+    "noneYet": "Assignments appear once workers are placed on a shift."
   },
   "settings": {
     "language": {
@@ -422,7 +427,10 @@
     "openInMaps": "Open in Maps",
     "mapsUnavailable": "No map app is available on this device.",
     "callHotel": "Call hotel",
-    "emailHotel": "Email hotel"
+    "emailHotel": "Email hotel",
+    "searchPlaceholder": "Search by hotel, city, date or status",
+    "searchNoMatch": "No matching shifts",
+    "searchNoMatchBody": "No shifts match that search. Try a different hotel, date or status."
   },
   "jobs": {
     "none": "No open jobs found.",
@@ -1081,7 +1089,9 @@
     "selectWorkerSubtitle": "Workers on shift today at your hotels",
     "noInspectableWorkers": "No workers to check",
     "noInspectableWorkersBody": "Nobody is on shift today at the hotels you are working.",
-    "workerUnavailable": "Worker unavailable"
+    "workerUnavailable": "Worker unavailable",
+    "searchChecksPlaceholder": "Search by room, note or outcome",
+    "searchChecksNoMatch": "No checks match that search."
   },
   "ratings": {
     "comment": "Comment",
