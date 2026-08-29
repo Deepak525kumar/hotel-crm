@@ -7,7 +7,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
-import type { WorkerAssignment, Attendance } from '@/types/api';
+import type { WorkerAssignment, Attendance, QualityCheck } from '@/types/api';
+import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
 import { translateApiError } from '../../lib/api-error-i18n';
@@ -22,6 +23,72 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * The checks a checker recorded against this shift.
+ *
+ * Owner decision, 2026-08-29: the worker used to see only the shift's own
+ * details, with no sign of whether anyone had inspected the rooms or what they
+ * found. Tapping one opens the same detail screen the checker sees.
+ */
+function CheckRow({ check, onPress }: { check: QualityCheck; onPress: () => void }) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+
+  const tone =
+    check.status === 'PASSED'
+      ? theme.success
+      : check.status === 'NEEDS_REWORK'
+        ? theme.warning
+        : theme.danger;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [checkStyles.row, { opacity: pressed ? 0.7 : 1, borderColor: theme.border }]}
+    >
+      <View style={checkStyles.left}>
+        <ThemedText type="smallBold">
+          {t('quality.roomLabel')} {check.room_number}
+        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          {check.checked_by
+            ? `${t('quality.checkedBy')} ${check.checked_by.first_name}`
+            : ''}
+        </ThemedText>
+        {/* Rework is the reason a worker opens this list, so it is called out
+            rather than left to be inferred from the status word. */}
+        {check.rework_required && !check.rework_completed_at ? (
+          <ThemedText type="small" style={{ color: theme.warning }}>
+            {t('quality.reworkPending')}
+          </ThemedText>
+        ) : null}
+      </View>
+      <View style={checkStyles.right}>
+        <ThemedText type="smallBold" style={{ color: tone }}>
+          {check.score}
+        </ThemedText>
+        <ThemedText type="small" style={{ color: tone }}>
+          {check.status.replace(/_/g, ' ')}
+        </ThemedText>
+      </View>
+    </Pressable>
+  );
+}
+
+const checkStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  left: { flex: 1, gap: 2 },
+  right: { alignItems: 'flex-end' },
+});
+
 export default function ShiftDetailScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,6 +97,7 @@ export default function ShiftDetailScreen() {
   const [att, setAtt] = useState<Attendance | null>(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  const [checks, setChecks] = useState<QualityCheck[] | null>(null);
 
   // AssignmentDto does not embed attendance, so resolve it by assignment_id.
   // This survives app restart / navigation / reload because it is fetched
@@ -47,6 +115,26 @@ export default function ShiftDetailScreen() {
     ]);
     setShift(assignment);
   };
+
+  // Fetched separately from the shift itself and tolerant of failure: the
+  // check list is additional context, and a worker who cannot load it must
+  // still be able to check in and out. `null` means "not loaded", which the
+  // section below renders as nothing rather than as "no checks yet".
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    void api.quality
+      .checksForAssignment(id)
+      .then((res) => {
+        if (!cancelled) setChecks(res.checks ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setChecks(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -308,6 +396,39 @@ export default function ShiftDetailScreen() {
               )}
             </Pressable>
           )}
+
+          {/* The checks recorded against this shift. Owner decision,
+              2026-08-29: the worker sees every inspection of their own work,
+              passed or sent back, and opens one to the same screen the checker
+              sees. Hidden entirely while unloaded, so a failed fetch never
+              reads as "nobody has checked this". */}
+          {checks && checks.length > 0 ? (
+            <>
+              <ThemedText type="smallBold" style={styles.title}>
+                {t('quality.checksTitle')}
+              </ThemedText>
+              <ThemedView type="backgroundElement" style={styles.section}>
+                {checks.map((check) => (
+                  <CheckRow
+                    key={check.id}
+                    check={check}
+                    onPress={() => router.push(`/check/${check.id}`)}
+                  />
+                ))}
+              </ThemedView>
+            </>
+          ) : checks && checks.length === 0 ? (
+            <>
+              <ThemedText type="smallBold" style={styles.title}>
+                {t('quality.checksTitle')}
+              </ThemedText>
+              <ThemedView type="backgroundElement" style={styles.section}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {t('quality.checksNoneBody')}
+                </ThemedText>
+              </ThemedView>
+            </>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>

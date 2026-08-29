@@ -23,6 +23,8 @@ describe('RecordInspectionSchema (multipart)', () => {
   const base = {
     assignment_id: 'a1',
     worker_id: 'w1',
+    // Required since 2026-08-29: a check always says which room.
+    room_number: '412',
     score: '82',
     outcome: 'rework',
   };

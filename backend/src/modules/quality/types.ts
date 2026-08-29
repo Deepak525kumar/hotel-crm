@@ -19,6 +19,8 @@ export const CreateQualityVerificationSchema = z.object({
   // number through unchanged, and .int() still rejects "50.5" or "abc".
   score: z.coerce.number().int().min(0).max(100),
   notes: z.string().optional(),
+  // Same requirement as the mobile path: a check always says which room.
+  room_number: z.string().trim().min(1, 'A room number is required').max(64),
   // TREQ-005 checklist, accepted here since the Rating merge (2026-08-29):
   // this endpoint is the web's inspection write, and without it the web could
   // no longer record a checklist at all while mobile still could.
@@ -44,6 +46,7 @@ export const CreateQualityVerificationSchema = z.object({
 });
 
 export interface CreateQualityVerificationRequest {
+  room_number: string;
   criteria_scores?: Record<string, number>;
   assignment_id: string;
   score: number; // 0-100
@@ -75,6 +78,11 @@ export type ListLeaderboardQuery = z.infer<typeof ListLeaderboardQuerySchema>;
 export const ListOwnInspectionsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   per_page: z.coerce.number().int().min(1).max(50).default(20),
+  // Free-text search across room, notes, worker name and hotel name (owner
+  // decision, 2026-08-29). Capped so a pathological string cannot become an
+  // expensive LIKE across five columns, and trimmed so a stray space does not
+  // silently return nothing.
+  q: z.string().trim().max(120).optional(),
 });
 
 export type ListOwnInspectionsQuery = z.infer<typeof ListOwnInspectionsQuerySchema>;
@@ -95,6 +103,10 @@ export type ListOwnInspectionsQuery = z.infer<typeof ListOwnInspectionsQuerySche
 export const RecordInspectionSchema = z.object({
   assignment_id: z.string().min(1),
   worker_id: z.string().min(1),
+  // Required (owner decision, 2026-08-29). With many checks per shift, a check
+  // that does not say which room it is about cannot be acted on or found.
+  // Trimmed so a space is not a room.
+  room_number: z.string().trim().min(1, 'A room number is required').max(64),
   score: z.coerce.number().int().min(0).max(100),
   comment: z.string().optional(),
   // Piped through criteriaScoresShape, NOT a bare z.record(z.string(), ...).
@@ -124,6 +136,7 @@ export const RecordInspectionSchema = z.object({
 export interface RecordInspectionRequest {
   assignment_id: string;
   worker_id: string;
+  room_number: string;
   score: number;
   comment?: string;
   criteria_scores?: Record<string, number>;

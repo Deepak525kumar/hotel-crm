@@ -168,26 +168,27 @@ describe('Quality scope authorization', () => {
         .field('assignment_id', 'asg_h1')
         .field('score', '80')
         .field('outcome', 'complete')
+        .field('room_number', '412')
         .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
       expect(res.status).toBe(201);
     });
 
     it('refuses a rating with no photo, even in scope (CRR §15)', async () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
-      const res = await request(makeApp()).post('/quality/verifications').send({ assignment_id: 'asg_h1', score: 80 });
+      const res = await request(makeApp()).post('/quality/verifications').send({ assignment_id: 'asg_h1', score: 80, room_number: '412' });
       expect(res.status).toBe(422);
     });
 
     it('denies a manager verifying an out-of-scope assignment (403)', async () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
-      const res = await request(makeApp()).post('/quality/verifications').send({ assignment_id: 'asg_h2', score: 80 });
+      const res = await request(makeApp()).post('/quality/verifications').send({ assignment_id: 'asg_h2', score: 80, room_number: '412' });
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('ForbiddenError');
     });
 
     it('denies a checker verifying cross-hotel (403)', async () => {
       testAuth = { userId: 'chk_1', role: 'checker', permissions: ['quality:write'], scope: null };
-      const res = await request(makeApp()).post('/quality/verifications').send({ assignment_id: 'asg_h2', score: 80 });
+      const res = await request(makeApp()).post('/quality/verifications').send({ assignment_id: 'asg_h2', score: 80, room_number: '412' });
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('ForbiddenError');
     });
@@ -208,6 +209,7 @@ describe('Quality scope authorization', () => {
         .field('worker_id', 'w1')
         .field('score', '80')
         .field('outcome', 'complete')
+        .field('room_number', '412')
         .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
       expect(res.status).toBe(201);
     });
@@ -216,7 +218,7 @@ describe('Quality scope authorization', () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
         .post('/quality/inspections')
-        .send({ assignment_id: 'asg_h1', worker_id: 'w1', score: 80, outcome: 'complete' });
+        .send({ assignment_id: 'asg_h1', worker_id: 'w1', score: 80, outcome: 'complete', room_number: '412' });
       expect(res.status).toBe(422);
     });
 
@@ -224,7 +226,7 @@ describe('Quality scope authorization', () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
         .post('/quality/inspections')
-        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80, outcome: 'complete' });
+        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80, outcome: 'complete', room_number: '412' });
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('ForbiddenError');
     });
@@ -233,7 +235,7 @@ describe('Quality scope authorization', () => {
       testAuth = { userId: 'chk_1', role: 'checker', permissions: ['quality:write'], scope: null };
       const res = await request(makeApp())
         .post('/quality/inspections')
-        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80, outcome: 'complete' });
+        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80, outcome: 'complete', room_number: '412' });
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('ForbiddenError');
     });

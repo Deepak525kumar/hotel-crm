@@ -100,7 +100,23 @@ router.get('/inspectable-workers', requirePermission('quality:write'), (req, res
 // never inspected simply gets an empty list. Gating a read behind a write
 // token would be the wrong shape to copy the next time this file grows.
 router.get('/my-inspections', requirePermission('quality:read'), (req, res, next) =>
-  qualityController.listOwnInspections(req, res, next)
+  qualityController.listOwnChecks(req, res, next)
+);
+
+// Every check recorded against one shift. NOT gated on quality:read: the
+// WORKER whose shift it is must be able to see the inspections of their own
+// work (CRR §14 says they are notified with the detail), and a worker does
+// hold quality:read -- but the authoritative gate is in the service, which
+// knows whose assignment it is. Keeping the token here as well would deny
+// nobody and imply the route is manager-facing, which it is not.
+router.get('/assignments/:assignment_id/checks', (req, res, next) =>
+  qualityController.listChecksForAssignment(req, res, next)
+);
+
+// One check, in the shape both sides render. Same reasoning as above for the
+// absent permission gate -- the subject of an inspection may always read it.
+router.get('/checks/:check_id', (req, res, next) =>
+  qualityController.getCheck(req, res, next)
 );
 
 router.get('/leaderboard', requirePermission('quality:read'), (req, res, next) =>

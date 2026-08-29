@@ -258,6 +258,7 @@ describe('verification score accepts a multipart string', () => {
   it('coerces "50" the way a multipart body sends it', () => {
     const parsed = CreateQualityVerificationSchema.safeParse({
       assignment_id: 'a1',
+      room_number: '412',
       score: '50',
     });
     expect(parsed.success).toBe(true);
@@ -267,6 +268,7 @@ describe('verification score accepts a multipart string', () => {
   it('still accepts a plain number from a JSON caller', () => {
     const parsed = CreateQualityVerificationSchema.safeParse({
       assignment_id: 'a1',
+      room_number: '412',
       score: 50,
     });
     expect(parsed.success).toBe(true);

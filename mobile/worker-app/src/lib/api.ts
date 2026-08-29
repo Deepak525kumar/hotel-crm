@@ -1,6 +1,7 @@
 import type { UiLocale } from '@/lib/locales';
 import type {
   EmploymentRecordDto,
+  QualityCheck,
   User,
   AuthResponse,
   WorkRequest,
@@ -500,6 +501,32 @@ export const api = {
     myStats: () => request<WorkerStats>('/analytics/my-stats'),
   },
   quality: {
+    /**
+     * Every check the checker recorded against one shift.
+     *
+     * The worker's shift screen lists these below the shift detail. No
+     * permission gate on the route: the subject of an inspection may always
+     * read it, and the server confirms it is their assignment.
+     */
+    checksForAssignment: (assignmentId: string) =>
+      request<{ assignment_id: string; checks: QualityCheck[] }>(
+        `/quality/assignments/${encodeURIComponent(assignmentId)}/checks`
+      ),
+
+    /**
+     * One check, in the SAME shape the checker's own history screen renders --
+     * deliberately one endpoint, so the two sides cannot show different scores
+     * for the same inspection.
+     */
+    getCheck: (checkId: string) =>
+      request<QualityCheck>(`/quality/checks/${encodeURIComponent(checkId)}`),
+
+    /** Presigned URLs for one check's photos, including any rework evidence. */
+    checkPhotos: (checkId: string) =>
+      request<{ verification_id: string; photos: { key: string; url: string | null }[] }>(
+        `/quality/verifications/${encodeURIComponent(checkId)}/photos`
+      ),
+
     // The leaderboard lives here, not under /analytics. /analytics/leaderboard
     // is gated requireRole(['admin','manager','regional_manager']) -- a worker
     // got a flat 403, so this screen had never worked -- and it applies no
