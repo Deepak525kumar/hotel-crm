@@ -130,6 +130,8 @@ export interface QualityVerification {
    * record did not.
    */
   criteria_scores?: Record<string, number> | null;
+  /** Which room this check is about. Required on every check since 2026-08-29. */
+  room_number?: string;
   /**
    * Whose work, where, when, and who inspected it — nested by
    * GET /quality/verifications/:id.
@@ -187,28 +189,36 @@ export interface RecordedInspection {
  * Photo COUNTS, not keys: the presigned URLs live 15 minutes, so they are
  * fetched per record by the evidence screens rather than carried in a list.
  */
+/**
+ * One CHECK — a single room inspected on a shift.
+ *
+ * Was one row per shift until 2026-08-29; a checker now inspects room by room,
+ * so a shift carries many of these and `room_number` is what tells them apart.
+ */
 export interface OwnInspection {
+  id: string;
   assignment_id: string;
-  day: string;
+  day: string | null;
+  assignment_status: AssignmentStatus | null;
+  room_number: string;
+  score: number;
+  status: VerificationStatus;
+  notes: string | null;
+  criteria_scores: Record<string, number> | null;
+  photo_count: number;
+  rework_required: boolean;
+  rework_notes: string | null;
+  rework_completed_at: string | null;
+  created_at: string;
   worker: { id: string; first_name: string; last_name: string } | null;
   hotel: { id: string; name: string; city: string } | null;
-  verification: {
-    id: string;
-    score: number;
-    status: VerificationStatus;
-    notes: string | null;
-    /** TREQ-005 checklist. Lives on the check since the Rating merge. */
-    criteria_scores: Record<string, number> | null;
-    photo_count: number;
-    rework_required: boolean;
-    rework_notes: string | null;
-    rework_completed_at: string | null;
-    created_at: string;
-  } | null;
+  checked_by: { id: string; first_name: string; last_name: string } | null;
+  /** Present when this check sent work back; drives the worker's "go to rework" button. */
+  rework_assignment: { id: string; status: AssignmentStatus; day: string } | null;
 }
 
 export interface OwnInspectionsPage {
-  inspections: OwnInspection[];
+  checks: OwnInspection[];
   pagination: { page: number; per_page: number; total: number; total_pages: number };
 }
 

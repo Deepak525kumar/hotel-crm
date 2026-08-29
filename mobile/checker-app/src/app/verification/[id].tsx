@@ -176,6 +176,14 @@ export default function VerificationEvidenceScreen() {
                 <Text style={styles.badgeText}>{verification.status}</Text>
               </View>
             </View>
+            {/* Which room. With many checks on one shift this is the only
+                thing distinguishing two otherwise identical records, so it
+                sits above the worker's name rather than buried in the meta. */}
+            {verification.room_number ? (
+              <Text style={styles.meta}>
+                {t('quality.roomLabel')} {verification.room_number}
+              </Text>
+            ) : null}
             {/* Whose work, where and when. The screen used to show a score and
                 photos with no way to tell which shift was inspected. */}
             {verification.assignment?.worker && (
@@ -236,6 +244,28 @@ export default function VerificationEvidenceScreen() {
                 <ThemedText type="smallBold">{verification.criteria_scores![item]}</ThemedText>
               </View>
             ))}
+          </View>
+        ) : null}
+
+        {/* CRR §14: the checker is notified with the photo, and this is where
+            they see it. Once rework is assigned the worker's completion photos
+            are APPENDED to the same photo_urls, so the grid below shows the
+            before-and-after pair on one screen -- which is the comparison the
+            checker actually has to make. This banner says which state it is
+            in, so an empty-looking grid is never mistaken for lost evidence. */}
+        {verification?.rework_required ? (
+          <View style={styles.card}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.reworkEvidenceTitle')}
+            </ThemedText>
+            <Text style={styles.notes}>
+              {verification.rework_completed_at
+                ? t('quality.reworkCompleted')
+                : t('quality.reworkAwaitingWorker')}
+            </Text>
+            {verification.rework_notes ? (
+              <Text style={styles.notes}>{verification.rework_notes}</Text>
+            ) : null}
           </View>
         ) : null}
 

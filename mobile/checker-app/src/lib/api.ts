@@ -21,6 +21,7 @@ import type {
   EmploymentRecordDto,
   LeaderboardEntry,
   Notification,
+  OwnInspection,
   OwnInspectionsPage,
   RecordedInspection,
   PayslipRequestDto,
@@ -545,6 +546,7 @@ export const api = {
       data: {
         assignment_id: string;
         worker_id: string;
+        room_number: string;
         score: number;
         comment?: string;
         criteria_scores?: Record<string, number>;
@@ -556,6 +558,7 @@ export const api = {
       const form = new FormData();
       form.append('assignment_id', data.assignment_id);
       form.append('worker_id', data.worker_id);
+      form.append('room_number', data.room_number);
       form.append('score', String(data.score));
       form.append('outcome', data.outcome);
       if (data.comment) form.append('comment', data.comment);
@@ -621,10 +624,24 @@ export const api = {
      * confirmation could not see their own scores or photos again, and
      * "Assign rework" (CRR §14) had no entry point at all.
      */
-    myInspections: (page = 1, perPage = 20) =>
-      request<OwnInspectionsPage>(
-        `/quality/my-inspections?page=${page}&per_page=${perPage}`
+    myInspections: (page = 1, perPage = 20, q?: string) => {
+      const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
+      // Omitted rather than sent empty: the server treats a blank q as "no
+      // search", but sending one anyway makes every request look like a query
+      // in the logs and invites a future reader to add a needless branch.
+      if (q && q.trim()) qs.set('q', q.trim());
+      return request<OwnInspectionsPage>(`/quality/my-inspections?${qs.toString()}`);
+    },
+
+    /** Every check recorded against one shift — the worker's shift screen. */
+    checksForAssignment: (assignmentId: string) =>
+      request<{ assignment_id: string; checks: OwnInspection[] }>(
+        `/quality/assignments/${encodeURIComponent(assignmentId)}/checks`
       ),
+
+    /** One check, in the shape both the worker and the checker see. */
+    getCheck: (checkId: string) =>
+      request<OwnInspection>(`/quality/checks/${encodeURIComponent(checkId)}`),
 
     verificationPhotos: (verificationId: string) =>
       request<{ verification_id: string; photos: { key: string; url: string | null }[] }>(
