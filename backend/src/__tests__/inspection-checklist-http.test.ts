@@ -149,6 +149,7 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
       .field('worker_id', 'w1')
       .field('score', '80')
       .field('outcome', 'complete')
+      .field('room_number', '412')
       .field('criteria_scores', JSON.stringify({ dust: 90, bathroom: 70, bed_linen: 100 }))
       .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
 
@@ -166,6 +167,7 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
         worker_id: 'w1',
         score: 80,
         outcome: 'complete',
+        room_number: '412',
         criteria_scores: { punctuality: 90 },
       });
 
@@ -181,6 +183,7 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
         worker_id: 'w1',
         score: 80,
         outcome: 'complete',
+        room_number: '412',
         criteria_scores: { dust: 5000 },
       });
 
@@ -194,6 +197,7 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
       .field('worker_id', 'w1')
       .field('score', '80')
       .field('outcome', 'complete')
+      .field('room_number', '412')
       .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(201);

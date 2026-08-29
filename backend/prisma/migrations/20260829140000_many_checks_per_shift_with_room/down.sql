@@ -1,0 +1,9 @@
+-- Reversible only while no shift has more than one check.
+--
+-- Restoring the unique constraint fails outright once a checker has recorded a
+-- second room on any shift, and there is no non-arbitrary way to choose which
+-- check to keep. Restore from a backup instead.
+--
+-- ALTER TABLE "QualityVerification" DROP COLUMN "room_number";
+-- CREATE UNIQUE INDEX "QualityVerification_assignment_id_key"
+--   ON "QualityVerification"("assignment_id");

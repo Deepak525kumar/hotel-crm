@@ -52,6 +52,86 @@ type RatingAggregateTx = Prisma.TransactionClient;
 // Rating row or a WorkerAssignment's status/completed_at must call this
 // inside the same transaction, or the aggregate silently goes stale — see
 // assignments/service.ts's call from AssignmentService.update().
+/**
+ * One shape for a check wherever it is listed.
+ *
+ * Three surfaces read checks -- the checker's history, the worker's shift
+ * screen, and the rework detail both of them open -- and they must agree.
+ * When they drifted before, the same inspection showed a different score
+ * depending on which screen you came from, which is unfalsifiable from a
+ * screenshot and reads as data corruption.
+ */
+export const QUALITY_CHECK_SELECT = {
+  id: true,
+  assignment_id: true,
+  room_number: true,
+  score: true,
+  status: true,
+  notes: true,
+  criteria_scores: true,
+  photo_urls: true,
+  rework_required: true,
+  rework_notes: true,
+  rework_completed_at: true,
+  created_at: true,
+  worker: { select: { id: true, first_name: true, last_name: true } },
+  hotel: { select: { id: true, name: true, city: true } },
+  verified_by: { select: { id: true, first_name: true, last_name: true } },
+  assignment: { select: { id: true, day: true, status: true } },
+  // The corrective assignment, so a screen can offer "go to your rework"
+  // without a second round trip. At most one today (one rework per check,
+  // owner decision 2026-08-29), but modelled as a list because the schema
+  // permits more.
+  rework_assignments: { select: { id: true, status: true, day: true } },
+} satisfies Prisma.QualityVerificationSelect;
+
+type QualityCheckRow = Prisma.QualityVerificationGetPayload<{
+  select: typeof QUALITY_CHECK_SELECT;
+}>;
+
+/**
+ * Photo COUNT, never the keys. A key is useless without a presigned URL, and
+ * the photos endpoint mints those on its own authorization check -- returning
+ * them in a list would widen it into a directory of private storage paths.
+ */
+export function toCheckDto(row: QualityCheckRow) {
+  return {
+    id: row.id,
+    assignment_id: row.assignment_id,
+    day: row.assignment?.day ?? null,
+    assignment_status: row.assignment?.status ?? null,
+    room_number: row.room_number,
+    score: row.score,
+    status: row.status,
+    notes: row.notes,
+    criteria_scores: row.criteria_scores,
+    photo_count: row.photo_urls.length,
+    rework_required: row.rework_required,
+    rework_notes: row.rework_notes,
+    rework_completed_at: row.rework_completed_at,
+    created_at: row.created_at,
+    worker: row.worker
+      ? { id: row.worker.id, first_name: row.worker.first_name, last_name: row.worker.last_name }
+      : null,
+    hotel: row.hotel ? { id: row.hotel.id, name: row.hotel.name, city: row.hotel.city } : null,
+    checked_by: row.verified_by
+      ? {
+          id: row.verified_by.id,
+          first_name: row.verified_by.first_name,
+          last_name: row.verified_by.last_name,
+        }
+      : null,
+    // What the worker's "go to your rework" button needs.
+    rework_assignment: row.rework_assignments[0]
+      ? {
+          id: row.rework_assignments[0].id,
+          status: row.rework_assignments[0].status,
+          day: row.rework_assignments[0].day,
+        }
+      : null,
+  };
+}
+
 export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_id: string) {
   // Serialize concurrent rating/assignment updates for this worker to prevent
   // double-triggering threshold warnings or overwriting intermediate state.
@@ -719,7 +799,7 @@ export class QualityService extends BaseService {
     actor: Actor,
     photos: UploadedPhoto[] = []
   ) {
-    const { assignment_id, worker_id, score, comment, criteria_scores, outcome } = data;
+    const { assignment_id, worker_id, score, comment, criteria_scores, outcome, room_number } = data;
     const reworkNotes = (data.rework_notes ?? comment ?? '').trim();
 
     const assignment = await this.prisma.workerAssignment.findUnique({
@@ -747,15 +827,14 @@ export class QualityService extends BaseService {
       throw new ValidationError('Rework notes are required to assign rework');
     }
 
-    // One record per assignment since the Rating merge (2026-08-29), so one
-    // pre-check. `assignment_id` is @unique, and the create below translates a
-    // concurrent P2002 to the same 409.
-    const existingVerification = await this.prisma.qualityVerification.findUnique({
-      where: { assignment_id },
-    });
-    if (existingVerification) {
-      throw new ConflictError('This assignment has already been inspected');
-    }
+    // No duplicate pre-check any more: a shift carries one check PER ROOM, so a
+    // second inspection of the same assignment is the normal case rather than
+    // a conflict (owner decision, 2026-08-29). The room number is what
+    // distinguishes them, which is why it is required above.
+    //
+    // Deliberately NOT unique on (assignment_id, room_number) either: a
+    // checker may legitimately re-inspect a room after rework, and rejecting
+    // that would make the second look like a mistake.
 
     // ONE upload, shared by both records. They are the same photographs of the
     // same room on the same visit; storing two copies under two key prefixes
@@ -790,6 +869,7 @@ export class QualityService extends BaseService {
             hotel_id: assignment.hotel_id,
             verified_by_id: actor.userId,
             worker_id,
+            room_number,
             score,
             status,
             notes: comment ?? null,
@@ -804,11 +884,11 @@ export class QualityService extends BaseService {
           },
         });
       } catch (error) {
-        // Concurrent duplicates pass the pre-check above and collide here.
-        // Translated to the same 409 rather than surfacing as a 500.
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-          throw new ConflictError('This assignment has already been inspected');
-        }
+        // No unique constraint on this table any more, so P2002 here would
+        // mean a NEW one somebody added without updating this handler --
+        // surfaced as itself rather than mistranslated into a stale
+        // "already inspected" message that would send the checker looking for
+        // a duplicate that does not exist.
         throw error;
       }
 
@@ -874,7 +954,7 @@ export class QualityService extends BaseService {
     // CRR §15: "the Checker/supervisor uploads a photo WITH the rating."
     photos: UploadedPhoto[] = []
   ) {
-    const { assignment_id, score, notes, criteria_scores } = data;
+    const { assignment_id, score, notes, criteria_scores, room_number } = data;
 
     const assignment = await this.prisma.workerAssignment.findUnique({
       where: { id: assignment_id },
@@ -927,10 +1007,8 @@ export class QualityService extends BaseService {
       throw new ValidationError('A photo is required to submit a rating');
     }
 
-    const existing = await this.prisma.qualityVerification.findUnique({
-      where: { assignment_id },
-    });
-    if (existing) throw new ConflictError('Verification already exists for this assignment');
+    // No duplicate check: one shift carries one check per room since
+    // 2026-08-29, so a second inspection of the same assignment is normal.
 
     const numScore = score;
     const derivedStatus: VerificationStatus =
@@ -963,6 +1041,7 @@ export class QualityService extends BaseService {
             // assignment rather than accepted from the client: the caller does
             // not get to say whose inspection this is.
             worker_id: assignment.worker_id,
+            room_number,
             score: numScore,
             status: derivedStatus,
             notes: notes ?? null,
@@ -976,16 +1055,12 @@ export class QualityService extends BaseService {
           },
         });
       } catch (err) {
-        // assignment_id is unique. Concurrent duplicate requests can pass the
-        // findUnique pre-check above and both reach create(), causing a P2002
-        // unique-constraint violation. Translate it to the same 409 the
-        // pre-check returns so concurrent duplicates never surface as a 500.
-        if (
-          err instanceof Prisma.PrismaClientKnownRequestError &&
-          err.code === 'P2002'
-        ) {
-          throw new ConflictError('Verification already exists for this assignment');
-        }
+        // No unique constraint on assignment_id since 2026-08-29 -- a shift
+        // carries one check per room -- so the P2002-to-409 translation that
+        // lived here is gone. A P2002 now would mean a NEW constraint somebody
+        // added without updating this handler, and it is re-thrown as itself
+        // rather than mistranslated into "already inspected", which would send
+        // a checker hunting for a duplicate that does not exist.
         throw err;
       }
 
@@ -1226,128 +1301,134 @@ export class QualityService extends BaseService {
   }
 
   /**
-   * The caller's own inspection history — every shift they scored, newest
-   * first (CRR §14/§15).
+   * The checks this person recorded, newest first, with free-text search.
    *
-   * The quality module had no list read path at all: `/verifications/:id` and
-   * `/ratings/:id/photos` can only be reached by someone who already knows the
-   * id. That made an inspection effectively write-only the moment the screen
-   * that created it was dismissed. Two concrete consequences, both reported
-   * from the field:
-   *
-   *   - A checker could not see what they had scored, or the photos they had
-   *     uploaded, once they left the submit screen.
-   *   - "Assign rework" (CRR §14) lives on the verification evidence screen,
-   *     which was reachable ONLY by the redirect immediately after submitting
-   *     a verification, or by tapping a REWORK_COMPLETED push. Miss both and
-   *     the one action the requirement names a checker for was unreachable.
-   *     The web app has the same gap for the same reason — see the "no GET
-   *     endpoint exists for either" comment on its assignment detail page,
-   *     which keeps both records in React state only and loses them on reload.
-   *
-   * Rooted at WorkerAssignment rather than queried per model because a
-   * checker's mental unit is the shift they inspected, not the two rows it
-   * produced. `Rating` and `QualityVerification` are each 1:1 with an
-   * assignment (`assignment_id @unique`) and are written by SEPARATE actions —
-   * the checklist score and the pass/fail verification — so one shift may
-   * legitimately have either, or both. Listing the two models separately would
-   * show the same inspection twice with no way for a client to tell that it
-   * was one visit.
+   * Lists CHECKS rather than shifts (2026-08-29). A shift now carries one
+   * check per room, so keying the history by assignment would collapse a
+   * hundred room inspections into one row and hide the very thing the checker
+   * is looking for.
    *
    * Self-scoped by construction: the filter is the caller's own id on
-   * `rated_by_id`/`verified_by_id`, never a client-supplied parameter. That is
-   * the whole authorization — the caller is being shown records they authored,
-   * and therefore already saw in full at authoring time. A role that cannot
-   * author (WORKER holds `quality:read` but not `quality:write`) gets an empty
-   * list, which is correct rather than a denial.
+   * `verified_by_id`, never a client-supplied parameter. A role that cannot
+   * inspect gets an empty list, which is correct rather than a denial.
    *
-   * Photo KEYS are deliberately not returned, only counts. A key is useless
-   * without a presigned URL, and the two existing photo endpoints already mint
-   * those per record on their own authorization check. Returning keys here
-   * would widen this response into a listing of private storage paths for no
-   * gain.
+   * Photo COUNTS, not keys: a key is useless without a presigned URL, and the
+   * photos endpoint mints those per record on its own authorization check.
    */
-  async listOwnInspections(actor: Actor, page = 1, perPage = 20) {
-    // One record per inspection since the Rating merge (2026-08-29), so one
-    // predicate. This was an OR across two relations, which is also why the
-    // per-record authorship filter below existed.
-    const where: Prisma.WorkerAssignmentWhereInput = {
-      quality_verification: { verified_by_id: actor.userId },
+  async listOwnChecks(
+    actor: Actor,
+    options: { page?: number; perPage?: number; q?: string } = {}
+  ) {
+    const page = options.page ?? 1;
+    const perPage = options.perPage ?? 20;
+    const q = options.q?.trim();
+
+    // One box, four columns (owner decision, 2026-08-29). Someone typing "412"
+    // may mean a room, a note that mentions it, or a name -- asking them which
+    // before they can search is the kind of form nobody fills in twice.
+    //
+    // `mode: 'insensitive'` on every arm: "Grand" and "grand" are the same
+    // hotel, and a case-sensitive search silently returns nothing rather than
+    // reporting that it could not help.
+    const search: Prisma.QualityVerificationWhereInput | undefined = q
+      ? {
+          OR: [
+            { room_number: { contains: q, mode: 'insensitive' } },
+            { notes: { contains: q, mode: 'insensitive' } },
+            { worker: { first_name: { contains: q, mode: 'insensitive' } } },
+            { worker: { last_name: { contains: q, mode: 'insensitive' } } },
+            { hotel: { name: { contains: q, mode: 'insensitive' } } },
+          ],
+        }
+      : undefined;
+
+    const where: Prisma.QualityVerificationWhereInput = {
+      verified_by_id: actor.userId,
+      ...(search ?? {}),
     };
 
-    const [total, assignments] = await Promise.all([
-      this.prisma.workerAssignment.count({ where }),
-      this.prisma.workerAssignment.findMany({
+    const [total, checks] = await Promise.all([
+      this.prisma.qualityVerification.count({ where }),
+      this.prisma.qualityVerification.findMany({
         where,
-        select: {
-          id: true,
-          day: true,
-          worker: { select: { id: true, first_name: true, last_name: true } },
-          hotel: { select: { id: true, name: true, city: true } },
-          quality_verification: {
-            select: {
-              id: true,
-              score: true,
-              status: true,
-              notes: true,
-              criteria_scores: true,
-              photo_urls: true,
-              rework_required: true,
-              rework_notes: true,
-              rework_completed_at: true,
-              created_at: true,
-            },
-          },
-        },
-        // `day` is the shift being inspected, which is what a checker
-        // recognizes a row by. `id` breaks ties deterministically: without a
-        // second key Postgres may return two same-day rows in a different
-        // order between two requests, which under pagination silently drops or
-        // duplicates a row across a page boundary rather than merely
-        // reshuffling the page.
-        orderBy: [{ day: 'desc' }, { id: 'desc' }],
+        select: QUALITY_CHECK_SELECT,
+        // created_at is the inspection's own moment, which is what a checker
+        // recognizes a row by when several rooms share a shift. `id` breaks
+        // ties deterministically -- without it, two checks written in the same
+        // transaction can swap places between requests and, under pagination,
+        // silently drop or duplicate one across a page boundary.
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * perPage,
         take: perPage,
       }),
     ]);
 
     return {
-      inspections: assignments.map((a) => {
-        // The `where` already restricts to this checker's own inspections, and
-        // there is now exactly one record per shift, so the per-record
-        // authorship filter this used to need is gone with the second model.
-        const verification = a.quality_verification;
-
-        return {
-          assignment_id: a.id,
-          day: a.day,
-          worker: a.worker
-            ? { id: a.worker.id, first_name: a.worker.first_name, last_name: a.worker.last_name }
-            : null,
-          hotel: a.hotel ? { id: a.hotel.id, name: a.hotel.name, city: a.hotel.city } : null,
-          verification: verification
-            ? {
-                id: verification.id,
-                score: verification.score,
-                status: verification.status,
-                notes: verification.notes,
-                criteria_scores: verification.criteria_scores,
-                photo_count: verification.photo_urls.length,
-                rework_required: verification.rework_required,
-                rework_notes: verification.rework_notes,
-                rework_completed_at: verification.rework_completed_at,
-                created_at: verification.created_at,
-              }
-            : null,
-        };
-      }),
-      pagination: {
-        page,
-        per_page: perPage,
-        total,
-        total_pages: Math.ceil(total / perPage),
-      },
+      checks: checks.map(toCheckDto),
+      pagination: { page, per_page: perPage, total, total_pages: Math.ceil(total / perPage) },
     };
+  }
+
+  /**
+   * Every check recorded against one shift.
+   *
+   * Backs the worker's shift screen (owner decision, 2026-08-29: "when the
+   * worker clicks on the shifts he completed, or are in progress ... below
+   * them he should be able to see all the checks that have been submitted by
+   * the checker for him"). Also serves a checker or manager opening the same
+   * shift, so both sides read one endpoint and cannot disagree.
+   *
+   * The WORKER the shift belongs to is admitted unconditionally -- these are
+   * inspections of their own work, and CRR §14 is explicit that they are
+   * notified with the detail. Everyone else goes through the same gate that
+   * guards a single check.
+   */
+  async listChecksForAssignment(assignmentId: string, actor: Actor) {
+    const assignment = await this.prisma.workerAssignment.findUnique({
+      where: { id: assignmentId },
+      select: { id: true, worker_id: true, hotel_id: true },
+    });
+    if (!assignment) throw new NotFoundError('Assignment not found');
+
+    // Reuses the single-check gate rather than restating it: one rule, so a
+    // future change to who may see an inspection cannot apply to the detail
+    // screen and miss the list that links to it.
+    await this.assertCanViewVerification(
+      { hotel_id: assignment.hotel_id, assignment: { worker_id: assignment.worker_id } },
+      actor
+    );
+
+    const checks = await this.prisma.qualityVerification.findMany({
+      where: { assignment_id: assignmentId },
+      select: QUALITY_CHECK_SELECT,
+      orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+    });
+
+    return { assignment_id: assignmentId, checks: checks.map(toCheckDto) };
+  }
+
+  /**
+   * One check, in the shape every screen renders.
+   *
+   * Distinct from getVerification() above, which returns the raw record for
+   * the checker's evidence screen. This returns the shared DTO -- including
+   * the rework assignment -- so the worker's detail screen and the checker's
+   * are literally the same view of the same data (owner decision: "he should
+   * see the details, I mean the same screen the checker sees").
+   */
+  async getCheck(checkId: string, actor: Actor) {
+    const check = await this.prisma.qualityVerification.findUnique({
+      where: { id: checkId },
+      select: QUALITY_CHECK_SELECT,
+    });
+    if (!check) throw new NotFoundError('Check not found');
+
+    await this.assertCanViewVerification(
+      { hotel_id: check.hotel?.id ?? '', assignment: { worker_id: check.worker?.id ?? '' } },
+      actor
+    );
+
+    return toCheckDto(check);
   }
 
   async getLeaderboard(

@@ -188,16 +188,59 @@ export class QualityController {
   // CRR §14/§15: the checker's own inspection history. Self-scoped in the
   // service off req.auth.userId -- there is deliberately no `checker_id` or
   // `user_id` query parameter to spoof.
-  async listOwnInspections(req: Request, res: Response, next: NextFunction) {
+  async listOwnChecks(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');
       const parsed = ListOwnInspectionsQuerySchema.safeParse(req.query);
       if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message);
-      const result = await qualityService.listOwnInspections(
+      const result = await qualityService.listOwnChecks(
         { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null },
-        parsed.data.page,
-        parsed.data.per_page
+        { page: parsed.data.page, perPage: parsed.data.per_page, q: parsed.data.q }
       );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Every check recorded against one shift. Backs the worker's shift screen
+  // and, for a checker or manager, the same shift opened from their side.
+  async listChecksForAssignment(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const id = req.params.assignment_id;
+      if (!id) throw new ValidationError('assignment_id is required');
+      const result = await qualityService.listChecksForAssignment(id, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope ?? null,
+      });
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // One check, in the shape both the worker's and the checker's detail screen
+  // render -- deliberately the same payload, so the two cannot drift.
+  async getCheck(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const id = req.params.check_id;
+      if (!id) throw new ValidationError('check_id is required');
+      const result = await qualityService.getCheck(id, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope ?? null,
+      });
       res.status(200).json({
         status: 'success',
         data: result,
