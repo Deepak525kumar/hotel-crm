@@ -25,6 +25,10 @@ export const ListAssignmentsQuerySchema = z.object({
   job_request_id: z.string().optional(),
   worker_id: z.string().optional(),
   status: z.nativeEnum(AssignmentStatus).optional(),
+  // Free-text search across worker name, hotel name and city (owner decision,
+  // 2026-08-30). Bounded: this becomes several LIKE clauses across joined
+  // tables, and an unbounded term is a cheap way to make an expensive query.
+  q: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).default(1),
   per_page: z.coerce.number().int().min(1).max(100).default(20),
 });

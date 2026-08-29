@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAssignments } from "@/hooks/useAssignments";
 import { useHotel, useUsersByIds } from "@/hooks/useHotels";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
@@ -11,6 +11,7 @@ import {
   Card,
   CardContent,
   EmptyState,
+  Input,
   Pager,
   PageHeader,
   Select,
@@ -86,10 +87,27 @@ function AssignmentRow({ assignment: a }: { assignment: Assignment }) {
 export default function AssignmentsPage() {
   const { t } = useTranslation();
   const [status, setStatus] = useState<AssignmentStatus | "">("");
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
   const [page, setPage] = useState(1);
+
+  // Debounced, and searched on the SERVER (owner decision, 2026-08-30). This
+  // list is paginated, so filtering the page the browser happens to hold would
+  // report "none found" while the match sat on page 3. Server-side means one
+  // request per keystroke without this delay.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDebounced(query.trim());
+      // Back to page 1 whenever the term changes: staying on page 4 of the old
+      // result set shows an empty table for a search that does have matches.
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [query]);
 
   const { assignments, isLoading, error, hasNext } = useAssignments({
     status: status || undefined,
+    q: debounced || undefined,
     page,
     per_page: PER_PAGE,
   });
@@ -112,6 +130,15 @@ export default function AssignmentsPage() {
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="w-full sm:flex-1">
+          <Input
+            label={t("assignments.searchLabel")}
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("assignments.searchPlaceholder")}
+          />
+        </div>
         <div className="w-full sm:w-48">
           <Select
             label={t("fields.status")}
@@ -148,9 +175,16 @@ export default function AssignmentsPage() {
                       <EmptyState
                         title={t("assignments.noneFound")}
                         description={
-                          status
-                            ? "Try adjusting your filters."
-                            : "Assignments appear once workers are placed on a shift."
+                          // Three different facts, and they were two: a search
+                          // with no match is not the same as a filter with no
+                          // match, and neither is the same as having no
+                          // assignments at all. (The first two were also the
+                          // only untranslated strings on this page.)
+                          debounced
+                            ? t("assignments.searchNoMatch")
+                            : status
+                              ? t("assignments.filterNoMatch")
+                              : t("assignments.noneYet")
                         }
                       />
                     </TD>

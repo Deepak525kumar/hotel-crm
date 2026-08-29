@@ -292,6 +292,12 @@ const envSchema = z.object({
   // query is a single indexed lookup that usually matches nothing.
   REWORK_ESCALATION_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
   REWORK_ESCALATION_BATCH_SIZE: z.coerce.number().int().positive().default(50),
+  // The end-of-shift inspection digest. The interval is how often the job
+  // looks; QUIET_PERIOD_MS in the job is how long a shift must be quiet before
+  // it is summarized, and that is the number that decides how late the digest
+  // feels to a worker.
+  INSPECTION_DIGEST_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
+  INSPECTION_DIGEST_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   GEO_RETENTION_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
   GEO_RETENTION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
 

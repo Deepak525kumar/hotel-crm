@@ -366,11 +366,18 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
     );
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(mockOutboxEvent.create).toHaveBeenCalledTimes(1);
-    expect(mockOutboxEvent.create.mock.calls[0][0].data.source_module).toBe('QUALITY');
     const notifData = mockNotification.create.mock.calls[0][0].data;
     expect(notifData.type).toBe('QUALITY_VERIFICATION_SUBMITTED');
     expect(notifData.user_id).toBe('w1');
+
+    // No outbox event, deliberately (owner decision, 2026-08-30). This used to
+    // assert exactly one PUSH. With one check per room a shift produced ~100
+    // of them, which is how a worker turns notifications off and loses the
+    // rework alerts along with the noise. A PASSED check is now recorded to
+    // the inbox -- the Notification row above -- and delivered later as one
+    // summary by InspectionDigestJob. The transaction property this test was
+    // written for (ADR-029 GD-01) is unchanged and still asserted above.
+    expect(mockOutboxEvent.create).not.toHaveBeenCalled();
   });
 
   it('emits REWORK_REQUIRED when the score lands in the needs-rework band', async () => {
@@ -557,12 +564,17 @@ describe('Quality recordInspection — worker notification (GAP-1)', () => {
     // a verification message about the same visit.
     expect(payload.type).toBe('QUALITY_VERIFICATION_SUBMITTED');
 
-    // ADR-029 (GD-01, Epic 7 PR 7.3): the enqueue joins the same
-    // transaction as the rating write and aggregate refresh — no more
-    // fire-and-forget microtask to wait on.
-    expect(mockOutboxEvent.create).toHaveBeenCalledTimes(1);
-    expect(mockOutboxEvent.create.mock.calls[0][0].data.source_module).toBe('QUALITY');
-    expect(mockOutboxEvent.create.mock.calls[0][0].data.transport).toBe('PUSH');
+    // ADR-029 (GD-01, Epic 7 PR 7.3): the enqueue joins the same transaction
+    // as the rating write and aggregate refresh — no more fire-and-forget
+    // microtask to wait on. Still true: the Notification row asserted above is
+    // written inside it.
+    expect(mockPrisma.$transaction).toHaveBeenCalled();
+
+    // But it no longer produces a PUSH. Owner decision (2026-08-30): a passing
+    // check stops interrupting and arrives in the end-of-shift digest, because
+    // ~100 rooms per shift meant ~100 pushes. Rework is unaffected and still
+    // pushes at once — asserted in quality-record-inspection.test.ts.
+    expect(mockOutboxEvent.create).not.toHaveBeenCalled();
   });
 });
 

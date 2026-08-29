@@ -1,4 +1,6 @@
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { matchesShift, SEARCH_THRESHOLD } from '@/lib/check-search';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import useSWR from 'swr';
@@ -92,6 +94,8 @@ export default function ScheduleScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
 
+  const [query, setQuery] = useState('');
+
   const {
     data: assignments,
     isLoading: loading,
@@ -102,6 +106,13 @@ export default function ScheduleScreen() {
   );
 
   const items = Array.isArray(assignments) ? assignments : [];
+
+  // Owner decision (2026-08-30): search wherever there are multiple entries.
+  // Filtered on the device -- this is one already-loaded page, so a server
+  // round-trip per keystroke would only add latency.
+  const visible = items.filter((i) =>
+    matchesShift(i, query, t(`shifts.status${i.status}`, { defaultValue: i.status }))
+  );
 
   return (
     <ThemedView style={styles.container}>
@@ -134,11 +145,25 @@ export default function ScheduleScreen() {
           title={t('shifts.upcomingTitle')}
         />
 
+        {/* Shown only once the list is long enough to be worth filtering. */}
+        {items.length > SEARCH_THRESHOLD ? (
+          <TextInput
+            style={[styles.search, { backgroundColor: theme.backgroundElement, color: theme.text }]}
+            placeholder={t('shifts.searchPlaceholder')}
+            placeholderTextColor={theme.textSecondary}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+          />
+        ) : null}
+
         {loading && !items.length ? (
           <ActivityIndicator style={styles.loader} />
         ) : (
           <FlatList
-            data={items}
+            data={visible}
             keyExtractor={(i) => i.id}
             initialNumToRender={10}
             maxToRenderPerBatch={10}
@@ -157,7 +182,15 @@ export default function ScheduleScreen() {
               />
             )}
             ListEmptyComponent={
-              <EmptyState title={t('shifts.none')} body={t('home.noUpcomingShiftsBody')} />
+              /* "No matches" and "no shifts" are different facts: one means
+                 the search is too narrow, the other that there is nothing to
+                 find. Showing "you have no shifts" to someone mid-search
+                 reads as though their schedule was cleared. */
+              query.trim() !== '' ? (
+                <EmptyState title={t('shifts.searchNoMatch')} body={t('shifts.searchNoMatchBody')} />
+              ) : (
+                <EmptyState title={t('shifts.none')} body={t('home.noUpcomingShiftsBody')} />
+              )
             }
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={() => void mutate()} />
@@ -172,6 +205,14 @@ export default function ScheduleScreen() {
 }
 
 const styles = StyleSheet.create({
+  search: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
   container: { flex: 1 },
   safeArea: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },

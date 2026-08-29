@@ -17,6 +17,11 @@ import {
 } from './recency-weighting.js';
 import { attendanceScore, blendQualityAndAttendance } from './overall-rating.js';
 import { notificationService } from '../notifications/service.js';
+// Shared with the assignments search: every free-text search needs this, and a
+// second copy of the rule is a second chance to get it wrong.
+import { escapeLikeTerm } from '../../lib/like-escape.js';
+
+export { escapeLikeTerm };
 import { isHotelInScope } from '../../middleware/permissions.js';
 // From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
 // pure predicates, so suites mocking the permissions middleware need not stub them.
@@ -52,24 +57,6 @@ type RatingAggregateTx = Prisma.TransactionClient;
 // Rating row or a WorkerAssignment's status/completed_at must call this
 // inside the same transaction, or the aggregate silently goes stale — see
 // assignments/service.ts's call from AssignmentService.update().
-/**
- * Neutralise LIKE metacharacters in a user-supplied search term.
- *
- * Prisma's `contains` compiles to `LIKE '%term%'` and does NOT escape the
- * term. So a search for "%" matched every row, "_" matched every row with at
- * least one character, and "%%%%%" is a cheap way to make five joined LIKE
- * clauses expensive. Not SQL injection -- the value is still parameterised --
- * but wildcard injection, which is a correctness bug the moment a room is
- * called "A_1" or someone types a stray %.
- *
- * Backslash first, or it would double-escape the escapes added after it.
- * Postgres LIKE treats backslash as the escape character by default, which is
- * what makes this work without an explicit ESCAPE clause.
- */
-export function escapeLikeTerm(term: string): string {
-  return term.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
-}
-
 /**
  * One shape for a check wherever it is listed.
  *
@@ -937,9 +924,19 @@ export class QualityService extends BaseService {
         return { verification, reworkAssignment };
       }
 
-      // Exactly one notification for the "complete" outcome. The old
-      // three-call path sent RATING_RECEIVED as well; two pushes for one
-      // inspection is noise, and the score is in this one.
+      // The inbox row is written; the PUSH is deliberately NOT.
+      //
+      // Owner decision (2026-08-30). A checker writes up to ~100 checks on one
+      // shift, one per room, and pushing each of them meant ~100 notifications
+      // for a normal day. That is how a worker learns to switch notifications
+      // off -- and once off, the rework alerts that genuinely need them to act
+      // are silently gone too. So a passing room is recorded here and
+      // delivered later as a single end-of-shift summary
+      // (InspectionDigestJob); only rework pushes at once, above.
+      //
+      // `transports: []` rather than skipping enqueue: the worker should still
+      // find every check in their inbox and on the shift screen. What changed
+      // is the interruption, not the record.
       await notificationService.enqueue(
         {
           recipientId: worker_id,
@@ -948,7 +945,7 @@ export class QualityService extends BaseService {
           message: `Your work was inspected and scored ${score} out of 100.`,
           data: { verification_id: verification.id, assignment_id, score, status },
           hotelId: assignment.hotel_id,
-          transports: [OutboxTransport.PUSH],
+          transports: [],
           sourceModule: OutboxSourceModule.QUALITY,
           producerService: 'QualityService',
         },
@@ -1096,7 +1093,12 @@ export class QualityService extends BaseService {
             : `Your work did not meet quality standards. Score: ${numScore}.`,
           data: { verification_id: created.id, assignment_id, score: numScore, status: derivedStatus },
           hotelId: assignment.hotel_id,
-          transports: [OutboxTransport.PUSH],
+          // Same policy as recordInspection (2026-08-30): a PASSED check is
+          // recorded to the inbox and summarized later by InspectionDigestJob,
+          // and only a check that asks the worker to DO something interrupts
+          // them. Applied here too, or the two writers would disagree about
+          // how loud the same event is depending on which screen produced it.
+          transports: isPassed ? [] : [OutboxTransport.PUSH],
           sourceModule: OutboxSourceModule.QUALITY,
           producerService: 'QualityService',
         },

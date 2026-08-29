@@ -75,10 +75,6 @@ export default function RootLayout() {
               name="attendance/[id]"
               options={{ title: t('nav.attendanceDetail'), headerShown: true }}
             />
-            <Stack.Screen
-              name="quality/[id]"
-              options={{ title: t('nav.qualityCheck'), headerShown: true }}
-            />
             <Stack.Screen name="verification/[id]" options={{ headerShown: false }} />
             {/* ADR-065: the onboarding gate is universal for non-Admin roles.
                 AuthGuard redirects a non-ACTIVE checker here. */}

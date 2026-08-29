@@ -310,7 +310,12 @@
     "calendarPlacementsDescription": "Mitarbeiter, die direkt im Kalender eines Hotels platziert wurden — ohne Rundmeldung, ohne Annahmeschritt.",
     "calendarPlacementsLink": "Kalenderplatzierungen",
     "scoreDerivedHint": "Der Status ergibt sich aus der Punktzahl: ab 70 bestanden, 40–69 Nacharbeit nötig, unter 40 nicht bestanden.",
-    "checklistItemRange": "Checklistenpunkte müssen ganze Zahlen zwischen 0 und 100 sein."
+    "checklistItemRange": "Checklistenpunkte müssen ganze Zahlen zwischen 0 und 100 sein.",
+    "searchLabel": "Suchen",
+    "searchPlaceholder": "Mitarbeiter, Hotel oder Stadt",
+    "searchNoMatch": "Keine Einsätze entsprechen dieser Suche.",
+    "filterNoMatch": "Passen Sie Ihre Filter an.",
+    "noneYet": "Einsätze erscheinen, sobald Mitarbeiter einer Schicht zugewiesen sind."
   },
   "settings": {
     "language": {
@@ -422,7 +427,10 @@
     "openInMaps": "In Karten öffnen",
     "mapsUnavailable": "Auf diesem Gerät ist keine Karten-App verfügbar.",
     "callHotel": "Hotel anrufen",
-    "emailHotel": "Hotel per E-Mail"
+    "emailHotel": "Hotel per E-Mail",
+    "searchPlaceholder": "Nach Hotel, Stadt, Datum oder Status suchen",
+    "searchNoMatch": "Keine passenden Schichten",
+    "searchNoMatchBody": "Keine Schichten entsprechen dieser Suche. Versuchen Sie ein anderes Hotel, Datum oder einen anderen Status."
   },
   "jobs": {
     "none": "Keine offenen Jobs gefunden.",
@@ -1081,7 +1089,9 @@
     "noInspectableWorkers": "Keine Mitarbeiter zu kontrollieren",
     "noInspectableWorkersBody": "In den Hotels, in denen Sie arbeiten, ist heute niemand im Dienst.",
     "workerUnavailable": "Mitarbeiter nicht verfügbar",
-    "overallScoreTitle": "Overall Score (0-100)"
+    "overallScoreTitle": "Overall Score (0-100)",
+    "searchChecksPlaceholder": "Nach Zimmer, Notiz oder Ergebnis suchen",
+    "searchChecksNoMatch": "Keine Prüfungen entsprechen dieser Suche."
   },
   "ratings": {
     "comment": "Kommentar",

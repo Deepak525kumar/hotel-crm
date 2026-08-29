@@ -311,7 +311,12 @@
     "calendarPlacementsDescription": "ہوٹل کے کیلنڈر پر براہ راست تعینات کارکن — کوئی اعلان نہیں، کوئی قبولیت مرحلہ نہیں۔",
     "calendarPlacementsLink": "کیلنڈر تعیناتیاں",
     "scoreDerivedHint": "حالت سکور سے اخذ کی جاتی ہے: 70+ کامیاب، 40–69 دوبارہ کام درکار، 40 سے کم ناکام۔",
-    "checklistItemRange": "چیک لسٹ کی اشیاء 0 سے 100 کے درمیان مکمل اعداد ہونی چاہئیں۔"
+    "checklistItemRange": "چیک لسٹ کی اشیاء 0 سے 100 کے درمیان مکمل اعداد ہونی چاہئیں۔",
+    "searchLabel": "تلاش",
+    "searchPlaceholder": "ورکر، ہوٹل یا شہر",
+    "searchNoMatch": "اس تلاش سے کوئی تفویض نہیں ملی۔",
+    "filterNoMatch": "اپنے فلٹرز تبدیل کر کے دیکھیں۔",
+    "noneYet": "ورکرز کو شفٹ پر تعینات کرنے کے بعد تفویضات ظاہر ہوں گی۔"
   },
   "settings": {
     "language": {
@@ -423,7 +428,10 @@
     "openInMaps": "نقشوں میں کھولیں",
     "mapsUnavailable": "اس ڈیوائس پر کوئی نقشہ ایپ دستیاب نہیں۔",
     "callHotel": "ہوٹل کو کال کریں",
-    "emailHotel": "ہوٹل کو ای میل کریں"
+    "emailHotel": "ہوٹل کو ای میل کریں",
+    "searchPlaceholder": "ہوٹل، شہر، تاریخ یا حیثیت سے تلاش کریں",
+    "searchNoMatch": "کوئی مماثل شفٹ نہیں",
+    "searchNoMatchBody": "اس تلاش سے کوئی شفٹ نہیں ملی۔ کوئی اور ہوٹل، تاریخ یا حیثیت آزمائیں۔"
   },
   "jobs": {
     "none": "کوئی کھلی نوکری نہیں ملی۔",
@@ -1082,7 +1090,9 @@
     "noInspectableWorkers": "جانچنے کے لیے کوئی ورکر نہیں",
     "noInspectableWorkersBody": "جن ہوٹلوں میں آپ کام کر رہے ہیں وہاں آج کوئی شفٹ پر نہیں ہے۔",
     "workerUnavailable": "ورکر دستیاب نہیں",
-    "overallScoreTitle": "Overall Score (0-100)"
+    "overallScoreTitle": "Overall Score (0-100)",
+    "searchChecksPlaceholder": "کمرہ، نوٹ یا نتیجہ سے تلاش کریں",
+    "searchChecksNoMatch": "اس تلاش سے کوئی چیک نہیں ملا۔"
   },
   "ratings": {
     "comment": "تبصرہ",

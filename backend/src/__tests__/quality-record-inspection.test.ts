@@ -162,6 +162,38 @@ describe('recordInspection writes one inspection, once', () => {
   });
 });
 
+describe('notification policy: rework interrupts, a pass does not', () => {
+  /**
+   * Owner decision (2026-08-30). ~100 checks per shift meant ~100 pushes,
+   * which is how a worker turns notifications off -- and once off, the rework
+   * alerts that need them to act are gone too. A passing room is still
+   * RECORDED (inbox + shift screen); it just stops interrupting, and arrives
+   * later in one digest from InspectionDigestJob.
+   */
+  it('does not PUSH a passing check', () => {
+    const src = body();
+    const enqueue = src.slice(src.indexOf("type: 'QUALITY_VERIFICATION_SUBMITTED'"));
+    expect(enqueue.slice(0, enqueue.indexOf(')'))).toMatch(/transports:\s*\[\s*\]/);
+  });
+
+  it('still WRITES the passing check to the inbox', () => {
+    // The distinction the whole decision rests on: quieter, not missing. If
+    // the enqueue were skipped instead of muted, the check would vanish from
+    // the worker's inbox entirely.
+    expect(body()).toMatch(/enqueue\([\s\S]*QUALITY_VERIFICATION_SUBMITTED/);
+  });
+
+  it('still pushes rework immediately', () => {
+    // createReworkAssignment carries the REWORK_REQUIRED push; the rework
+    // branch returns before reaching the muted enqueue, so muting a pass
+    // cannot silence a rework.
+    const src = body();
+    const reworkReturn = src.indexOf('return { verification, reworkAssignment }');
+    expect(reworkReturn).toBeGreaterThan(-1);
+    expect(reworkReturn).toBeLessThan(src.indexOf("type: 'QUALITY_VERIFICATION_SUBMITTED'"));
+  });
+});
+
 describe('the shared rework helper keeps the two producers in step', () => {
   it('is used by BOTH assignRework and recordInspection', () => {
     // The worker app deep-links a REWORK_REQUIRED push on

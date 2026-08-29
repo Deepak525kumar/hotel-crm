@@ -311,7 +311,12 @@
     "calendarPlacementsDescription": "الموظفون المُنسَّبون مباشرة في تقويم الفندق — بدون بث وبدون خطوة قبول.",
     "calendarPlacementsLink": "التنسيبات في التقويم",
     "scoreDerivedHint": "تُشتق الحالة من النتيجة: 70 فأكثر ناجح، 40–69 يحتاج إعادة عمل، أقل من 40 راسب.",
-    "checklistItemRange": "يجب أن تكون عناصر قائمة التحقق أعدادًا صحيحة بين 0 و100."
+    "checklistItemRange": "يجب أن تكون عناصر قائمة التحقق أعدادًا صحيحة بين 0 و100.",
+    "searchLabel": "بحث",
+    "searchPlaceholder": "الموظف أو الفندق أو المدينة",
+    "searchNoMatch": "لا توجد تعيينات تطابق هذا البحث.",
+    "filterNoMatch": "حاول تعديل عوامل التصفية.",
+    "noneYet": "تظهر التعيينات بمجرد تعيين الموظفين في وردية."
   },
   "settings": {
     "language": {
@@ -423,7 +428,10 @@
     "openInMaps": "فتح في الخرائط",
     "mapsUnavailable": "لا يتوفر تطبيق خرائط على هذا الجهاز.",
     "callHotel": "الاتصال بالفندق",
-    "emailHotel": "مراسلة الفندق"
+    "emailHotel": "مراسلة الفندق",
+    "searchPlaceholder": "ابحث حسب الفندق أو المدينة أو التاريخ أو الحالة",
+    "searchNoMatch": "لا توجد ورديات مطابقة",
+    "searchNoMatchBody": "لا توجد ورديات تطابق هذا البحث. جرّب فندقًا أو تاريخًا أو حالة أخرى."
   },
   "jobs": {
     "none": "لم يتم العثور على وظائف متاحة.",
@@ -1082,7 +1090,9 @@
     "noInspectableWorkers": "لا يوجد موظفون للفحص",
     "noInspectableWorkersBody": "لا أحد في الوردية اليوم في الفنادق التي تعمل بها.",
     "workerUnavailable": "الموظف غير متاح",
-    "overallScoreTitle": "Overall Score (0-100)"
+    "overallScoreTitle": "Overall Score (0-100)",
+    "searchChecksPlaceholder": "ابحث حسب الغرفة أو الملاحظة أو النتيجة",
+    "searchChecksNoMatch": "لا توجد فحوصات تطابق هذا البحث."
   },
   "ratings": {
     "comment": "تعليق",

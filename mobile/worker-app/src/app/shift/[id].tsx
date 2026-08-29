@@ -1,4 +1,4 @@
-import { StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, View, Linking, Platform } from 'react-native';
+import { StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, View, Linking, Platform, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
 import { translateApiError } from '../../lib/api-error-i18n';
 import { formatHotelAddress, hasCoordinates, mapsUrlFor, type MapPlatform } from '@/lib/map-link';
+import { matchesCheck, SEARCH_THRESHOLD } from '@/lib/check-search';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -98,6 +99,14 @@ export default function ShiftDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [checks, setChecks] = useState<QualityCheck[] | null>(null);
+  const [checkQuery, setCheckQuery] = useState('');
+  const theme = useTheme();
+
+  // Filtered here rather than inside the JSX so the "no matches" branch below
+  // can tell an empty search result apart from a shift nobody has checked.
+  const visibleChecks = (checks ?? []).filter((c) =>
+    matchesCheck(c, checkQuery, t(`quality.outcome${c.status}`))
+  );
 
   // AssignmentDto does not embed attendance, so resolve it by assignment_id.
   // This survives app restart / navigation / reload because it is fetched
@@ -407,14 +416,48 @@ export default function ShiftDetailScreen() {
               <ThemedText type="smallBold" style={styles.title}>
                 {t('quality.checksTitle')}
               </ThemedText>
+              {/* The box appears only once the list is long enough to need it
+                  (owner decision, 2026-08-30: search where there are multiple
+                  entries). On a three-room shift it is clutter; at ~100 rooms
+                  scrolling to find room 412 is the entire problem. Filtered on
+                  the device rather than over the network -- these checks are
+                  already loaded, so a round-trip would only add latency to
+                  every keystroke. */}
+              {checks.length > SEARCH_THRESHOLD ? (
+                <TextInput
+                  style={[
+                    styles.search,
+                    { backgroundColor: theme.backgroundElement, color: theme.text },
+                  ]}
+                  placeholder={t('quality.searchChecksPlaceholder')}
+                  placeholderTextColor={theme.textSecondary}
+                  value={checkQuery}
+                  onChangeText={setCheckQuery}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  clearButtonMode="while-editing"
+                />
+              ) : null}
               <ThemedView type="backgroundElement" style={styles.section}>
-                {checks.map((check) => (
-                  <CheckRow
-                    key={check.id}
-                    check={check}
-                    onPress={() => router.push(`/check/${check.id}`)}
-                  />
-                ))}
+                {visibleChecks.length > 0 ? (
+                  visibleChecks.map((check) => (
+                    <CheckRow
+                      key={check.id}
+                      check={check}
+                      onPress={() => router.push(`/check/${check.id}`)}
+                    />
+                  ))
+                ) : (
+                  /* Distinct from "nobody has checked this shift" below: the
+                     checks exist, this search just does not match them. */
+                  <ThemedText
+                    type="small"
+                    themeColor="textSecondary"
+                    style={styles.searchEmpty}
+                  >
+                    {t('quality.searchChecksNoMatch')}
+                  </ThemedText>
+                )}
               </ThemedView>
             </>
           ) : checks && checks.length === 0 ? (
@@ -449,6 +492,14 @@ const styles = StyleSheet.create({
   back: { marginBottom: Spacing.three },
   scroll: { paddingBottom: Spacing.six },
   title: { marginBottom: Spacing.three },
+  search: {
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    marginBottom: Spacing.two,
+    fontSize: 15,
+  },
+  searchEmpty: { padding: Spacing.three },
   section: { borderRadius: Spacing.two, overflow: 'hidden', marginBottom: Spacing.three },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
   infoRowColumn: { flexDirection: 'column', paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },

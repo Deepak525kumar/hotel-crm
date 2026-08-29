@@ -2,6 +2,7 @@ import { AssignmentStatus, AttendanceStatus, CalendarAbsenceKind, CalendarEntry,
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
+import { escapeLikeTerm } from '../../lib/like-escape.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 // From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
 // pure predicates, so suites mocking the permissions middleware need not stub them.
@@ -426,6 +427,31 @@ export class AssignmentService extends BaseService {
         where.hotel = { hotel_group_id: scope.hotel_group_id };
       }
       // scope.type === 'global' -> no added restriction.
+    }
+
+    // Free-text search (owner decision, 2026-08-30), pushed to the database
+    // rather than filtered on the client: this endpoint is paginated, so
+    // filtering the page the client happens to hold would report "none found"
+    // while the match sat on page 3.
+    //
+    // Added under AND rather than as `where.OR`. The scope block above may
+    // already have set `where.hotel` (hotel_group scope), and a top-level OR
+    // carrying its own `hotel` clause would overwrite that key -- turning a
+    // manager's scoped list into a platform-wide one. AND nests instead of
+    // colliding, so the search can never widen what the actor may see.
+    const term = query.q?.trim();
+    if (term) {
+      const contains = { contains: escapeLikeTerm(term), mode: 'insensitive' as const };
+      where.AND = [
+        {
+          OR: [
+            { worker: { first_name: contains } },
+            { worker: { last_name: contains } },
+            { hotel: { name: contains } },
+            { hotel: { city: contains } },
+          ],
+        },
+      ];
     }
 
     const [records, total] = await Promise.all([

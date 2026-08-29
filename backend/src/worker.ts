@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/node';
 import { setErrorSink, captureException } from './lib/error-tracker.js';
 import { Scheduler } from './lib/scheduler.js';
 import { ReworkEscalationJob } from './modules/quality/rework-escalation-job.js';
+import { InspectionDigestJob } from './modules/quality/inspection-digest-job.js';
 import { OutboxRepository } from './modules/notifications/outbox-repository.js';
 import { OutboxWorker } from './modules/notifications/outbox-worker.js';
 import {
@@ -114,6 +115,12 @@ async function main() {
         new ReworkEscalationJob(prisma, {
           intervalMs: env.REWORK_ESCALATION_INTERVAL_MS,
           batchSize: env.REWORK_ESCALATION_BATCH_SIZE,
+        })
+      )
+      .register(
+        new InspectionDigestJob(prisma, {
+          intervalMs: env.INSPECTION_DIGEST_INTERVAL_MS,
+          batchSize: env.INSPECTION_DIGEST_BATCH_SIZE,
         })
       )
       .register(
