@@ -66,6 +66,9 @@ const mockPrisma = {
   employmentRecord: mockEmploymentRecord,
   hotelGroup: mockHotelGroup,
   hotel: mockHotel,
+  // refreshWorkerOverallRating() reads QualityVerification for the quality
+  // half of the rating (2026-08-29). Neutral fixture: no checks recorded.
+  qualityVerification: { aggregate: async () => ({ _avg: { score: null }, _count: 0 }), findMany: async () => [] },
   rating: mockRating,
   attendance: mockAttendance,
   workerOverallRating: mockWorkerOverallRating,

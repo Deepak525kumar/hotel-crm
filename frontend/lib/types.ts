@@ -996,9 +996,11 @@ export interface CreateVerificationInput {
   assignment_id: string;
   score: number;
   notes?: string;
+  /** TREQ-005 checklist. Lives on the check since the Rating merge (2026-08-29). */
+  criteria_scores?: Partial<Record<InspectionChecklistItem, number>>;
 }
 
-/** Sub-scores schema per the backend's own `Rating.criteria_scores` comment (Prisma model). */
+/** Sub-scores schema per the backend's own `QualityVerification.criteria_scores` (Prisma model). */
 export const INSPECTION_CHECKLIST_ITEMS = [
   "dust",
   "bathroom",

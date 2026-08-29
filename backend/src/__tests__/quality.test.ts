@@ -52,7 +52,14 @@ jest.mock('../lib/logger.js', () => ({
 const mockQualityVerification = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  // refreshWorkerOverallRating() reads checks for the quality half of the
+  // rating (2026-08-29). Defaults below say "no checks yet"; the rating suites
+  // override them where the score under test matters.
+  aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
+mockQualityVerification.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
+mockQualityVerification.findMany.mockResolvedValue([]);
 const mockWorkerAssignment = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -126,7 +133,7 @@ import {
   ABSENCE_CANCEL_REASON_SELF,
   ABSENCE_CANCEL_REASON_MANAGER,
 } from '../config/constants.js';
-import { CreateRatingSchema } from '../modules/quality/types.js';
+import { RecordInspectionSchema } from '../modules/quality/types.js';
 import { Prisma } from '@prisma/client';
 
 function makeReq(
@@ -217,7 +224,7 @@ describe('Quality Zod validation — createVerification (B3)', () => {
   });
 });
 
-describe('Quality Zod validation — createRating (P2-03)', () => {
+describe('Quality Zod validation — recordInspection (P2-03)', () => {
   let controller: QualityController;
 
   beforeEach(() => {
@@ -226,33 +233,33 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
   });
 
   it('rejects missing worker_id with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', score: 80 });
+    const req = makeReq({ assignment_id: 'a1', score: 80, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('rejects score out of range (>100) with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 101 });
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 101, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('rejects non-integer score with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 85.5 });
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 85.5, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
@@ -267,6 +274,9 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
+      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
+      // shift the worker has not begun (owner decision 2026-08-29).
+      status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
@@ -327,6 +337,9 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
+      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
+      // shift the worker has not begun (owner decision 2026-08-29).
+      status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
@@ -380,7 +393,7 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
   });
 });
 
-describe('Quality Zod validation — createRating (P2-03)', () => {
+describe('Quality Zod validation — recordInspection (P2-03)', () => {
   let controller: QualityController;
 
   beforeEach(() => {
@@ -389,40 +402,40 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
   });
 
   it('rejects missing worker_id with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', score: 80 });
+    const req = makeReq({ assignment_id: 'a1', score: 80, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('rejects score out of range (>100) with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 101 });
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 101, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('rejects non-integer score with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 85.5 });
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 85.5, outcome: 'complete' });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
-    await controller.createRating(req, res as unknown as Response, next);
+    await controller.recordInspection(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ValidationError' }));
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('rejects score below range (boundary score = -1) at the schema level', () => {
-    const result = CreateRatingSchema.safeParse({
+    const result = RecordInspectionSchema.safeParse({
       assignment_id: 'a1',
       worker_id: 'w1',
       score: -1,
@@ -432,27 +445,29 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
   });
 
   it('accepts score at the boundary (score = 0) at the schema level', () => {
-    const result = CreateRatingSchema.safeParse({
+    const result = RecordInspectionSchema.safeParse({
       assignment_id: 'a1',
       worker_id: 'w1',
       score: 0,
+      outcome: 'complete',
     });
 
     expect(result.success).toBe(true);
   });
 
   it('accepts score at the boundary (score = 100) at the schema level', () => {
-    const result = CreateRatingSchema.safeParse({
+    const result = RecordInspectionSchema.safeParse({
       assignment_id: 'a1',
       worker_id: 'w1',
       score: 100,
+      outcome: 'complete',
     });
 
     expect(result.success).toBe(true);
   });
 });
 
-describe('Quality createRating — duplicate rating handling (P1-02)', () => {
+describe('Quality recordInspection — duplicate handling (P1-02)', () => {
   let service: QualityService;
 
   beforeEach(() => {
@@ -460,13 +475,16 @@ describe('Quality createRating — duplicate rating handling (P1-02)', () => {
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
+      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
+      // shift the worker has not begun (owner decision 2026-08-29).
+      status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
   });
 
-  it('maps a Prisma P2002 from rating.create() to a ConflictError', async () => {
-    mockRating.create.mockRejectedValue(
+  it('maps a Prisma P2002 from the inspection write to a ConflictError', async () => {
+    mockQualityVerification.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
         clientVersion: 'test',
@@ -474,26 +492,37 @@ describe('Quality createRating — duplicate rating handling (P1-02)', () => {
     );
 
     await expect(
-      service.createRating(
-        { assignment_id: 'a1', worker_id: 'w1', score: 80 } as any,
+      service.recordInspection(
+        { assignment_id: 'a1', worker_id: 'w1', score: 80, outcome: 'complete' } as any,
         { userId: 'u1', role: 'admin' },
         RATING_PHOTO
       )
     ).rejects.toMatchObject({
       name: 'ConflictError',
-      message: 'Rating already exists for this assignment',
+      // One record per assignment since the Rating merge (2026-08-29), so one
+      // message rather than one per model.
+      message: 'This assignment has already been inspected',
     });
   });
 });
 
-describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => {
+describe('Quality recordInspection — worker notification (GAP-1)', () => {
   let service: QualityService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Not just clearAllMocks: that resets call history, NOT an implementation
+    // a previous describe installed with mockRejectedValue. Without this the
+    // P2002 fixture above leaks forward and fails this block for the wrong
+    // reason.
+    mockQualityVerification.create.mockReset();
+    mockQualityVerification.create.mockResolvedValue({ id: 'qv1' });
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
+      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
+      // shift the worker has not begun (owner decision 2026-08-29).
+      status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
@@ -510,9 +539,9 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
     (mockPrisma.attendance.count as jest.Mock).mockResolvedValue(1 as never);
   }
 
-  it('emits RATING_RECEIVED to the rated worker after a successful rating', async () => {
-    await service.createRating(
-      { assignment_id: 'a1', worker_id: 'w1', score: 80 } as any,
+  it('emits one notification to the inspected worker after a successful inspection', async () => {
+    await service.recordInspection(
+      { assignment_id: 'a1', worker_id: 'w1', score: 80, outcome: 'complete' } as any,
       { userId: 'u1', role: 'admin' },
         RATING_PHOTO
     );
@@ -520,7 +549,10 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
     expect(mockNotification.create).toHaveBeenCalledTimes(1);
     const payload = mockNotification.create.mock.calls[0][0].data;
     expect(payload.user_id).toBe('w1');
-    expect(payload.type).toBe('RATING_RECEIVED');
+    // RATING_RECEIVED went with the Rating model. One inspection now emits
+    // ONE notification carrying the outcome, rather than a rating message plus
+    // a verification message about the same visit.
+    expect(payload.type).toBe('QUALITY_VERIFICATION_SUBMITTED');
 
     // ADR-029 (GD-01, Epic 7 PR 7.3): the enqueue joins the same
     // transaction as the rating write and aggregate refresh — no more
@@ -531,14 +563,23 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
   });
 });
 
-describe('Quality createRating — WorkerOverallRating single-writer aggregate (GD-04)', () => {
+describe('Quality recordInspection — WorkerOverallRating single-writer aggregate (GD-04)', () => {
   let service: QualityService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Not just clearAllMocks: that resets call history, NOT an implementation
+    // a previous describe installed with mockRejectedValue. Without this the
+    // P2002 fixture above leaks forward and fails this block for the wrong
+    // reason.
+    mockQualityVerification.create.mockReset();
+    mockQualityVerification.create.mockResolvedValue({ id: 'qv1' });
     service = new QualityService();
     mockWorkerAssignment.findUnique.mockResolvedValue({
       id: 'a1',
+      // IN_PROGRESS, not CONFIRMED: assertShiftHasStarted() refuses a
+      // shift the worker has not begun (owner decision 2026-08-29).
+      status: 'IN_PROGRESS',
       hotel_id: 'h1',
       worker_id: 'w1',
     });
@@ -549,7 +590,11 @@ describe('Quality createRating — WorkerOverallRating single-writer aggregate (
   });
 
   it('upserts all five aggregate fields from a fresh computation, not just average_score/total_ratings', async () => {
-    mockRating.aggregate.mockResolvedValue({ _avg: { score: 72 }, _count: 4 });
+    // The quality half comes from checks now (2026-08-29). An empty recent
+    // window makes blendRecencyWeightedScore fall back to the lifetime
+    // average, so quality is exactly 72 here.
+    mockQualityVerification.aggregate.mockResolvedValue({ _avg: { score: 72 }, _count: 4 });
+    mockQualityVerification.findMany.mockResolvedValue([]);
     mockWorkerAssignment.count
       .mockResolvedValueOnce(10) // total_assignments
       .mockResolvedValueOnce(6); // completed (status: COMPLETED)
@@ -557,8 +602,8 @@ describe('Quality createRating — WorkerOverallRating single-writer aggregate (
     const lastCompletedAt = new Date('2026-07-20T00:00:00Z');
     mockWorkerAssignment.findFirst.mockResolvedValue({ completed_at: lastCompletedAt });
 
-    await service.createRating(
-      { assignment_id: 'a1', worker_id: 'w1', score: 72 } as any,
+    await service.recordInspection(
+      { assignment_id: 'a1', worker_id: 'w1', score: 72, outcome: 'complete' } as any,
       { userId: 'u1', role: 'admin' },
         RATING_PHOTO
     );
@@ -566,7 +611,11 @@ describe('Quality createRating — WorkerOverallRating single-writer aggregate (
     expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);
     const { create, update } = mockWorkerOverallRating.upsert.mock.calls[0][0];
     const expected = {
-      average_score: 72,
+      // 0.7 x quality + 0.3 x attendance, where attendance is
+      // completed / due x 100 = 6/10 x 100 = 60.
+      //   0.7 * 72 + 0.3 * 60 = 50.4 + 18 = 68.4
+      average_score: 68.4,
+      // Now the count of CHECKS, not of Rating rows.
       total_ratings: 4,
       total_assignments: 10,
       completion_rate: 0.6,
@@ -801,17 +850,24 @@ describe('Quality getLeaderboard — pagination (ADR-035)', () => {
 // outcomes that were not (yet, or ever) their doing. This exercises
 // refreshWorkerOverallRating() directly against a minimal fake `tx`,
 // independent of QualityService's own request-handling tests above.
-describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-13 fix)', () => {
+describe('refreshWorkerOverallRating — total_assignments denominator', () => {
   const makeTx = () => ({
     $executeRawUnsafe: jest.fn(),
-    rating: { aggregate: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    // The quality half now reads checks, not the Rating model (2026-08-29).
+    qualityVerification: {
+      aggregate: jest.fn() as jest.MockedFunction<(...a: any[]) => any>,
+      findMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue([]),
+    },
     workerAssignment: {
       count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockImplementation(
         async (args: any) => {
-          // The completedAssignments count (status: COMPLETED only) is a
-          // second, distinct call -- only the FIRST call (the denominator)
-          // is asserted against assignmentCountWhere by the caller.
-          return args.where && 'OR' in args.where ? 3 : 1;
+          // The denominator used to be identifiable by an `OR`; since
+          // 2026-08-29 it is a flat COMPLETED+NO_SHOW status filter, so it is
+          // matched on that. The completedAssignments count (COMPLETED only)
+          // is a second, distinct call.
+          return Array.isArray(args.where?.status?.in) && args.where.status.in.length === 2
+            ? 3
+            : 1;
         }
       ),
       findFirst: jest.fn() as jest.MockedFunction<(...a: any[]) => any>,
@@ -826,14 +882,14 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
 
   it('excludes CANCELLED and REASSIGNED from the denominator, at any day', async () => {
     const tx = makeTx();
-    tx.rating.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 5 });
+    tx.qualityVerification.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 5 });
     tx.attendance.count.mockResolvedValue(1);
     tx.workerAssignment.findFirst.mockResolvedValue(null);
 
     await refreshWorkerOverallRating(tx as any, 'w1');
 
     const denominatorCall = (tx.workerAssignment.count.mock.calls as any[]).find(
-      (c) => c[0]?.where && 'OR' in c[0].where
+      (c) => Array.isArray(c[0]?.where?.status?.in) && c[0].where.status.in.length === 2
     );
     expect(denominatorCall[0].where).toEqual({
       worker_id: 'w1',
@@ -844,10 +900,9 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
       // on top of the 0-100 quality score, which is the mechanism the platform
       // actually uses to record poor work.
       rework_of_assignment_id: null,
-      OR: [
-        { status: { in: ['COMPLETED', 'NO_SHOW'] } },
-        { status: { in: ['CONFIRMED', 'IN_PROGRESS'] }, day: { lte: new Date('2026-08-13T00:00:00.000Z') } },
-      ],
+      // Owner decision 2026-08-29: only settled shifts. The CONFIRMED/
+      // IN_PROGRESS-with-a-past-day arm is gone -- those have no outcome yet.
+      status: { in: ['COMPLETED', 'NO_SHOW'] },
     });
   });
 
@@ -856,7 +911,7 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
   // ratio, where it would be indistinguishable from a no-show.
   it('counts worker-initiated cancellations separately, without touching the denominator', async () => {
     const tx = makeTx();
-    tx.rating.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 5 });
+    tx.qualityVerification.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 5 });
     tx.attendance.count.mockResolvedValue(1);
     tx.workerAssignment.findFirst.mockResolvedValue(null);
 
@@ -880,33 +935,38 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
     expect(upsert.create.worker_cancellations).toBe(1);
   });
 
-  it('includes a future-dated CONFIRMED/IN_PROGRESS shift once its day is <= today, excludes it before', async () => {
+  it('excludes CONFIRMED/IN_PROGRESS entirely, even once their day has passed', async () => {
+    // Retargeted 2026-08-29. This previously asserted the opposite -- that a
+    // past-dated active shift COUNTED -- which scored shifts that had not
+    // finished. A stale one is resolved to NO_SHOW by AssignmentNoShowJob and
+    // counts from that point.
     const tx = makeTx();
-    tx.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
+    tx.qualityVerification.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
     tx.attendance.count.mockResolvedValue(0);
     tx.workerAssignment.findFirst.mockResolvedValue(null);
 
     await refreshWorkerOverallRating(tx as any, 'w1');
 
     const denominatorCall = (tx.workerAssignment.count.mock.calls as any[]).find(
-      (c) => c[0]?.where && 'OR' in c[0].where
+      (c) => Array.isArray(c[0]?.where?.status?.in) && c[0].where.status.in.length === 2
     );
-    const dayFilter = denominatorCall[0].where.OR[1].day;
-    expect(dayFilter).toEqual({ lte: new Date('2026-08-13T00:00:00.000Z') });
+    expect(denominatorCall[0].where.status.in).toEqual(['COMPLETED', 'NO_SHOW']);
+    expect(denominatorCall[0].where).not.toHaveProperty('OR');
+    expect(denominatorCall[0].where).not.toHaveProperty('day');
   });
 
   it('always includes COMPLETED/NO_SHOW regardless of day (a terminal outcome already happened)', async () => {
     const tx = makeTx();
-    tx.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
+    tx.qualityVerification.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
     tx.attendance.count.mockResolvedValue(0);
     tx.workerAssignment.findFirst.mockResolvedValue(null);
 
     await refreshWorkerOverallRating(tx as any, 'w1');
 
     const denominatorCall = (tx.workerAssignment.count.mock.calls as any[]).find(
-      (c) => c[0]?.where && 'OR' in c[0].where
+      (c) => Array.isArray(c[0]?.where?.status?.in) && c[0].where.status.in.length === 2
     );
-    expect(denominatorCall[0].where.OR[0]).toEqual({ status: { in: ['COMPLETED', 'NO_SHOW'] } });
+    expect(denominatorCall[0].where.status).toEqual({ in: ['COMPLETED', 'NO_SHOW'] });
   });
 });
 
@@ -915,16 +975,20 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
 describe('refreshWorkerOverallRating — on_time_rate numerator/denominator agreement', () => {
   const makeTx = (dueCount: number, presentCount: number) => ({
     $executeRawUnsafe: jest.fn(),
-    rating: {
+    qualityVerification: {
       aggregate: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({
         _avg: { score: 80 },
         _count: 1,
       }),
+      findMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue([]),
     },
     workerAssignment: {
       count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockImplementation(
         async (args: any) => {
-          if (args.where && 'OR' in args.where) return dueCount; // denominator
+          // Denominator: the flat COMPLETED+NO_SHOW status filter.
+          if (Array.isArray(args.where?.status?.in) && args.where.status.in.length === 2) {
+            return dueCount;
+          }
           if (args.where?.cancellation_reason !== undefined) return 0;
           return 0; // completedAssignments
         }
@@ -972,9 +1036,9 @@ describe('refreshWorkerOverallRating — on_time_rate numerator/denominator agre
     expect(attendanceWhere).toHaveProperty('assignment');
   });
 
-  it('does not trigger a warning if the worker has 0 ratings, avoiding a default 0 score from firing alerts', async () => {
+  it('does not trigger a warning if the worker has no checks, avoiding a default 0 score from firing alerts', async () => {
     const tx = makeTx(1, 1);
-    tx.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 }); // 0 ratings
+    tx.qualityVerification.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 }); // 0 ratings
 
     await refreshWorkerOverallRating(tx as any, 'w1');
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 
-// Storage is mocked, not merely unconfigured: createVerification()/createRating()
+// Storage is mocked, not merely unconfigured: createVerification()/recordInspection()
 // call uploadPhotos(), which resolves a REAL S3 client whenever S3_BUCKET is set,
 // so without this these tests perform live network I/O — green on a workstation
 // with working AWS credentials, red in CI. Mirrors quality-photos-authz.test.ts.
@@ -21,7 +21,7 @@ jest.mock('../modules/documents/storage.js', () => ({
  * Cites OQ-03 / OQ-09 / SIR-QUAL-003 / SIR-QUAL-004:
  *  - READ (OQ-03): GET /quality/leaderboard/by-hotel/:hotel_id is guarded by
  *    checkHotelAccess() — a manager may only read in-scope hotels.
- *  - WRITE (OQ-09): POST /quality/verifications and /ratings enforce a manager
+ *  - WRITE (OQ-09): POST /quality/verifications and /inspections enforce a manager
  *    scope check inside the service before mutating; checker keeps cross-hotel
  *    write access (preserved). Removing the manager-scope flip turns the
  *    out-of-scope cases from 403 into success.
@@ -32,9 +32,15 @@ let testAuth:
   | null = null;
 
 // assignment_id -> hotel it belongs to.
-const assignments: Record<string, { id: string; hotel_id: string; worker_id: string }> = {
-  asg_h1: { id: 'asg_h1', hotel_id: 'h1', worker_id: 'w1' },
-  asg_h2: { id: 'asg_h2', hotel_id: 'h2', worker_id: 'w1' },
+// `status` is IN_PROGRESS because assertShiftHasStarted() (2026-08-29) refuses
+// a shift the worker has not begun. These cases are about SCOPE, so they need
+// a shift that clears the unrelated business rule.
+const assignments: Record<
+  string,
+  { id: string; hotel_id: string; worker_id: string; status: string }
+> = {
+  asg_h1: { id: 'asg_h1', hotel_id: 'h1', worker_id: 'w1', status: 'IN_PROGRESS' },
+  asg_h2: { id: 'asg_h2', hotel_id: 'h2', worker_id: 'w1', status: 'IN_PROGRESS' },
 };
 
 jest.mock('../config/feature-flags.js', () => ({
@@ -73,6 +79,9 @@ const txStub = {
   // + notification enqueue in $transaction too.
   qualityVerification: {
     create: async ({ data }: any) => ({ id: 'ver_1', ...data }),
+    // Quality half of the rating now reads checks (2026-08-29).
+    aggregate: async () => ({ _avg: { score: null }, _count: 0 }),
+    findMany: async () => [],
   },
 };
 
@@ -85,6 +94,9 @@ jest.mock('../lib/db.js', () => ({
     qualityVerification: {
       findUnique: async () => null,
       create: async ({ data }: any) => ({ id: 'ver_1', ...data }),
+    // Quality half of the rating now reads checks (2026-08-29).
+    aggregate: async () => ({ _avg: { score: null }, _count: 0 }),
+    findMany: async () => [],
     },
     workerOverallRating: { findMany: async () => [], count: async () => 0 },
     hotel: {
@@ -155,6 +167,7 @@ describe('Quality scope authorization', () => {
         .post('/quality/verifications')
         .field('assignment_id', 'asg_h1')
         .field('score', '80')
+        .field('outcome', 'complete')
         .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
       expect(res.status).toBe(201);
     });
@@ -180,17 +193,21 @@ describe('Quality scope authorization', () => {
     });
   });
 
-  describe('WRITE ratings (OQ-09 / SIR-QUAL-004)', () => {
+  // Was POST /quality/ratings; that route went with the Rating merge
+  // (2026-08-29). Same scope rule, same actor set, on the endpoint that
+  // replaced it.
+  describe('WRITE inspections (OQ-09 / SIR-QUAL-004)', () => {
     it('allows a manager to rate an in-scope assignment (201)', async () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       // Multipart with a photo: CRR §15 is enforced on ratings as of
       // 2026-08-24, so a photo-less rating is 422 regardless of scope. This
       // case is about scope, so it supplies the photo.
       const res = await request(makeApp())
-        .post('/quality/ratings')
+        .post('/quality/inspections')
         .field('assignment_id', 'asg_h1')
         .field('worker_id', 'w1')
         .field('score', '80')
+        .field('outcome', 'complete')
         .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
       expect(res.status).toBe(201);
     });
@@ -198,16 +215,16 @@ describe('Quality scope authorization', () => {
     it('refuses a rating with no photo, even in scope (CRR §15)', async () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
-        .post('/quality/ratings')
-        .send({ assignment_id: 'asg_h1', worker_id: 'w1', score: 80 });
+        .post('/quality/inspections')
+        .send({ assignment_id: 'asg_h1', worker_id: 'w1', score: 80, outcome: 'complete' });
       expect(res.status).toBe(422);
     });
 
     it('denies a manager rating an out-of-scope assignment (403)', async () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
-        .post('/quality/ratings')
-        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80 });
+        .post('/quality/inspections')
+        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80, outcome: 'complete' });
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('ForbiddenError');
     });
@@ -215,8 +232,8 @@ describe('Quality scope authorization', () => {
     it('denies a checker rating cross-hotel (403)', async () => {
       testAuth = { userId: 'chk_1', role: 'checker', permissions: ['quality:write'], scope: null };
       const res = await request(makeApp())
-        .post('/quality/ratings')
-        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80 });
+        .post('/quality/inspections')
+        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80, outcome: 'complete' });
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('ForbiddenError');
     });

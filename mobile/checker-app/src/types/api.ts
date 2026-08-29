@@ -125,6 +125,12 @@ export interface QualityVerification {
   rework_completed_at?: string | null;
   rework_escalated_at?: string | null;
   /**
+   * TREQ-005 inspection checklist. Lives on the check since the Rating merge
+   * (2026-08-29) -- it was the one thing the retired Rating held that this
+   * record did not.
+   */
+  criteria_scores?: Record<string, number> | null;
+  /**
    * Whose work, where, when, and who inspected it — nested by
    * GET /quality/verifications/:id.
    *
@@ -163,7 +169,6 @@ export interface Rating {
  */
 export interface RecordedInspection {
   verification: QualityVerification;
-  rating: Rating;
   rework_assignment: { id: string } | null;
 }
 
@@ -187,19 +192,13 @@ export interface OwnInspection {
   day: string;
   worker: { id: string; first_name: string; last_name: string } | null;
   hotel: { id: string; name: string; city: string } | null;
-  rating: {
-    id: string;
-    score: number;
-    comment: string | null;
-    criteria_scores: Record<string, number> | null;
-    photo_count: number;
-    created_at: string;
-  } | null;
   verification: {
     id: string;
     score: number;
     status: VerificationStatus;
     notes: string | null;
+    /** TREQ-005 checklist. Lives on the check since the Rating merge. */
+    criteria_scores: Record<string, number> | null;
     photo_count: number;
     rework_required: boolean;
     rework_notes: string | null;

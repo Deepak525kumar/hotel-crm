@@ -52,6 +52,9 @@ const mockPrisma = {
   // these on any CANCELLED transition (refreshWorkerOverallRating,
   // notification enqueue) -- defaulted to empty/no-op so the cascade tests
   // don't need to know AssignmentService's own internals.
+  // refreshWorkerOverallRating() reads QualityVerification for the quality
+  // half of the rating (2026-08-29). Neutral fixture: no checks recorded.
+  qualityVerification: { aggregate: async () => ({ _avg: { score: null }, _count: 0 }), findMany: async () => [] },
   rating: {
     aggregate: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({
       _avg: { score: 0 },

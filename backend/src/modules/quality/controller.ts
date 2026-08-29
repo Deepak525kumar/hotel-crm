@@ -5,7 +5,6 @@ import {
   AssignReworkSchema,
   CompleteReworkSchema,
   CreateQualityVerificationSchema,
-  CreateRatingSchema,
   ListLeaderboardQuerySchema,
   ListOwnInspectionsQuerySchema,
   RecordInspectionSchema,
@@ -164,54 +163,6 @@ export class QualityController {
     }
   }
 
-  async createRating(req: Request, res: Response, next: NextFunction) {
-    try {
-      if (!req.auth) throw new UnauthorizedError('Not authenticated');
-      const parsed = CreateRatingSchema.safeParse(req.body);
-      if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message);
-      const result = await qualityService.createRating(
-        parsed.data,
-        {
-          userId: req.auth.userId,
-          role: req.auth.role,
-          scope: req.auth.scope ?? null,
-        },
-        photosFrom(req)
-      );
-      res.status(201).json({
-        status: 'success',
-        data: result,
-        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async getRatingPhotos(req: Request, res: Response, next: NextFunction) {
-    try {
-      if (!req.auth) throw new UnauthorizedError('Not authenticated');
-      const id = req.params.rating_id;
-      if (!id) throw new ValidationError('rating_id is required');
-      const result = await qualityService.getRatingPhotos(id, {
-        userId: req.auth.userId,
-        role: req.auth.role,
-        scope: req.auth.scope ?? null,
-      });
-      res.status(200).json({
-        status: 'success',
-        data: result,
-        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * GET /quality/inspectable-workers — who this checker may inspect today.
-   * `day` is optional and defaults to today in the calendar timezone.
-   */
   async listInspectableWorkers(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');

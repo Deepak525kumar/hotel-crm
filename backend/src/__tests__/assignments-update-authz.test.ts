@@ -102,6 +102,9 @@ jest.mock('../lib/db.js', () => {
     // Complete. That needs a user lookup for assigned_by_name; this suite is
     // about authorization, so an anonymous assigner is fine.
     user: { findUnique: async () => null, findMany: async () => [] },
+    // refreshWorkerOverallRating() reads QualityVerification for the quality
+    // half of the rating (2026-08-29). Neutral fixture: no checks recorded.
+    qualityVerification: { aggregate: async () => ({ _avg: { score: null }, _count: 0 }), findMany: async () => [] },
     rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
     attendance: { count: async () => 0, updateMany: async () => ({ count: 0 }) },
     workerOverallRating: { upsert: async () => ({}) },

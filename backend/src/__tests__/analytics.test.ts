@@ -33,7 +33,11 @@ const mockAttendance = {
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
-const mockRating = {
+// Renamed from mockRating 2026-08-29: the per-worker rating reads moved to
+// QualityVerification when the two models merged. Same methods, same
+// worker_id filter, so every assertion below still describes the same
+// behaviour -- only the table changed.
+const mockQualityVerification = {
   aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -44,7 +48,7 @@ const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   roomsCompletedEntry: mockRoomsCompletedEntry,
   attendance: mockAttendance,
-  rating: mockRating,
+  qualityVerification: mockQualityVerification,
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
@@ -120,8 +124,8 @@ describe('Analytics getWorkerStats (GD-06)', () => {
       { status: 'ABSENT', _count: { id: 2 } },
     ]);
     mockAttendance.count.mockResolvedValue(8);
-    mockRating.aggregate.mockResolvedValue({ _avg: { score: 91 } });
-    mockRating.findMany.mockResolvedValue([
+    mockQualityVerification.aggregate.mockResolvedValue({ _avg: { score: 91 } });
+    mockQualityVerification.findMany.mockResolvedValue([
       { assignment_id: 'a1', score: 95, created_at: new Date('2026-08-05T00:00:00Z') },
       { assignment_id: 'a2', score: 80, created_at: new Date('2026-08-01T00:00:00Z') },
     ]);
@@ -137,10 +141,10 @@ describe('Analytics getWorkerStats (GD-06)', () => {
     expect(mockWorkerOverallRating.findUnique.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
     expect(mockAttendance.groupBy.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
     expect(mockAttendance.count.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
-    for (const call of mockRating.aggregate.mock.calls) {
+    for (const call of mockQualityVerification.aggregate.mock.calls) {
       expect(call[0].where).toMatchObject({ worker_id: 'w1' });
     }
-    expect(mockRating.findMany.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
+    expect(mockQualityVerification.findMany.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
   });
 
   it('never reads or returns another worker\'s data — result shape matches WorkerStats exactly', async () => {
@@ -170,8 +174,8 @@ describe('Analytics getWorkerStats (GD-06)', () => {
     mockWorkerOverallRating.findUnique.mockResolvedValue(null);
     mockAttendance.groupBy.mockResolvedValue([]);
     mockAttendance.count.mockResolvedValue(0);
-    mockRating.aggregate.mockResolvedValue({ _avg: { score: null } });
-    mockRating.findMany.mockResolvedValue([]);
+    mockQualityVerification.aggregate.mockResolvedValue({ _avg: { score: null } });
+    mockQualityVerification.findMany.mockResolvedValue([]);
 
     const result = await service.getWorkerStats('w-new');
     expect(result).toEqual({
@@ -190,7 +194,7 @@ describe('Analytics getWorkerStats (GD-06)', () => {
 
   it('caps recent_ratings at RECENT_RATINGS_LIMIT (5) via take, newest first via orderBy', async () => {
     await service.getWorkerStats('w1');
-    const call = mockRating.findMany.mock.calls[0][0];
+    const call = mockQualityVerification.findMany.mock.calls[0][0];
     expect(call.take).toBe(5);
     expect(call.orderBy).toEqual({ created_at: 'desc' });
   });

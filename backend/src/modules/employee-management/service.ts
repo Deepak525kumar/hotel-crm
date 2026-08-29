@@ -331,7 +331,10 @@ export class EmployeeManagementService extends BaseService {
           orderBy: { created_at: 'desc' },
         }),
       () =>
-        this.prisma.rating.findMany({
+        // The worker's inspection history. Reads checks since the Rating merge
+        // (2026-08-29); `worker_id` is a real column on QualityVerification,
+        // so this stays the same shape and stays index-backed.
+        this.prisma.qualityVerification.findMany({
           where: { worker_id: record.user_id, created_at: { gte: rangeStart, lte: rangeEnd } },
           take: limit,
           skip: (page - 1) * limit,

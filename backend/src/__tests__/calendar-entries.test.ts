@@ -91,6 +91,9 @@ const mockCalendarAbsence = {
 const mockPrisma = {
   // placeOnCalendar() now refreshes WorkerOverallRating in-transaction
   // (2026-08-07): the aggregate counts a worker's rows regardless of status.
+  // refreshWorkerOverallRating() reads QualityVerification for the quality
+  // half of the rating (2026-08-29). Neutral fixture: no checks recorded.
+  qualityVerification: { aggregate: async () => ({ _avg: { score: null }, _count: 0 }), findMany: async () => [] },
   rating: { aggregate: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({ _avg: { score: null }, _count: 0 }) },
   workerOverallRating: { upsert: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({}) },
   attendance: { count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue(0) },

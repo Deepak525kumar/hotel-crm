@@ -20,6 +20,7 @@ import { BackLink } from '@/components/BackLink';
 import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
+import { checklistItemLabelKey, INSPECTION_CHECKLIST_ITEMS } from '@/lib/inspection-checklist';
 import type { QualityVerification } from '@/types/api';
 
 /**
@@ -212,6 +213,29 @@ export default function VerificationEvidenceScreen() {
                 </Text>
               </View>
             ) : null}
+          </View>
+        ) : null}
+
+        {/* The per-item checklist, which lived on the retired Rating model and
+            had its own screen until the two merged (2026-08-29). Rendered here
+            so the evidence screen shows the whole inspection rather than a
+            score whose breakdown is somewhere else. */}
+        {verification?.criteria_scores &&
+        INSPECTION_CHECKLIST_ITEMS.some(
+          (item) => typeof verification.criteria_scores?.[item] === 'number'
+        ) ? (
+          <View style={styles.card}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.checklistTitle')}
+            </ThemedText>
+            {INSPECTION_CHECKLIST_ITEMS.filter(
+              (item) => typeof verification.criteria_scores?.[item] === 'number'
+            ).map((item) => (
+              <View key={item} style={styles.row}>
+                <ThemedText type="small">{t(checklistItemLabelKey(item))}</ThemedText>
+                <ThemedText type="smallBold">{verification.criteria_scores![item]}</ThemedText>
+              </View>
+            ))}
           </View>
         ) : null}
 
