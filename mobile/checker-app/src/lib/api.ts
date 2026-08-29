@@ -574,11 +574,15 @@ export const api = {
     },
 
     createVerification: (
-      data: { assignment_id: string; score: number; notes?: string },
+      // room_number is REQUIRED, not optional-with-a-default: the server
+      // rejects a check without one, and leaving it out of this type is what
+      // let the web's equivalent form break silently -- tsc had nothing to say.
+      data: { assignment_id: string; room_number: string; score: number; notes?: string },
       photos: { uri: string; name: string; type: string }[] = []
     ) => {
       const form = new FormData();
       form.append('assignment_id', data.assignment_id);
+      form.append('room_number', data.room_number);
       form.append('score', String(data.score));
       if (data.notes) form.append('notes', data.notes);
       for (const photo of photos) appendNativeFile(form, 'photos', photo);

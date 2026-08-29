@@ -53,6 +53,24 @@ type RatingAggregateTx = Prisma.TransactionClient;
 // inside the same transaction, or the aggregate silently goes stale — see
 // assignments/service.ts's call from AssignmentService.update().
 /**
+ * Neutralise LIKE metacharacters in a user-supplied search term.
+ *
+ * Prisma's `contains` compiles to `LIKE '%term%'` and does NOT escape the
+ * term. So a search for "%" matched every row, "_" matched every row with at
+ * least one character, and "%%%%%" is a cheap way to make five joined LIKE
+ * clauses expensive. Not SQL injection -- the value is still parameterised --
+ * but wildcard injection, which is a correctness bug the moment a room is
+ * called "A_1" or someone types a stray %.
+ *
+ * Backslash first, or it would double-escape the escapes added after it.
+ * Postgres LIKE treats backslash as the escape character by default, which is
+ * what makes this work without an explicit ESCAPE clause.
+ */
+export function escapeLikeTerm(term: string): string {
+  return term.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+/**
  * One shape for a check wherever it is listed.
  *
  * Three surfaces read checks -- the checker's history, the worker's shift
@@ -815,6 +833,16 @@ export class QualityService extends BaseService {
     // this assignment gets that answer, not a hint about its state.
     this.assertShiftHasStarted(assignment);
 
+    // Room is validated HERE as well as in the zod schema. The schema guards
+    // the HTTP boundary, but every other rule on this path -- shift started,
+    // photo present, rework notes -- is enforced in the service, and leaving
+    // one of them to the transport alone means an internal caller (a job, a
+    // script, a future chatbot tool) can write a check nobody can locate.
+    // Found by probing the service directly: it accepted '' and '   '.
+    if (!room_number || room_number.trim() === '') {
+      throw new ValidationError('A room number is required');
+    }
+
     // CRR §15: the photo accompanies the rating. After authorization, so an
     // actor who may not inspect gets that answer rather than a validation hint.
     if (photos.length === 0) {
@@ -872,7 +900,9 @@ export class QualityService extends BaseService {
             hotel_id: assignment.hotel_id,
             verified_by_id: actor.userId,
             worker_id,
-            room_number,
+            // Trimmed: ' 412 ' and '412' are the same room, and storing both
+            // makes search and grouping disagree with what the checker sees.
+            room_number: room_number.trim(),
             score,
             status,
             notes: comment ?? null,
@@ -986,6 +1016,10 @@ export class QualityService extends BaseService {
 
     this.assertShiftHasStarted(assignment);
 
+    if (!room_number || room_number.trim() === '') {
+      throw new ValidationError('A room number is required');
+    }
+
     // CRR §15 enforcement (2026-08-24). The comment on the `photos` parameter
     // above has stated this requirement since the parameter was added, but
     // nothing checked it: a rating with no photo returned 201 and stored
@@ -1036,7 +1070,7 @@ export class QualityService extends BaseService {
             // assignment rather than accepted from the client: the caller does
             // not get to say whose inspection this is.
             worker_id: assignment.worker_id,
-            room_number,
+            room_number: room_number.trim(),
             score: numScore,
             status: derivedStatus,
             notes: notes ?? null,
@@ -1307,7 +1341,10 @@ export class QualityService extends BaseService {
   ) {
     const page = options.page ?? 1;
     const perPage = options.perPage ?? 20;
-    const q = options.q?.trim();
+    // Escaped, not just trimmed -- see escapeLikeTerm. A bare '%' otherwise
+    // returns the caller's entire history, which reads as a broken filter.
+    const raw = options.q?.trim();
+    const q = raw ? escapeLikeTerm(raw) : undefined;
 
     // One box, four columns (owner decision, 2026-08-29). Someone typing "412"
     // may mean a room, a note that mentions it, or a name -- asking them which

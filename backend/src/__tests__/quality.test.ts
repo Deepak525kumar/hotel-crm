@@ -377,7 +377,7 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
     mockQualityVerification.create.mockResolvedValue({ id: 'qv2', status: 'NEEDS_REWORK' });
 
     await service.createVerification(
-      { assignment_id: 'a1', score: 50 } as any,
+      { assignment_id: 'a1', room_number: '412', score: 50 } as any,
       { userId: 'u1', role: 'admin' },
         PHOTO_FIXTURE
     );
@@ -606,7 +606,7 @@ describe('Quality recordInspection — WorkerOverallRating single-writer aggrega
     mockWorkerAssignment.findFirst.mockResolvedValue({ completed_at: lastCompletedAt });
 
     await service.recordInspection(
-      { assignment_id: 'a1', worker_id: 'w1', score: 72, outcome: 'complete' } as any,
+      { assignment_id: 'a1', worker_id: 'w1', room_number: '412', score: 72, outcome: 'complete' } as any,
       { userId: 'u1', role: 'admin' },
         RATING_PHOTO
     );

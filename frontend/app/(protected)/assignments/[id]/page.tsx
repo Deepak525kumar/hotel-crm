@@ -34,7 +34,6 @@ import { BackLink } from "@/components/ui/BackLink";
 import type {
   InspectionChecklistItem,
   QualityVerification,
-  Rating,
   RoomsCompletedEntry,
 } from "@/lib/types";
 import { INSPECTION_CHECKLIST_ITEMS } from "@/lib/types";
@@ -949,6 +948,9 @@ function CreateVerificationModal({
   const { t } = useTranslation();
   const [score, setScore] = useState("");
   const [notes, setNotes] = useState("");
+  // Required since 2026-08-29: a shift carries one check per room, so a check
+  // that does not say which room cannot be acted on or found.
+  const [roomNumber, setRoomNumber] = useState("");
   // TREQ-005: one entry per confirmed checklist item, driven off the shared
   // constant rather than hand-declared hooks -- adding or removing an item is
   // then a one-line change and cannot leave the form and the API disagreeing.
@@ -964,6 +966,7 @@ function CreateVerificationModal({
   const reset = () => {
     setScore("");
     setNotes("");
+    setRoomNumber("");
     setCriteria({});
     setPhotos([]);
     setFieldError(null);
@@ -1001,6 +1004,12 @@ function CreateVerificationModal({
 
   const onSubmit = () => {
     setFieldError(null);
+    // Checked before the score and before any upload: a missing room is the
+    // cheapest failure to surface.
+    if (roomNumber.trim() === "") {
+      setFieldError(t("quality.roomRequired"));
+      return;
+    }
     const parsed = Number(score);
     if (score === "" || !Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
       setFieldError(t("assignments.scoreWholeNumber"));
@@ -1026,6 +1035,7 @@ function CreateVerificationModal({
         qualityApi.createVerification(
           {
             assignment_id: assignmentId,
+            room_number: roomNumber.trim(),
             score: parsed,
             notes: notes.trim() || undefined,
             criteria_scores: criteriaScores,
@@ -1059,6 +1069,13 @@ function CreateVerificationModal({
       }
     >
       <div className="space-y-4">
+        <Input
+          label={t("quality.roomTitle")}
+          value={roomNumber}
+          onChange={(e) => setRoomNumber(e.target.value)}
+          placeholder={t("quality.roomPlaceholder")}
+          maxLength={64}
+        />
         <Input
           label={t("fields.score0to100")}
           type="number"

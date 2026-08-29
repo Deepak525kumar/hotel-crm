@@ -40,7 +40,7 @@ jest.mock('../config/env.js', () => ({
 }));
 
 import { QualityController } from '../modules/quality/controller.js';
-import { QualityService } from '../modules/quality/service.js';
+import { QualityService, escapeLikeTerm } from '../modules/quality/service.js';
 import { ListOwnInspectionsQuerySchema } from '../modules/quality/types.js';
 
 const CHECKER = { userId: 'checker-1', role: 'checker' };
@@ -174,6 +174,56 @@ describe('QualityService.listOwnChecks', () => {
   it('paginates with skip/take', async () => {
     await service.listOwnChecks(CHECKER, { page: 3, perPage: 20 });
     expect(mockQualityVerification.findMany.mock.calls[0][0]).toMatchObject({ skip: 40, take: 20 });
+  });
+});
+
+describe('search terms are escaped before they reach LIKE', () => {
+  /**
+   * Prisma's `contains` compiles to LIKE '%term%' and does NOT escape the
+   * term. Probing the real database, a search for "%" returned all 8 of the
+   * caller's checks instead of 0 -- the filter silently did nothing. Not SQL
+   * injection (the value is still parameterised) but wildcard injection, which
+   * is a live correctness bug the moment a room is named "A_1".
+   */
+  it('neutralises % so it matches a literal percent, not everything', () => {
+    expect(escapeLikeTerm('%')).toBe('\\%');
+    expect(escapeLikeTerm('50%')).toBe('50\\%');
+  });
+
+  it('neutralises _ so it does not match any single character', () => {
+    // Real rooms are named this way -- "A_1" must find A_1, not A11 and AX1.
+    expect(escapeLikeTerm('A_1')).toBe('A\\_1');
+  });
+
+  it('escapes the backslash FIRST, so escapes are not double-escaped', () => {
+    // If % were escaped before \\, the added backslash would itself be escaped
+    // and the term would match a literal backslash followed by a wildcard.
+    expect(escapeLikeTerm('\\')).toBe('\\\\');
+    expect(escapeLikeTerm('a\\%b')).toBe('a\\\\\\%b');
+  });
+
+  it('leaves an ordinary term untouched', () => {
+    // The escape must not change the common case: room numbers and names.
+    expect(escapeLikeTerm('412')).toBe('412');
+    expect(escapeLikeTerm('Zimmer-Ü-12')).toBe('Zimmer-Ü-12');
+  });
+
+  it('applies the escape to every clause of the search, not just the room', async () => {
+    jest.clearAllMocks();
+    const service = new QualityService();
+    mockQualityVerification.count.mockResolvedValue(0);
+    mockQualityVerification.findMany.mockResolvedValue([]);
+
+    await service.listOwnChecks(CHECKER, { q: '100%' });
+
+    const where = mockQualityVerification.findMany.mock.calls[0][0].where;
+    const json = JSON.stringify(where.OR);
+    // All five OR clauses carry the escaped term. Escaping only room_number
+    // would leave notes, worker name and hotel name wildcard-injectable.
+    expect(where.OR).toHaveLength(5);
+    expect(json.match(/100\\\\%/g)).toHaveLength(5);
+    // ...and the raw term reaches LIKE nowhere.
+    expect(json).not.toMatch(/[^\\\\]100%/);
   });
 });
 
