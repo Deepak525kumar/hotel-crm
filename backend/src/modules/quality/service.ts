@@ -861,9 +861,12 @@ export class QualityService extends BaseService {
     const status = outcome === 'rework' ? VerificationStatus.NEEDS_REWORK : derivedStatus;
 
     const result = await this.prisma.$transaction(async (tx) => {
-      let verification;
-      try {
-        verification = await tx.qualityVerification.create({
+      // No try/catch: with no unique constraint on this table there is nothing
+      // left to translate. A P2002 here would mean a NEW constraint somebody
+      // added without revisiting this code, and it should surface as itself
+      // rather than as a stale "already inspected" that sends a checker
+      // hunting a duplicate which does not exist.
+      const verification = await tx.qualityVerification.create({
           data: {
             assignment_id,
             hotel_id: assignment.hotel_id,
@@ -883,14 +886,6 @@ export class QualityService extends BaseService {
               : {}),
           },
         });
-      } catch (error) {
-        // No unique constraint on this table any more, so P2002 here would
-        // mean a NEW one somebody added without updating this handler --
-        // surfaced as itself rather than mistranslated into a stale
-        // "already inspected" message that would send the checker looking for
-        // a duplicate that does not exist.
-        throw error;
-      }
 
       // GD-04 single-writer rule: every path that writes a Rating must refresh
       // the aggregate inside the same transaction, or WorkerOverallRating goes
@@ -1030,9 +1025,9 @@ export class QualityService extends BaseService {
     // ADR-029 (GD-01, Epic 7 PR 7.3): single commit for the verification
     // write and its notification enqueue.
     const verification = await this.prisma.$transaction(async (tx) => {
-      let created;
-      try {
-        created = await tx.qualityVerification.create({
+      // No try/catch: see recordInspection's note. There is no unique
+      // constraint left on assignment_id, so nothing to translate.
+      const created = await tx.qualityVerification.create({
           data: {
             assignment_id,
             hotel_id: assignment.hotel_id,
@@ -1054,15 +1049,6 @@ export class QualityService extends BaseService {
             photo_urls: photoKeys,
           },
         });
-      } catch (err) {
-        // No unique constraint on assignment_id since 2026-08-29 -- a shift
-        // carries one check per room -- so the P2002-to-409 translation that
-        // lived here is gone. A P2002 now would mean a NEW constraint somebody
-        // added without updating this handler, and it is re-thrown as itself
-        // rather than mistranslated into "already inspected", which would send
-        // a checker hunting for a duplicate that does not exist.
-        throw err;
-      }
 
       await notificationService.enqueue(
         {
