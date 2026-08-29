@@ -65,7 +65,6 @@ export class InspectionDigestJob implements ScheduledJob {
         rework_required: false,
       },
       _max: { created_at: true },
-      _count: { _all: true },
       // Oldest first, so when more shifts are ready than one batch can hold,
       // the worker who has been waiting longest is summarized first rather
       // than being starved behind a steady stream of newer shifts. Prisma also
@@ -86,6 +85,9 @@ export class InspectionDigestJob implements ScheduledJob {
 
     for (const group of quiet) {
       try {
+        // One timestamp per shift, captured before the write so the read-back
+        // can ask for exactly the rows this claim stamped.
+        const stampedAt = new Date();
         await this.prisma.$transaction(async (tx) => {
           // Claim first, and re-state the whole predicate. Between the groupBy
           // and this claim another process may have digested the shift, or the
@@ -98,25 +100,40 @@ export class InspectionDigestJob implements ScheduledJob {
               rework_required: false,
               created_at: { lte: cutoff },
             },
-            data: { digest_notified_at: new Date() },
+            data: { digest_notified_at: stampedAt },
           });
           if (claimed.count === 0) return;
 
-          // Read back what we just claimed, for the recipient and the numbers.
-          // After the claim, so the rows are pinned and a concurrent write
-          // cannot inflate the count we report.
+          // Read back EXACTLY the rows just claimed, identified by the stamp
+          // written above.
+          //
+          // This previously matched `digest_notified_at: { not: null }`, which
+          // also matched every row digested by an EARLIER run. On a shift the
+          // checker returned to, the message then reported this visit's room
+          // count against the whole shift's average: "1 room was checked.
+          // Average score 88" for a room that scored 70. The count and the
+          // average described different sets of rows.
+          //
+          // The stamp is unique per claimed set: two runs cannot claim the
+          // same assignment (the loser's updateMany matches nothing once the
+          // winner commits), and the assignment_id filter keeps two
+          // same-millisecond stamps on DIFFERENT shifts apart.
           const rows = await tx.qualityVerification.findMany({
-            where: { assignment_id: group.assignment_id, digest_notified_at: { not: null } },
-            select: { score: true, worker_id: true, hotel_id: true, rework_required: true },
+            where: {
+              assignment_id: group.assignment_id,
+              digest_notified_at: stampedAt,
+              rework_required: false,
+            },
+            select: { score: true, worker_id: true, hotel_id: true },
           });
-          const digested = rows.filter((r) => !r.rework_required);
-          const first = digested[0];
+          const first = rows[0];
           if (!first) return;
 
-          const rooms = claimed.count;
-          const average = Math.round(
-            digested.reduce((sum, r) => sum + r.score, 0) / digested.length
-          );
+          // claimed.count and rows.length describe the same set now, but the
+          // average is derived from `rows` -- the scores it actually summed --
+          // so the two numbers in the message can never disagree.
+          const rooms = rows.length;
+          const average = Math.round(rows.reduce((sum, r) => sum + r.score, 0) / rows.length);
 
           await notificationService.enqueue(
             {

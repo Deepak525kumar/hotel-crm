@@ -99,6 +99,18 @@ export function resolvePushTapRoute(data: Record<string, unknown> | undefined | 
     const notes = typeof data.notes === 'string' ? data.notes : '';
     return `/rework/${data.rework_assignment_id}?notes=${encodeURIComponent(notes)}`;
   }
+  // The end-of-shift digest (2026-08-30) summarizes a whole shift, so it opens
+  // that shift -- where the per-room checks are listed and searchable. It
+  // carries assignment_id rather than verification_id precisely because it is
+  // about many checks, not one.
+  //
+  // Note this type is ALSO used by the per-check inbox notification, which
+  // carries the same field. That one is deliberately not pushed (transports:
+  // []), so it never reaches this function; if that ever changes, this route
+  // is still the right destination for it.
+  if (data?.type === 'QUALITY_VERIFICATION_SUBMITTED' && typeof data.assignment_id === 'string') {
+    return `/shift/${data.assignment_id}`;
+  }
   return '/notifications';
 }
 

@@ -6,5 +6,5 @@
 -- Dropping the column loses only the record of which checks were summarized.
 -- That is recoverable by re-deriving it (the forward migration stamps every
 -- existing row), and the digest job does not exist in the rolled-back code.
-DROP INDEX IF EXISTS "QualityVerification_digest_notified_at_rework_required_creat_idx";
+DROP INDEX IF EXISTS "QualityVerification_digest_notified_at_rework_required_crea_idx";
 ALTER TABLE "QualityVerification" DROP COLUMN IF EXISTS "digest_notified_at";

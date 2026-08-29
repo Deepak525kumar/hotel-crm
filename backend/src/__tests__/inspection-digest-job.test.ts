@@ -33,7 +33,13 @@ function makePrisma(groups: any[], rows: any[], claimCount = rows.length) {
   const updateMany = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
   updateMany.mockResolvedValue({ count: claimCount });
   const findMany = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
-  findMany.mockResolvedValue(rows);
+  // The job reads back by the exact stamp it just wrote, so the fake honours
+  // that: rows carrying a different stamp are invisible to it, the way an
+  // earlier digest's rows are in the database.
+  findMany.mockImplementation(async (args: any) => {
+    const stamp = args?.where?.digest_notified_at;
+    return rows.filter((r: any) => r.__stamp === undefined || r.__stamp === stamp);
+  });
   const tx = { qualityVerification: { updateMany, findMany } };
   return {
     prisma: {
@@ -150,14 +156,58 @@ describe('InspectionDigestJob', () => {
     });
   });
 
-  it('reports the CLAIMED count, not everything it read back', () => {
-    // The read-back is unfiltered by the cutoff, so a room checked after the
-    // claim can appear in it. The number the worker is told must be the number
-    // actually covered by this digest.
-    const { prisma } = makePrisma([quietGroup], [row(90), row(80), row(70)], 2);
+  it('averages ONLY this digest\'s rooms, not every room ever digested', async () => {
+    // The defect this test exists for. The read-back once matched
+    // `digest_notified_at: { not: null }`, which also matched rows stamped by
+    // an EARLIER run. A checker returning to a shift then produced "1 room was
+    // checked. Average score 88" for a room that scored 70 -- the count
+    // described this visit and the average described the whole shift.
+    const groupBy = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+    groupBy.mockResolvedValue([quietGroup]);
+    const updateMany = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+    const findMany = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+
+    let written: unknown;
+    updateMany.mockImplementation(async (args: any) => {
+      written = args.data.digest_notified_at;
+      return { count: 1 };
+    });
+    // Twelve rooms at 90 from a previous digest, plus the one room this run
+    // claims, scoring 70. Only the latter carries the stamp just written.
+    findMany.mockImplementation(async (args: any) => {
+      const stamp = args.where.digest_notified_at;
+      expect(stamp).toBe(written);
+      const previous = Array.from({ length: 12 }, () => ({ ...row(90), __stamp: 'earlier' }));
+      const mine = [{ ...row(70), __stamp: stamp }];
+      return [...previous, ...mine].filter((r) => r.__stamp === stamp);
+    });
+
+    const prisma = {
+      qualityVerification: { groupBy },
+      $transaction: (fn: any) => fn({ qualityVerification: { updateMany, findMany } }),
+    } as any;
+
+    await new InspectionDigestJob(prisma, { intervalMs: 1000 }).run();
+
+    const msg = mockEnqueue.mock.calls[0][0].message as string;
+    expect(msg).toContain('1 room was');
+    expect(msg).toContain('70');
+    // 88 is the average across all thirteen -- the number the bug produced.
+    expect(msg).not.toContain('88');
+  });
+
+  it('counts and averages the SAME rows, so the two numbers cannot disagree', () => {
+    // This used to assert that the count came from claimed.count while the
+    // average came from a separately-read set -- which is precisely how the
+    // message ended up saying "1 room ... average 88" for a room scoring 70.
+    // Both now derive from the stamp-scoped read-back, so a mismatch is not
+    // expressible rather than merely untested.
+    const { prisma } = makePrisma([quietGroup], [row(90), row(80), row(70)], 3);
 
     return new InspectionDigestJob(prisma, { intervalMs: 1000 }).run().then(() => {
-      expect(mockEnqueue.mock.calls[0][0].message).toContain('2 rooms');
+      const msg = mockEnqueue.mock.calls[0][0].message as string;
+      expect(msg).toContain('3 rooms');
+      expect(msg).toContain('80'); // (90+80+70)/3, over those same three rows
     });
   });
 

@@ -110,9 +110,11 @@ export default function ScheduleScreen() {
   // Owner decision (2026-08-30): search wherever there are multiple entries.
   // Filtered on the device -- this is one already-loaded page, so a server
   // round-trip per keystroke would only add latency.
-  const visible = items.filter((i) =>
-    matchesShift(i, query, t(`shifts.status${i.status}`, { defaultValue: i.status }))
-  );
+  // The label passed in is exactly what the card renders -- `status` with
+  // underscores as spaces -- so typing what is on screen finds it. There is no
+  // shifts.status* translation key; the badge is not translated either, and
+  // inventing a key here would have searched a string no user ever sees.
+  const visible = items.filter((i) => matchesShift(i, query, i.status.replace(/_/g, ' ')));
 
   return (
     <ThemedView style={styles.container}>

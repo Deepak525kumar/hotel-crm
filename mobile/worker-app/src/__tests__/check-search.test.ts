@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
-import { matchesCheck, SEARCH_THRESHOLD } from '@/lib/check-search';
-import type { QualityCheck } from '@/types/api';
+import { matchesCheck, matchesShift, SEARCH_THRESHOLD } from '@/lib/check-search';
+import type { QualityCheck, WorkerAssignment } from '@/types/api';
 
 /**
  * Search on the worker's shift screen (owner decision, 2026-08-30).
@@ -55,6 +55,14 @@ describe('matchesCheck', () => {
     expect(matchesCheck(c, 'NEEDS_REWORK', 'NACHARBEIT ERFORDERLICH')).toBe(false);
   });
 
+  it('matches an English outcome typed with an underscore or a space', () => {
+    // The label reads "NEEDS REWORK"; the enum is NEEDS_REWORK. Both forms
+    // reach the box, and neither should return nothing.
+    const c = check({ status: 'NEEDS_REWORK' });
+    expect(matchesCheck(c, 'needs rework', 'NEEDS REWORK')).toBe(true);
+    expect(matchesCheck(c, 'needs_rework', 'NEEDS REWORK')).toBe(true);
+  });
+
   it('treats an empty box as no filter, not as a filter matching nothing', () => {
     expect(matchesCheck(check(), '', 'PASSED')).toBe(true);
     expect(matchesCheck(check(), '   ', 'PASSED')).toBe(true);
@@ -78,10 +86,69 @@ describe('matchesCheck', () => {
     expect(matchesCheck(check(), '%', 'PASSED')).toBe(false);
     expect(matchesCheck(check(), '_', 'PASSED')).toBe(false);
   });
+
+  it('does not let the status underscore-folding leak into notes', () => {
+    // Underscores are folded to spaces for STATUS only. Folding them
+    // everywhere made a bare '_' a search for ' ', which matched every check
+    // whose note contained a space -- the same defect class as the unescaped
+    // LIKE '_' on the server, reached by a different route.
+    const spaced = check({ notes: 'has spaces in it', room_number: '412' });
+    expect(matchesCheck(spaced, '_', 'PASSED')).toBe(false);
+    // And a room genuinely containing an underscore is still found literally.
+    expect(matchesCheck(check({ room_number: 'A_1' }), 'A_1', 'PASSED')).toBe(true);
+  });
 });
 
 describe('SEARCH_THRESHOLD', () => {
   it('hides the box on a shift small enough to read by scrolling', () => {
     expect(SEARCH_THRESHOLD).toBe(5);
+  });
+});
+
+const shift = (over: Partial<WorkerAssignment> = {}): WorkerAssignment =>
+  ({
+    id: 's1',
+    worker_id: 'w1',
+    status: 'IN_PROGRESS',
+    day: '2026-08-30',
+    hotel: { id: 'h1', name: 'Grand Hotel', city: 'Berlin' },
+    created_at: '2026-08-30T08:00:00.000Z',
+    ...over,
+  }) as WorkerAssignment;
+
+describe('matchesShift', () => {
+  it('matches hotel name and city', () => {
+    expect(matchesShift(shift(), 'grand', 'IN PROGRESS')).toBe(true);
+    expect(matchesShift(shift(), 'berlin', 'IN PROGRESS')).toBe(true);
+    expect(matchesShift(shift(), 'munich', 'IN PROGRESS')).toBe(false);
+  });
+
+  it('matches the ISO day, so a month or a date can be searched', () => {
+    // The card shows a formatted date, but the ISO form is what someone
+    // scanning for a specific day actually types.
+    expect(matchesShift(shift(), '2026-08', 'IN PROGRESS')).toBe(true);
+    expect(matchesShift(shift(), '08-30', 'IN PROGRESS')).toBe(true);
+    expect(matchesShift(shift(), '2025', 'IN PROGRESS')).toBe(false);
+  });
+
+  it('matches the status whether typed spaced or underscored', () => {
+    // The badge renders "IN PROGRESS"; the value behind it is IN_PROGRESS.
+    // A worker may type either, and neither should silently return nothing.
+    expect(matchesShift(shift(), 'in progress', 'IN PROGRESS')).toBe(true);
+    expect(matchesShift(shift(), 'IN_PROGRESS', 'IN PROGRESS')).toBe(true);
+    expect(matchesShift(shift(), 'progress', 'IN PROGRESS')).toBe(true);
+  });
+
+  it('survives a calendar-placed shift with no hotel and no day', () => {
+    // Both fields are optional on the DTO; a missing hotel must not throw and
+    // must not match everything either.
+    const bare = shift({ hotel: null, day: undefined });
+    expect(matchesShift(bare, 'grand', 'CONFIRMED')).toBe(false);
+    expect(matchesShift(bare, '', 'CONFIRMED')).toBe(true);
+    expect(matchesShift(bare, 'confirmed', 'CONFIRMED')).toBe(true);
+  });
+
+  it('treats an empty box as no filter', () => {
+    expect(matchesShift(shift(), '   ', 'IN PROGRESS')).toBe(true);
   });
 });

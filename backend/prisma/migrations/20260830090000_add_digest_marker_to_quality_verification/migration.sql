@@ -20,5 +20,5 @@ UPDATE "QualityVerification" SET "digest_notified_at" = "created_at";
 -- one -- almost every row is digested), then non-rework, then the quiet-period
 -- cutoff on created_at. Without this the job sequentially scans every check
 -- ever written, on every tick, forever.
-CREATE INDEX "QualityVerification_digest_notified_at_rework_required_creat_idx"
+CREATE INDEX "QualityVerification_digest_notified_at_rework_required_crea_idx"
   ON "QualityVerification" ("digest_notified_at", "rework_required", "created_at");

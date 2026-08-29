@@ -17,6 +17,27 @@ import type { QualityCheck, WorkerAssignment } from '@/types/api';
  */
 export const SEARCH_THRESHOLD = 5;
 
+function fold(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+/**
+ * Status comparison only: underscores read as spaces on BOTH sides.
+ *
+ * A row shows "IN PROGRESS" (the screen renders `status.replace(/_/g, ' ')`)
+ * while the value behind it is `IN_PROGRESS`, and a worker may type either.
+ *
+ * Deliberately NOT applied to room numbers, notes, hotel or city. Folding the
+ * underscore everywhere makes `_` behave as a wildcard -- a bare underscore
+ * became a search for " ", which matched every check whose note contained a
+ * space. That is the same class of defect as the unescaped LIKE `_` on the
+ * server, arriving by a different route.
+ */
+function matchesStatus(statusLabel: string, needle: string): boolean {
+  const spaced = (v: string) => v.replace(/_/g, ' ');
+  return spaced(fold(statusLabel)).includes(spaced(needle));
+}
+
 /**
  * Room number, the checker's note, or the outcome -- whichever the worker
  * happens to remember.
@@ -27,14 +48,14 @@ export const SEARCH_THRESHOLD = 5;
  * Matching the raw enum would work in English only, by coincidence.
  */
 export function matchesCheck(check: QualityCheck, q: string, statusLabel: string): boolean {
-  const needle = q.trim().toLowerCase();
+  const needle = fold(q);
   // An empty or whitespace-only box is not a filter that matches nothing; it
   // is no filter at all.
   if (needle === '') return true;
   return (
-    check.room_number.toLowerCase().includes(needle) ||
-    (check.notes ?? '').toLowerCase().includes(needle) ||
-    statusLabel.toLowerCase().includes(needle)
+    fold(check.room_number).includes(needle) ||
+    fold(check.notes ?? '').includes(needle) ||
+    matchesStatus(statusLabel, needle)
   );
 }
 
@@ -54,16 +75,16 @@ export function matchesShift(
   q: string,
   statusLabel: string
 ): boolean {
-  const needle = q.trim().toLowerCase();
+  const needle = fold(q);
   if (needle === '') return true;
   const hotel = shift.hotel;
   return (
-    (hotel?.name ?? '').toLowerCase().includes(needle) ||
-    (hotel?.city ?? '').toLowerCase().includes(needle) ||
+    fold(hotel?.name ?? '').includes(needle) ||
+    fold(hotel?.city ?? '').includes(needle) ||
     // The raw YYYY-MM-DD, so "2026-08" finds a month and "08-30" a day. The
     // card shows a formatted date, but the ISO form is what someone scanning
     // for a specific date actually types.
-    (shift.day ?? '').toLowerCase().includes(needle) ||
-    statusLabel.toLowerCase().includes(needle)
+    fold(shift.day ?? '').includes(needle) ||
+    matchesStatus(statusLabel, needle)
   );
 }
