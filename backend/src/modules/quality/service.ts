@@ -121,8 +121,19 @@ type QualityCheckRow = Prisma.QualityVerificationGetPayload<{
  */
 export function toCheckDto(row: QualityCheckRow) {
   // The round still awaiting the worker, if any. Rounds are selected in
-  // round_number order, so the last incomplete one is the current attempt.
-  const openRound = [...row.rework_rounds].reverse().find((r) => r.completed_at === null) ?? null;
+  // round_number order, so the last one still outstanding is the current
+  // attempt.
+  //
+  // `cancelled_at` is checked as well as `completed_at`. A round written off
+  // after three days has NEITHER set-to-completed nor been done, so testing
+  // completion alone left it looking open forever: the worker kept being
+  // offered "go to your rework" for a shift that had been cancelled off their
+  // schedule, and the check reported an open rework that no longer existed.
+  // Falsy rather than `=== null` on cancelled_at: a row that simply lacks the
+  // field -- an older client shape, a narrower select -- must fall back to
+  // "not cancelled" and stay open, not silently hide the worker's button.
+  const openRound =
+    [...row.rework_rounds].reverse().find((r) => r.completed_at === null && !r.cancelled_at) ?? null;
   const openAssignment = openRound
     ? (row.rework_assignments.find((a) => a.id === openRound.assignment_id) ?? null)
     : null;
@@ -571,26 +582,51 @@ export class QualityService extends BaseService {
       // escalation timers for one failure. This conditional update is a
       // compare-and-swap -- whoever flips false->true wins, the loser matches
       // zero rows and gets the same 409 a sequential duplicate would.
+      // Serialize on the verification row FIRST.
       //
-      // The predicate is "no round is currently OPEN", not "never sent back"
-      // (owner decision, 2026-08-30: a room can be sent back again if the fix
-      // is not good enough). Claiming on `rework_required: false` alone made a
-      // second round impossible, since that flag is only ever true once.
+      // Without this the open-round check below is check-then-act, and
+      // Postgres READ COMMITTED gives every statement its own snapshot: two
+      // concurrent callers both see no open round, then the second's
+      // round-number query runs AFTER the first commits, sees round 1, and
+      // allocates round 2 -- so no unique violation fires and the worker gets
+      // two rework shifts and two 20-minute clocks for one failure. Observed
+      // exactly that way against a real database.
       //
-      // Two concurrent callers on an already-completed round both match this
-      // predicate on read, but not on write: the loser blocks on the row lock,
-      // re-evaluates against the winner's committed version where
-      // rework_completed_at is no longer set, matches nothing, and gets the
-      // same 409 a sequential duplicate would. The unique index on
-      // (verification_id, round_number) is the second line of defence.
+      // FOR UPDATE makes the second caller wait for the first to commit, so
+      // its open-round check runs against the finished state and correctly
+      // answers 409. Same technique refreshWorkerOverallRating already uses to
+      // serialize rating writes for one worker.
+      //
+      // Guarded because the unit tests drive a mocked transaction with no raw
+      // access; the database path always has it.
+      if (typeof tx.$queryRawUnsafe === 'function') {
+        await tx.$queryRawUnsafe('SELECT id FROM "QualityVerification" WHERE id = $1 FOR UPDATE', verification.id);
+      }
+
+      // "Is a round currently OPEN?" asked of the ROUNDS, not of the check's
+      // flat mirror.
+      //
+      // The mirror cannot express this. A round CANCELLED after three days has
+      // completed_at NULL, so a claim of "rework_completed_at is not null"
+      // matched nothing and the checker could never raise rework on that room
+      // again -- the write-off permanently disabled the feature for that check.
+      //
+      // Concurrency is carried by the unique index on
+      // (verification_id, round_number): two callers racing both compute the
+      // same next number, exactly one INSERT survives, and the loser's whole
+      // transaction -- rework shift included -- rolls back. That is a stronger
+      // guarantee than the compare-and-swap it replaces, which protected only
+      // the mirror.
+      const openRound = await tx.reworkRound.findFirst({
+        where: { verification_id: verification.id, completed_at: null, cancelled_at: null },
+        select: { id: true },
+      });
+      if (openRound) {
+        throw new ConflictError('A rework round is already open for this verification');
+      }
+
       const claimed = await tx.qualityVerification.updateMany({
-        where: {
-          id: verification.id,
-          OR: [
-            { rework_required: false },
-            { rework_required: true, rework_completed_at: { not: null } },
-          ],
-        },
+        where: { id: verification.id },
         data: {
           rework_required: true,
           rework_notes: input.notes,
@@ -616,7 +652,7 @@ export class QualityService extends BaseService {
         },
       });
       if (claimed.count === 0) {
-        throw new ConflictError('A rework round is already open for this verification');
+        throw new NotFoundError('Verification not found');
       }
 
       // Only the assignment is returned: this endpoint's response shape is the
@@ -783,9 +819,27 @@ export class QualityService extends BaseService {
 
       const existing = await tx.reworkRound.findFirst({
         where: { assignment_id: assignmentId },
-        select: { id: true, round_number: true, completed_at: true, updated_at: true },
+        select: {
+          id: true,
+          round_number: true,
+          completed_at: true,
+          cancelled_at: true,
+          updated_at: true,
+        },
       });
       if (!existing) throw new NotFoundError('Rework not found');
+
+      // A round written off after three days is CLOSED. Without this guard a
+      // worker whose screen was still open could submit into it, producing a
+      // row that is both cancelled and completed -- and a "completed" rework
+      // whose shift had already been cancelled off the schedule and whose
+      // reason still reads "not completed for 3 days".
+      //
+      // Checked inside the transaction, so a cancellation committing between
+      // the upload and this write is caught rather than raced past.
+      if (existing.cancelled_at) {
+        throw new ConflictError('This rework was cancelled and can no longer be completed');
+      }
 
       // OPTIMISTIC LOCK on updated_at, not a "completed_at is null" claim.
       //
@@ -1772,8 +1826,11 @@ export class QualityService extends BaseService {
             },
             tx
           );
-          started += 1;
+          return true;
         });
+        // Counted only once the transaction has COMMITTED. Incrementing inside
+        // it would over-report a round whose commit then failed.
+        started += 1;
       } catch (error) {
         // One round must not stop the others, and must never fail the
         // check-in. A failed transaction leaves timer_started_at null, so the

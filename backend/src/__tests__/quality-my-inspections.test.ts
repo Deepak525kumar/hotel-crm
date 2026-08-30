@@ -74,6 +74,9 @@ const ROW = {
       notes: 'redo the balcony',
       assigned_at: new Date('2026-08-26T11:06:00.000Z'),
       completed_at: null,
+      cancelled_at: null,
+      timer_started_at: new Date('2026-08-26T11:06:00.000Z'),
+      cancellation_reason: null,
       photo_urls: [],
       assignment_id: 'rework-1',
       assigned_by: { id: 'checker-1', first_name: 'Cal', last_name: 'Checker' },
@@ -189,6 +192,9 @@ describe('QualityService.listOwnChecks', () => {
             notes: 'still not clean',
             assigned_at: new Date('2026-08-27T09:00:00.000Z'),
             completed_at: null,
+            cancelled_at: null,
+            timer_started_at: null,
+            cancellation_reason: null,
             photo_urls: [],
             assignment_id: 'rework-2',
             assigned_by: { id: 'checker-1', first_name: 'Cal', last_name: 'Checker' },
@@ -199,6 +205,40 @@ describe('QualityService.listOwnChecks', () => {
 
     const [check] = (await service.listOwnChecks(CHECKER)).checks;
     expect(check!.rework_assignment).toMatchObject({ id: 'rework-2' });
+  });
+
+  it('treats a CANCELLED round as closed, so no rework shift is offered', async () => {
+    // A round written off after three days has completed_at NULL -- it was
+    // never done. Testing completion alone left it looking open forever, so
+    // the worker kept being offered "go to your rework" for a shift that had
+    // been cancelled off their schedule.
+    mockQualityVerification.findMany.mockResolvedValue([
+      {
+        ...ROW,
+        rework_rounds: [
+          {
+            ...ROW.rework_rounds[0],
+            cancelled_at: new Date('2026-08-29T09:00:00.000Z'),
+            cancellation_reason: 'Rework not completed for 3 days',
+          },
+        ],
+      },
+    ]);
+
+    const [check] = (await service.listOwnChecks(CHECKER)).checks;
+    expect(check!.rework_assignment).toBeNull();
+    expect(check!.rework_rounds[0]!.cancellation_reason).toBe('Rework not completed for 3 days');
+  });
+
+  it('still opens the button when the round carries no cancelled_at field at all', async () => {
+    // Defensive: a narrower select or an older shape leaves the field absent.
+    // `undefined` must read as "not cancelled" and keep the round open, not
+    // silently hide the worker's way to the work.
+    const { cancelled_at: _omitted, ...withoutField } = ROW.rework_rounds[0] as Record<string, unknown>;
+    mockQualityVerification.findMany.mockResolvedValue([{ ...ROW, rework_rounds: [withoutField] }]);
+
+    const [check] = (await service.listOwnChecks(CHECKER)).checks;
+    expect(check!.rework_assignment).toMatchObject({ id: 'rework-1' });
   });
 
   it('exposes every round, in order, with per-round photo counts', async () => {

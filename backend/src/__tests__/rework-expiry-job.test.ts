@@ -126,12 +126,15 @@ describe('ReworkExpiryJob', () => {
     expect(call.where.status).toEqual({ not: 'COMPLETED' });
   });
 
-  it('tells the checker AND the manager', async () => {
+  it('tells the checker, the manager AND the worker', async () => {
+    // The worker is on this list because cancelling takes a shift off their
+    // schedule. Without telling them, assigned work simply disappears -- which
+    // reads as the app losing it rather than as a decision someone made.
     const { prisma } = makePrisma([staleRound]);
     await new ReworkExpiryJob(prisma, { intervalMs: 1000 }).run();
 
     const recipients = mockEnqueue.mock.calls.map((c: any[]) => c[0].recipientId);
-    expect(new Set(recipients)).toEqual(new Set(['checker1', 'mgr1']));
+    expect(new Set(recipients)).toEqual(new Set(['checker1', 'mgr1', 'w1']));
     expect(mockEnqueue.mock.calls[0][0].message).toContain('3 days');
   });
 
@@ -142,7 +145,8 @@ describe('ReworkExpiryJob', () => {
     };
     const { prisma } = makePrisma([row]);
     await new ReworkExpiryJob(prisma, { intervalMs: 1000 }).run();
-    expect(mockEnqueue).toHaveBeenCalledTimes(1);
+    // Checker and manager collapse to one; the worker is still told.
+    expect(mockEnqueue).toHaveBeenCalledTimes(2);
   });
 
   it('still notifies the checker when the hotel has no manager', async () => {
@@ -152,8 +156,10 @@ describe('ReworkExpiryJob', () => {
     };
     const { prisma } = makePrisma([row]);
     await new ReworkExpiryJob(prisma, { intervalMs: 1000 }).run();
-    expect(mockEnqueue).toHaveBeenCalledTimes(1);
-    expect(mockEnqueue.mock.calls[0][0].recipientId).toBe('checker1');
+    // A missing manager is skipped, not fatal: the checker and the worker are
+    // still told.
+    const recipients = mockEnqueue.mock.calls.map((c: any[]) => c[0].recipientId);
+    expect(new Set(recipients)).toEqual(new Set(['checker1', 'w1']));
   });
 
   it('one failing round does not abort the batch', async () => {

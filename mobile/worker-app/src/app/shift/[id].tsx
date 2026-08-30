@@ -36,6 +36,14 @@ function CheckRow({ check, onPress }: { check: QualityCheck; onPress: () => void
   const theme = useTheme();
   // Newest round number, or 0 when the server predates rounds.
   const rounds = check.rework_rounds?.length ?? 0;
+  const newest = check.rework_rounds?.[check.rework_rounds.length - 1] ?? null;
+  // A round cancelled after three days is closed but was never done. Without
+  // this the row said "round N in progress" forever for work that had been
+  // written off and taken off the schedule.
+  const cancelled = !!newest?.cancelled_at;
+  // ...and one that is waiting for the worker to be back on site is not
+  // "in progress" either: no clock is running.
+  const waiting = !cancelled && !newest?.completed_at && !newest?.timer_started_at;
 
   const tone =
     check.status === 'PASSED'
@@ -67,7 +75,15 @@ function CheckRow({ check, onPress }: { check: QualityCheck; onPress: () => void
             that was never sent back. The round number is included because a
             room can now be sent back more than once, and "completed" without
             it does not say WHICH attempt finished. */}
-        {check.rework_required && !check.rework_completed_at ? (
+        {check.rework_required && cancelled ? (
+          <ThemedText type="small" style={{ color: theme.danger }}>
+            {t('quality.reworkCancelled')}
+          </ThemedText>
+        ) : check.rework_required && waiting ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('quality.reworkWaitingOnSite')}
+          </ThemedText>
+        ) : check.rework_required && !check.rework_completed_at ? (
           <ThemedText type="small" style={{ color: theme.warning }}>
             {rounds > 0 ? t('quality.reworkRoundOpenShort', { number: rounds }) : t('quality.reworkPending')}
           </ThemedText>

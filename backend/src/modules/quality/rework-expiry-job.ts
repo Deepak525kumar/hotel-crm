@@ -97,10 +97,14 @@ export class ReworkExpiryJob implements ScheduledJob {
 
           const v = round.verification;
 
-          // The checker and the manager, the same two the 20-minute escalation
-          // tells. They are the people who can decide what happens to a room
-          // that was never put right.
-          const recipients = [v.verified_by_id, v.hotel?.manager_user_id].filter(
+          // The checker, the manager -- the two who decide what happens to a
+          // room that was never put right -- AND the worker.
+          //
+          // The worker is included because this cancels a shift off their
+          // schedule. Without it, work they were assigned simply disappears
+          // with no explanation, which reads as the app losing it rather than
+          // as a decision anyone made.
+          const recipients = [v.verified_by_id, v.hotel?.manager_user_id, v.worker_id].filter(
             (id): id is string => Boolean(id)
           );
           for (const recipientId of new Set(recipients)) {

@@ -166,7 +166,11 @@ export default function VerificationEvidenceScreen() {
   // The server enforces exactly this with a compare-and-swap and answers 409;
   // the button follows the same rule so the checker is not offered an action
   // that is going to be refused.
-  const openRound = rounds.find((r) => r.completed_at === null) ?? null;
+  // Cancelled counts as closed. A round written off after three days has
+  // completed_at NULL, so testing completion alone left it looking open
+  // forever -- and the "assign rework again" button stayed hidden for good on
+  // exactly the rooms that were never put right.
+  const openRound = rounds.find((r) => r.completed_at === null && !r.cancelled_at) ?? null;
   const canAssignRework = verification !== null && openRound === null;
 
   const styles = StyleSheet.create({
