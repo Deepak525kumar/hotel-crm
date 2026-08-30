@@ -14,6 +14,7 @@ import { parseBuildAsync } from "../lib/parseBuild.js";
 import { baseUrl, installPageUrl } from "../lib/env.js";
 import { uploadLimiter, dashboardApiLimiter } from "../lib/rateLimits.js";
 import { CHANNEL_LABELS, isChannel, type Channel } from "../lib/domain.js";
+import { APP_DEFINITIONS, APP_LABELS, isAppKey, type AppKey } from "../lib/apps.js";
 import { barChart, toDailySeries } from "../lib/sparkline.js";
 
 export const buildsRouter = Router();
@@ -36,6 +37,17 @@ function platformForFilename(filename: string): "IOS" | "ANDROID" | null {
  * "Android 14" as "Android 10". Taking the human's word for it removes the
  * ambiguity entirely.
  */
+/** The error a FAILED build carries — parseBuild.ts writes {error} into metadataJson. */
+export function failureReason(build: { status: string; metadataJson: string }): string | null {
+  if (build.status !== "FAILED") return null;
+  try {
+    const parsed = JSON.parse(build.metadataJson || "{}");
+    return typeof parsed.error === "string" ? parsed.error : null;
+  } catch {
+    return null;
+  }
+}
+
 export function minOsLabel(build: { platform: string; minOsVersion: string | null; minOsOverride: string | null }): string | null {
   const prefix = build.platform === "IOS" ? "iOS" : "Android";
 
@@ -92,6 +104,8 @@ buildsRouter.get("/", requireAuth, async (req, res) => {
     sizeMb: formatSize(b.sizeBytes),
     minOs: minOsLabel(b),
     installUrl: installPageUrl(base, b.slug),
+    appLabel: APP_LABELS[b.app as AppKey] ?? b.app,
+    failureReason: failureReason(b),
     channelLabel: CHANNEL_LABELS[b.channel as Channel] ?? b.channel,
     channelIsManual: b.channelSource === "MANUAL",
     otherChannel: b.channel === "PRODUCTION" ? "DEVELOPMENT" : "PRODUCTION",
@@ -99,7 +113,20 @@ buildsRouter.get("/", requireAuth, async (req, res) => {
     isLive: liveBuildIds.has(b.id),
   }));
 
+  // Two sections, one per app, so the upload area and the build list line up:
+  // dropping a file on the Worker dropzone only ever competes with other
+  // worker builds for attention.
+  const appSections = APP_DEFINITIONS.map((app) => ({
+    app: app.key,
+    label: app.label,
+    audience: app.audience,
+    uploadUrl: `${config.adminPath}/api/builds/upload`,
+    builds: presented.filter((b) => b.app === app.key),
+    latest: presented.find((b) => b.app === app.key && b.status === "READY") ?? null,
+  }));
+
   res.render("dashboard", {
+    appSections,
     builds: presented,
     stats: {
       uploads: {
@@ -111,9 +138,6 @@ buildsRouter.get("/", requireAuth, async (req, res) => {
         chart: barChart({ data: installSeries, label: "Installations per day" }),
       },
     },
-    // The most recent build, shown as a prominent "ready" card with its code,
-    // link and QR — the thing an operator wants the instant an upload finishes.
-    latest: presented.find((b) => b.status === "READY") ?? null,
     email: req.session!.email,
     adminPath: config.adminPath,
     installPath: config.installPath,
@@ -130,6 +154,7 @@ buildsRouter.get("/history", requireAuth, async (_req, res) => {
       sizeMb: formatSize(h.sizeBytes),
       minOs: minOsLabel({ platform: h.platform, minOsVersion: h.minOsVersion, minOsOverride: null }),
       channelLabel: CHANNEL_LABELS[h.channel as Channel] ?? h.channel,
+      appLabel: APP_LABELS[h.app as AppKey] ?? h.app,
     })),
     adminPath: config.adminPath,
   });
@@ -142,6 +167,9 @@ buildsRouter.post("/api/builds/upload", requireAuth, uploadLimiter, (req, res) =
   let handled = false;
   let notes = "";
   let minOsOverride = "";
+  /** Which upload section this came from — required, since there is no default app. */
+  let app: AppKey | null = null;
+  let appInvalid = false;
   /** Only set when the operator deliberately overrode the detector. */
   let channelOverride: Channel | null = null;
   let channelInvalid = false;
@@ -162,6 +190,10 @@ buildsRouter.post("/api/builds/upload", requireAuth, uploadLimiter, (req, res) =
     if (name === "channel" && value) {
       if (isChannel(value)) channelOverride = value;
       else channelInvalid = true;
+    }
+    if (name === "app") {
+      if (isAppKey(value)) app = value;
+      else appInvalid = true;
     }
   });
 
@@ -212,11 +244,16 @@ buildsRouter.post("/api/builds/upload", requireAuth, uploadLimiter, (req, res) =
           await fs.promises.rm(tmpPath, { force: true });
           return respond(400, { error: "Unknown channel." });
         }
+        if (appInvalid || !app) {
+          await fs.promises.rm(tmpPath, { force: true });
+          return respond(400, { error: "Choose the Worker app or Checker app section to upload into." });
+        }
 
         const created = await prisma.build.create({
           data: {
             slug,
             platform,
+            app,
             // Starts as DEVELOPMENT and is reassigned once the binary has been
             // read, so a build is never visible as a production candidate during
             // the seconds it spends parsing.
@@ -270,6 +307,8 @@ buildsRouter.get("/api/builds", requireAuth, dashboardApiLimiter, async (_req, r
       id: b.id,
       slug: b.slug,
       platform: b.platform,
+      app: b.app,
+      appReason: b.appReason,
       channel: b.channel,
       channelSource: b.channelSource,
       channelReason: b.channelReason,
@@ -356,6 +395,7 @@ buildsRouter.delete("/api/builds/:id", requireAuth, dashboardApiLimiter, async (
       prisma.promotionEvent.create({
         data: {
           channel: slot.channel,
+          app: slot.app,
           platform: slot.platform,
           action: "CLEARED",
           replacedBuildId: build.id,

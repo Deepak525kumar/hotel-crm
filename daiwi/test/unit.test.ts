@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
-import { minOsLabel, androidVersionForApiLevel } from "../src/routes/builds.js";
+import { minOsLabel, androidVersionForApiLevel, failureReason } from "../src/routes/builds.js";
 import { isChannel, isPlatform, CHANNELS, PLATFORMS } from "../src/lib/domain.js";
 import { passwordProblem, hashResetToken, newResetToken, MIN_PASSWORD_LENGTH } from "../src/lib/passwords.js";
 import { buildManifest, itmsServicesUrl, inspectUserAgent } from "../src/lib/manifest.js";
@@ -9,6 +9,7 @@ import { newKey } from "../src/lib/storage.js";
 import { detectIosChannel, detectAndroidChannel } from "../src/lib/detectChannel.js";
 import { barChart, toDailySeries } from "../src/lib/sparkline.js";
 import { formatSize } from "../src/lib/format.js";
+import { appForBundleId, isAppKey, APPS } from "../src/lib/apps.js";
 
 describe("minimum OS labelling", () => {
   test("iOS reports the declared version", () => {
@@ -369,5 +370,68 @@ describe("size formatting", () => {
 
   test("accepts the bigint the database returns", () => {
     assert.equal(formatSize(BigInt(45 * 1024 * 1024)), "45.0 MB");
+  });
+});
+
+describe("app identity", () => {
+  test("only WORKER and CHECKER are accepted", () => {
+    for (const a of APPS) assert.ok(isAppKey(a));
+    for (const bad of ["", "worker", "Worker", null, undefined, 1, {}, ["WORKER"]]) {
+      assert.equal(isAppKey(bad), false, JSON.stringify(bad));
+    }
+  });
+
+  test("the worker app's exact bundle id resolves to WORKER", () => {
+    assert.equal(appForBundleId("com.fhmhotelservices.workerapp"), "WORKER");
+  });
+
+  test("the checker app's exact bundle id resolves to CHECKER", () => {
+    assert.equal(appForBundleId("com.fhmhotelservices.checkerapp"), "CHECKER");
+  });
+
+  test("matching is case-insensitive", () => {
+    assert.equal(appForBundleId("COM.FHMHOTELSERVICES.WORKERAPP"), "WORKER");
+  });
+
+  test("a channel-suffixed variant still resolves — the suffix is the channel, not the app", () => {
+    assert.equal(appForBundleId("com.fhmhotelservices.workerapp.debug"), "WORKER");
+    assert.equal(appForBundleId("com.fhmhotelservices.checkerapp.dev"), "CHECKER");
+  });
+
+  test("a lookalike id sharing the prefix is NOT treated as a match", () => {
+    // "workerappX" is a different app id than "workerapp"; only a dot boundary counts.
+    assert.equal(appForBundleId("com.fhmhotelservices.workerappx"), null);
+  });
+
+  test("an unrelated bundle id resolves to nothing, not a guess", () => {
+    assert.equal(appForBundleId("com.example.someotherapp"), null);
+  });
+
+  test("empty or missing input resolves to nothing", () => {
+    assert.equal(appForBundleId(""), null);
+    // @ts-expect-error — exercising the runtime guard against a bad caller
+    assert.equal(appForBundleId(undefined), null);
+  });
+});
+
+describe("failure reason", () => {
+  test("a FAILED build surfaces the parser's error message", () => {
+    const reason = failureReason({
+      status: "FAILED",
+      metadataJson: JSON.stringify({ error: "This is the Checker app — upload it there instead." }),
+    });
+    assert.equal(reason, "This is the Checker app — upload it there instead.");
+  });
+
+  test("a READY build has no failure reason", () => {
+    assert.equal(failureReason({ status: "READY", metadataJson: "{}" }), null);
+  });
+
+  test("malformed metadata degrades to null rather than throwing", () => {
+    assert.equal(failureReason({ status: "FAILED", metadataJson: "not json" }), null);
+  });
+
+  test("metadata with no error field degrades to null", () => {
+    assert.equal(failureReason({ status: "FAILED", metadataJson: "{}" }), null);
   });
 });

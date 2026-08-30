@@ -48,6 +48,17 @@ model Build {
   id               String    @id @default(uuid())
   slug             String    @unique
   platform         String // IOS | ANDROID
+  /// WORKER | CHECKER — which app this build belongs to. Chosen by the operator
+  /// via which upload section they drop the file into, then verified against the
+  /// bundle identifier baked into the binary once it parses (lib/apps.ts). A
+  /// confirmed mismatch (this is provably the other app) fails the upload
+  /// outright; an unrecognised bundle id is filed under the chosen section with
+  /// a warning, since there is no counter-evidence to override the operator on.
+  app              String    @default("WORKER")
+  /// Empty until parsing resolves the bundle id. Shown on the card, mirroring
+  /// channelReason — "Confirmed by bundle id" or "Bundle id not recognised;
+  /// filed under Worker app as uploaded."
+  appReason        String    @default("")
   /// PRODUCTION | DEVELOPMENT. Decides which board the build appears on and which
   /// catalogue it can be promoted into. Detected from the binary during parsing
   /// (see lib/detectChannel.ts) and overridable by an operator afterwards.
@@ -96,6 +107,7 @@ model Build {
   @@index([userId])
   @@index([platform, status, createdAt])
   @@index([channel, platform, status, createdAt])
+  @@index([app, channel, platform, status, createdAt])
 }
 
 /// One row per (channel, platform) — four at most: the live build for
@@ -107,14 +119,16 @@ model Build {
 /// without every worker's install page moving underneath them.
 model ReleaseSlot {
   channel         String // PRODUCTION | DEVELOPMENT
+  app             String    @default("WORKER") // WORKER | CHECKER
   platform        String // IOS | ANDROID
   buildId         String
   build           Build    @relation(fields: [buildId], references: [id])
   promotedAt      DateTime @default(now())
   promotedByEmail String
 
-  /// Composite key: a channel/platform pair can only ever name one build.
-  @@id([channel, platform])
+  /// Composite key: a (channel, app, platform) triple can only ever name one
+  /// build — eight slots total (2 channels x 2 apps x 2 platforms).
+  @@id([channel, app, platform])
   @@index([buildId])
 }
 
@@ -127,6 +141,7 @@ model ReleaseSlot {
 model InstallEvent {
   id        String   @id @default(uuid())
   buildId   String
+  app       String    @default("WORKER") // WORKER | CHECKER
   platform  String // IOS | ANDROID
   channel   String // PRODUCTION | DEVELOPMENT
   createdAt DateTime @default(now())
@@ -140,6 +155,7 @@ model InstallEvent {
 model PromotionEvent {
   id           String   @id @default(uuid())
   channel      String   @default("PRODUCTION")
+  app          String   @default("WORKER")
   platform     String
   action       String // PROMOTED | CLEARED
   buildId      String?
@@ -151,7 +167,7 @@ model PromotionEvent {
   actorEmail   String
   createdAt    DateTime @default(now())
 
-  @@index([channel, platform, createdAt])
+  @@index([channel, app, platform, createdAt])
 }
 
 /// Append-only log of every version ever published, and what happened to it.
@@ -165,6 +181,7 @@ model ReleaseHistory {
   slug            String
   platform        String // IOS | ANDROID
   channel         String    @default("PRODUCTION")
+  app             String    @default("WORKER")
   fileName        String
   appName         String
   bundleId        String

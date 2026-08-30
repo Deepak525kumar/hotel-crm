@@ -5,132 +5,147 @@
   <%- include("partials/nav", { active: 'builds' }) %>
 
   <main class="container">
-    <div class="dash-grid">
-      <section class="panel">
-        <h2 class="panel-title">Upload a build</h2>
-        <div class="dropzone" id="dropzone" data-upload-url="<%= adminPath %>/api/builds/upload">
-          <p><strong>Drop an .ipa or .apk here</strong> or click to choose a file</p>
-          <input type="file" id="fileInput" accept=".ipa,.apk" hidden />
-          <div class="upload-row">
-            <input type="text" id="notesInput" placeholder="Release notes (optional)" maxlength="2000" />
-            <input type="text" id="minOsInput" placeholder="Min OS override (e.g. 16.0)" maxlength="32" />
-          </div>
-          <p class="hint muted">
-            Development or production is detected from the build itself, and the minimum OS is read
-            from the binary. You can correct either afterwards.
-          </p>
-          <div class="progress" id="progressWrap" hidden>
-            <div class="progress-bar" id="progressBar"></div>
-          </div>
-          <p class="error" id="uploadError"></p>
-        </div>
-      </section>
-
-      <section class="panel">
-        <h2 class="panel-title">Last 30 days</h2>
-        <div class="stat-row">
-          <div class="stat-tile">
-            <div class="stat-label">Uploads</div>
-            <div class="stat-value"><%= stats.uploads.total %></div>
-            <%- stats.uploads.chart %>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-label">Installations</div>
-            <div class="stat-value"><%= stats.installs.total %></div>
-            <%- stats.installs.chart %>
-          </div>
-        </div>
-        <p class="hint muted">
-          Counts only. No record is kept of who installed a build or from which device.
-        </p>
-      </section>
-    </div>
-
-    <% if (latest) { %>
-      <section class="panel">
-        <h2 class="panel-title">Latest build</h2>
-        <div class="ready-card">
-          <div class="ready-main">
-            <div class="ready-app">
-              <%= latest.appName %>
-              <span class="platform-badge platform-<%= latest.platform.toLowerCase() %>"><%= latest.platform === 'IOS' ? 'iOS' : 'Android' %></span>
-              <span class="channel-badge channel-<%= latest.channel.toLowerCase() %>"><%= latest.channelLabel %></span>
-            </div>
-            <div class="ready-code"><%= latest.slug %></div>
-            <div class="link-row">
-              <a class="mono link-text" href="<%= latest.installUrl %>" target="_blank" rel="noopener"><%= latest.installUrl %></a>
-              <button class="btn copy-btn" type="button" data-url="<%= latest.installUrl %>">Copy link</button>
-            </div>
-            <div class="muted small">
-              Version <%= latest.version %> (<%= latest.buildNumber %>) · <%= latest.sizeMb %><% if (latest.minOs) { %> · <%= latest.minOs %><% } %>
-            </div>
-            <div class="muted small">Send this link to anyone, or have them scan the code.</div>
-          </div>
-          <div class="ready-qr">
-            <img src="<%= adminPath %>/api/builds/<%= latest.id %>/qr" alt="QR code for the install link" width="180" height="180" />
-          </div>
-        </div>
-      </section>
-    <% } %>
-
     <section class="panel">
-      <h2 class="panel-title">All builds <span class="muted small">(<%= builds.length %>)</span></h2>
-      <div class="builds" id="buildsList">
-        <% builds.forEach(b => { %>
-          <div class="build-card" data-id="<%= b.id %>" data-slug="<%= b.slug %>" data-status="<%= b.status %>">
-            <% if (b.iconKey) { %>
-              <img class="icon" src="<%= installPath %>/<%= b.slug %>/icon" alt="" />
-            <% } else { %>
-              <div class="icon placeholder"></div>
-            <% } %>
+      <h2 class="panel-title">Last 30 days</h2>
+      <div class="stat-row">
+        <div class="stat-tile">
+          <div class="stat-label">Uploads</div>
+          <div class="stat-value"><%= stats.uploads.total %></div>
+          <%- stats.uploads.chart %>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Installations</div>
+          <div class="stat-value"><%= stats.installs.total %></div>
+          <%- stats.installs.chart %>
+        </div>
+      </div>
+      <p class="hint muted">
+        Counts only, across both apps. No record is kept of who installed a build or from which device.
+      </p>
+    </section>
 
-            <div class="build-info">
-              <div class="build-title">
-                <%= b.appName %>
-                <span class="platform-badge platform-<%= b.platform.toLowerCase() %>"><%= b.platform === 'IOS' ? 'iOS' : 'Android' %></span>
-                <span class="channel-badge channel-<%= b.channel.toLowerCase() %>"><%= b.channelLabel %></span>
-                <% if (b.isLive) { %><span class="status status-ready">live</span><% } %>
-              </div>
-              <div class="muted">
-                <%= b.version %> (<%= b.buildNumber %>) · <%= b.sizeMb %>
-                <% if (b.minOs) { %> · <%= b.minOs %><% } %>
-                · <span class="status status-<%= b.status.toLowerCase() %>"><%= b.status %></span>
-              </div>
-              <div class="muted small mono"><%= b.fileName %></div>
+    <% appSections.forEach(section => { %>
+      <section class="app-section">
+        <div class="app-section-head">
+          <h2 class="app-section-title"><%= section.label %></h2>
+          <span class="muted small"><%= section.audience %></span>
+        </div>
 
-              <% if (b.status === 'READY' && b.channelReason) { %>
-                <div class="muted small channel-why">
-                  <%= b.channelIsManual ? 'Set by hand' : 'Detected' %>: <%= b.channelReason %>
-                </div>
-              <% } %>
-
-              <% if (b.notes) { %><div class="notes"><%= b.notes %></div><% } %>
-              <% if (b.status === 'READY') { %>
-                <div class="link-row">
-                  <span class="mono link-text"><%= b.installUrl %></span>
-                </div>
-              <% } %>
+        <div class="panel">
+          <h3 class="panel-title">Upload a <%= section.label.toLowerCase() %> build</h3>
+          <div class="dropzone" data-app="<%= section.app %>" data-upload-url="<%= section.uploadUrl %>">
+            <p><strong>Drop an .ipa or .apk here</strong> or click to choose a file</p>
+            <input type="file" class="file-input" accept=".ipa,.apk" hidden />
+            <div class="upload-row">
+              <input type="text" class="notes-input" placeholder="Release notes (optional)" maxlength="2000" />
+              <input type="text" class="min-os-input" placeholder="Min OS override (e.g. 16.0)" maxlength="32" />
             </div>
+            <p class="hint muted">
+              Only <%= section.label.toLowerCase() %> builds belong here — the bundle identifier is checked once the
+              file parses, and anything that turns out to be the other app is refused. Development or production is
+              detected automatically, and the minimum OS is read from the binary.
+            </p>
+            <div class="progress" hidden>
+              <div class="progress-bar"></div>
+            </div>
+            <p class="error"></p>
+          </div>
+        </div>
 
-            <div class="build-actions">
-              <% if (b.status === 'READY') { %>
-                <a class="btn" href="<%= b.installUrl %>" target="_blank" rel="noopener">Open</a>
-                <button class="btn copy-btn" type="button" data-url="<%= b.installUrl %>">Copy link</button>
-                <button class="btn qr-btn" type="button" data-qr="<%= adminPath %>/api/builds/<%= b.id %>/qr">QR</button>
-                <% if (!b.isLive) { %>
-                  <button class="btn channel-btn" type="button"
-                    data-id="<%= b.id %>" data-channel="<%= b.otherChannel %>" data-label="<%= b.otherChannelLabel %>">
-                    Move to <%= b.otherChannelLabel %>
-                  </button>
-                <% } %>
-              <% } %>
-              <button class="btn danger delete-btn" type="button" data-id="<%= b.id %>">Delete</button>
+        <% if (section.latest) { %>
+          <div class="panel">
+            <h3 class="panel-title">Latest <%= section.label.toLowerCase() %> build</h3>
+            <div class="ready-card">
+              <div class="ready-main">
+                <div class="ready-app">
+                  <%= section.latest.appName %>
+                  <span class="platform-badge platform-<%= section.latest.platform.toLowerCase() %>"><%= section.latest.platform === 'IOS' ? 'iOS' : 'Android' %></span>
+                  <span class="channel-badge channel-<%= section.latest.channel.toLowerCase() %>"><%= section.latest.channelLabel %></span>
+                </div>
+                <div class="ready-code"><%= section.latest.slug %></div>
+                <div class="link-row">
+                  <a class="mono link-text" href="<%= section.latest.installUrl %>" target="_blank" rel="noopener"><%= section.latest.installUrl %></a>
+                  <button class="btn copy-btn" type="button" data-url="<%= section.latest.installUrl %>">Copy link</button>
+                </div>
+                <div class="muted small">
+                  Version <%= section.latest.version %> (<%= section.latest.buildNumber %>) · <%= section.latest.sizeMb %><% if (section.latest.minOs) { %> · <%= section.latest.minOs %><% } %>
+                </div>
+              </div>
+              <div class="ready-qr">
+                <img src="<%= adminPath %>/api/builds/<%= section.latest.id %>/qr" alt="QR code for the install link" width="140" height="140" />
+              </div>
             </div>
           </div>
-        <% }) %>
-        <% if (builds.length === 0) { %><p class="muted">No builds yet — upload one above.</p><% } %>
-      </div>
-    </section>
+        <% } %>
+
+        <div class="panel">
+          <h3 class="panel-title"><%= section.label %> builds <span class="muted small">(<%= section.builds.length %>)</span></h3>
+          <div class="builds">
+            <% section.builds.forEach(b => { %>
+              <div class="build-card" data-id="<%= b.id %>" data-slug="<%= b.slug %>" data-status="<%= b.status %>">
+                <% if (b.iconKey) { %>
+                  <img class="icon" src="<%= installPath %>/<%= b.slug %>/icon" alt="" />
+                <% } else { %>
+                  <div class="icon placeholder"></div>
+                <% } %>
+
+                <div class="build-info">
+                  <div class="build-title">
+                    <%= b.appName %>
+                    <span class="platform-badge platform-<%= b.platform.toLowerCase() %>"><%= b.platform === 'IOS' ? 'iOS' : 'Android' %></span>
+                    <span class="channel-badge channel-<%= b.channel.toLowerCase() %>"><%= b.channelLabel %></span>
+                    <% if (b.isLive) { %><span class="status status-ready">live</span><% } %>
+                  </div>
+                  <div class="muted">
+                    <%= b.version %> (<%= b.buildNumber %>) · <%= b.sizeMb %>
+                    <% if (b.minOs) { %> · <%= b.minOs %><% } %>
+                    · <span class="status status-<%= b.status.toLowerCase() %>"><%= b.status %></span>
+                  </div>
+                  <div class="muted small mono"><%= b.fileName %></div>
+
+                  <% if (b.status === 'READY' && b.channelReason) { %>
+                    <div class="muted small channel-why">
+                      <%= b.channelIsManual ? 'Set by hand' : 'Detected' %>: <%= b.channelReason %>
+                    </div>
+                  <% } %>
+                  <% if (b.status === 'READY' && b.appReason) { %>
+                    <div class="muted small channel-why"><%= b.appReason %></div>
+                  <% } %>
+                  <% if (b.status === 'FAILED' && b.failureReason) { %>
+                    <div class="muted small failure-reason">⚠️ <%= b.failureReason %></div>
+                  <% } %>
+
+                  <% if (b.notes) { %><div class="notes"><%= b.notes %></div><% } %>
+                  <% if (b.status === 'READY') { %>
+                    <div class="link-row">
+                      <span class="mono link-text"><%= b.installUrl %></span>
+                    </div>
+                  <% } %>
+                </div>
+
+                <div class="build-actions">
+                  <% if (b.status === 'READY') { %>
+                    <a class="btn" href="<%= b.installUrl %>" target="_blank" rel="noopener">Open</a>
+                    <button class="btn copy-btn" type="button" data-url="<%= b.installUrl %>">Copy link</button>
+                    <button class="btn qr-btn" type="button" data-qr="<%= adminPath %>/api/builds/<%= b.id %>/qr">QR</button>
+                    <% if (!b.isLive) { %>
+                      <button class="btn channel-btn" type="button"
+                        data-id="<%= b.id %>" data-channel="<%= b.otherChannel %>" data-label="<%= b.otherChannelLabel %>">
+                        Move to <%= b.otherChannelLabel %>
+                      </button>
+                    <% } %>
+                  <% } %>
+                  <button class="btn danger delete-btn" type="button" data-id="<%= b.id %>">Delete</button>
+                </div>
+              </div>
+            <% }) %>
+            <% if (section.builds.length === 0) { %>
+              <p class="muted">No <%= section.label.toLowerCase() %> builds yet — upload one above.</p>
+            <% } %>
+          </div>
+        </div>
+      </section>
+    <% }) %>
   </main>
 
   <dialog id="qrDialog" class="qr-dialog">

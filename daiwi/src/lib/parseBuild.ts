@@ -6,6 +6,7 @@ import { parseIpa } from "./ipa.js";
 import { parseApk } from "./apk.js";
 import { APK_CONTENT_TYPE } from "./manifest.js";
 import { detectIosChannel, detectAndroidChannel, type ChannelDecision } from "./detectChannel.js";
+import { appForBundleId, appDefinition, type AppKey } from "./apps.js";
 
 const IPA_CONTENT_TYPE = "application/octet-stream";
 
@@ -128,6 +129,31 @@ export async function parseBuildAsync(buildId: string, tmpPath: string): Promise
     const sizeBytes = fs.statSync(tmpPath).size;
     const info = await parse(build.platform, tmpPath);
 
+    // Checked before a single byte reaches object storage: the bundle id is the
+    // one piece of evidence a build cannot lie about by way of which upload
+    // section it was dropped into.
+    const resolvedApp = appForBundleId(info.bundleId);
+    let appReason: string;
+    if (resolvedApp && resolvedApp !== build.app) {
+      // A confirmed mismatch — this binary provably belongs to the other app —
+      // fails the upload outright rather than silently filing it under the
+      // wrong section or silently moving it to the right one. Either of those
+      // would be a surprise; refusing it is not.
+      const actual = appDefinition(resolvedApp).label;
+      const chosen = appDefinition(build.app as AppKey).label;
+      throw new Error(
+        `This is the ${actual} (bundle id ${info.bundleId}) — it was uploaded to the ${chosen} section. Upload it there instead.`
+      );
+    } else if (!resolvedApp) {
+      // No counter-evidence either way: keep the operator's choice, but say so.
+      appReason = `Bundle identifier "${info.bundleId}" is not recognised — filed under ${appDefinition(build.app as AppKey).label} as uploaded.`;
+      (info.metadata as { warnings?: string[] }).warnings?.push(
+        "Bundle identifier does not match a known app — verify this was uploaded to the right section."
+      );
+    } else {
+      appReason = `Confirmed by bundle id (${info.bundleId}).`;
+    }
+
     await storage.putFile(
       build.storageKey,
       tmpPath,
@@ -151,6 +177,7 @@ export async function parseBuildAsync(buildId: string, tmpPath: string): Promise
       where: { id: buildId },
       data: {
         ...channelFields,
+        appReason,
         appName: info.appName,
         bundleId: info.bundleId,
         version: info.version,
