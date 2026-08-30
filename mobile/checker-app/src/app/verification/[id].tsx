@@ -46,6 +46,26 @@ import type { QualityVerification, ReworkRoundPhotos } from '@/types/api';
  * Styles are passed in because this screen builds them from the theme inside
  * the component; the tile has no business rebuilding them.
  */
+/**
+ * What a rework round's state should say, in one place.
+ *
+ * Four states now, not two (2026-08-30). A round raised after the worker's
+ * shift ended has no clock running -- saying "awaiting the worker" implies a
+ * deadline that is not ticking, and saying nothing implies it was forgotten.
+ * A round cancelled after three days is closed but explicitly NOT completed:
+ * the room was never fixed, and the label has to keep saying so.
+ */
+function roundState(round: {
+  completed_at: string | null;
+  cancelled_at?: string | null;
+  timer_started_at?: string | null;
+}): { key: string; tone: 'success' | 'warning' | 'danger' | 'muted' } {
+  if (round.cancelled_at) return { key: 'quality.reworkCancelled', tone: 'danger' };
+  if (round.completed_at) return { key: 'quality.reworkCompleted', tone: 'success' };
+  if (!round.timer_started_at) return { key: 'quality.reworkWaitingOnSite', tone: 'muted' };
+  return { key: 'quality.reworkAwaitingWorker', tone: 'warning' };
+}
+
 function PhotoTile({
   photo,
   styles,
@@ -146,7 +166,11 @@ export default function VerificationEvidenceScreen() {
   // The server enforces exactly this with a compare-and-swap and answers 409;
   // the button follows the same rule so the checker is not offered an action
   // that is going to be refused.
-  const openRound = rounds.find((r) => r.completed_at === null) ?? null;
+  // Cancelled counts as closed. A round written off after three days has
+  // completed_at NULL, so testing completion alone left it looking open
+  // forever -- and the "assign rework again" button stayed hidden for good on
+  // exactly the rooms that were never put right.
+  const openRound = rounds.find((r) => r.completed_at === null && !r.cancelled_at) ?? null;
   const canAssignRework = verification !== null && openRound === null;
 
   const styles = StyleSheet.create({
@@ -336,14 +360,22 @@ export default function VerificationEvidenceScreen() {
               <ThemedText type="smallBold">
                 {t('quality.reworkRoundTitle', { number: round.round_number })}
               </ThemedText>
-              <ThemedText
-                type="small"
-                style={{ color: round.completed_at ? theme.success : theme.warning }}
-              >
-                {round.completed_at
-                  ? t('quality.reworkCompleted')
-                  : t('quality.reworkAwaitingWorker')}
-              </ThemedText>
+              {(() => {
+                const st = roundState(round);
+                const tone =
+                  st.tone === 'success'
+                    ? theme.success
+                    : st.tone === 'danger'
+                      ? theme.danger
+                      : st.tone === 'muted'
+                        ? theme.textSecondary
+                        : theme.warning;
+                return (
+                  <ThemedText type="small" style={{ color: tone }}>
+                    {t(st.key)}
+                  </ThemedText>
+                );
+              })()}
             </View>
             <Text style={styles.notes}>{round.notes}</Text>
             {round.photos.length > 0 ? (
@@ -362,9 +394,13 @@ export default function VerificationEvidenceScreen() {
               // finished before per-round evidence was recorded. Saying which
               // stops an empty section reading as lost evidence.
               <ThemedText type="small" themeColor="textSecondary">
-                {round.completed_at
-                  ? t('quality.reworkNoRoundPhotos')
-                  : t('quality.reworkAwaitingPhotos')}
+                {round.cancelled_at
+                  ? t('quality.reworkCancelledBody')
+                  : round.completed_at
+                    ? t('quality.reworkNoRoundPhotos')
+                    : !round.timer_started_at
+                      ? t('quality.reworkWaitingOnSiteBody')
+                      : t('quality.reworkAwaitingPhotos')}
               </ThemedText>
             )}
           </View>

@@ -1104,7 +1104,11 @@
     "originalCheckTitle": "Constat du contrôleur",
     "roomLabelShort": "Chambre",
     "yourEvidenceTitle": "Ce que vous avez envoyé ({{count}})",
-    "canAddMoreEvidence": "Vous pouvez ajouter d’autres photos si nécessaire."
+    "canAddMoreEvidence": "Vous pouvez ajouter d’autres photos si nécessaire.",
+    "reworkCancelled": "Annulée",
+    "reworkCancelledBody": "Cette reprise n’a pas été effectuée sous 3 jours et a été annulée.",
+    "reworkWaitingOnSite": "En attente",
+    "reworkWaitingOnSiteBody": "Démarre au prochain pointage dans cet hôtel."
   },
   "ratings": {
     "comment": "Commentaire",

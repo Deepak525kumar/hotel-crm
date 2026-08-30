@@ -14,6 +14,8 @@ import { AttendanceDto, CheckInInput, ListAttendanceQuery, UpdateAttendanceInput
   AttendanceHotelDto,
 } from './types.js';
 import { assignmentService, resolveScheduledStart } from '../assignments/service.js';
+import { qualityService } from '../quality/service.js';
+import { logger } from '../../lib/logger.js';
 import { AssignmentStatus } from '@prisma/client';
 import { todayInCalendarTimezone } from '../../lib/utils.js';
 
@@ -290,6 +292,28 @@ export class AttendanceService extends BaseService {
       null,
       true // internalBypass = true
     );
+
+    // Rework waiting on this worker AT THIS HOTEL starts its 20-minute clock
+    // here (owner decision, 2026-08-30). A checker who inspected after the
+    // worker went home leaves the round deferred; this is the first moment
+    // they are on site and could actually walk to the room.
+    //
+    // Deliberately not awaited into the failure path: a reminder that cannot
+    // be sent must never stop someone starting their shift. Anything left
+    // unstarted is retried on their next check-in, since the claim is on
+    // timer_started_at still being null.
+    try {
+      await qualityService.startDeferredReworkOnCheckIn({
+        workerId: actorId,
+        hotelId: assignment.hotel_id,
+        day: assignment.day,
+      });
+    } catch (error) {
+      logger.error('deferred_rework_on_checkin_failed', {
+        assignmentId: input.assignment_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return this.toDto(updated, await this.enrichContext(updated));
   }

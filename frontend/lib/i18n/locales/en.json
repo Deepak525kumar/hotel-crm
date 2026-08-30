@@ -1104,7 +1104,11 @@
     "originalCheckTitle": "What the checker found",
     "roomLabelShort": "Room",
     "yourEvidenceTitle": "What you sent ({{count}})",
-    "canAddMoreEvidence": "You can add more photos if you need to."
+    "canAddMoreEvidence": "You can add more photos if you need to.",
+    "reworkCancelled": "Cancelled",
+    "reworkCancelledBody": "This rework was not completed within 3 days and has been cancelled.",
+    "reworkWaitingOnSite": "Waiting",
+    "reworkWaitingOnSiteBody": "Starts the next time the worker checks in at this hotel."
   },
   "ratings": {
     "comment": "Comment",

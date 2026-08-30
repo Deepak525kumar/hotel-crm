@@ -1104,7 +1104,11 @@
     "originalCheckTitle": "Feststellung des Prüfers",
     "roomLabelShort": "Zimmer",
     "yourEvidenceTitle": "Was Sie gesendet haben ({{count}})",
-    "canAddMoreEvidence": "Sie können bei Bedarf weitere Fotos hinzufügen."
+    "canAddMoreEvidence": "Sie können bei Bedarf weitere Fotos hinzufügen.",
+    "reworkCancelled": "Storniert",
+    "reworkCancelledBody": "Diese Nacharbeit wurde nicht innerhalb von 3 Tagen erledigt und wurde storniert.",
+    "reworkWaitingOnSite": "Wartet",
+    "reworkWaitingOnSiteBody": "Beginnt beim nächsten Einchecken in diesem Hotel."
   },
   "ratings": {
     "comment": "Kommentar",

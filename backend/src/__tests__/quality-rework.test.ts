@@ -98,6 +98,9 @@ describe('ReworkEscalationJob', () => {
       id: 'round1',
       escalated_at: null,
       completed_at: null,
+      // A round cancelled after three days is closed; escalating it would
+      // chase work that has already been written off.
+      cancelled_at: null,
     });
     expect(updateMany.mock.calls[0][0].data.escalated_at).toBeInstanceOf(Date);
   });
@@ -143,7 +146,13 @@ describe('ReworkEscalationJob', () => {
     // round 2 would have escalated it instantly.
     expect(where.completed_at).toBeNull();
     expect(where.escalated_at).toBeNull();
-    expect(where.assigned_at.lte).toBeInstanceOf(Date);
+    expect(where.cancelled_at).toBeNull();
+    // Measured from when the clock STARTED, not when the round was assigned
+    // (owner decision, 2026-08-30). A round raised against a finished shift
+    // has timer_started_at NULL, and `{ lte }` never matches NULL -- so it
+    // cannot escalate until the worker checks in and the clock is set.
+    expect(where.timer_started_at.lte).toBeInstanceOf(Date);
+    expect(where.assigned_at).toBeUndefined();
   });
 
   it('one failing row does not abort the batch', async () => {
@@ -205,15 +214,67 @@ describe('rework is the checker’s decision, not an inference from the score', 
 });
 
 describe('rework claims are compare-and-swap, not check-then-act', () => {
-  it('assignRework claims on rework_required === false', () => {
+  it('assignRework refuses a second round while one is genuinely OPEN', () => {
     const src = readFileSync('src/modules/quality/service.ts', 'utf8');
     const body = src.slice(src.indexOf('async assignRework('), src.indexOf('async completeRework('));
-    // The WHERE must constrain the prior state; a bare id would let both
-    // concurrent callers win and create two rework rows -- and therefore two
-    // 20-minute escalation timers for one failure.
-    expect(body).toContain('rework_required: false');
-    expect(body).toContain('updateMany');
-    expect(body).toContain('claimed.count === 0');
+    // Two open rounds would mean two rework shifts and two 20-minute
+    // escalation timers for one failure.
+    //
+    // Asked of the ROUNDS, not the check's flat mirror. A round cancelled
+    // after three days has completed_at NULL, so the old claim --
+    // `rework_completed_at: { not: null }` -- matched nothing and the checker
+    // could never raise rework on that room again: the write-off permanently
+    // disabled the feature for that check. Concurrency is now carried by the
+    // unique (verification_id, round_number) index, which rolls back the
+    // loser's rework shift too, rather than by a mirror-only swap.
+    expect(body).toMatch(/reworkRound\.findFirst\([\s\S]*?completed_at: null,\s*cancelled_at: null/);
+    expect(body).toContain('A rework round is already open for this verification');
+    expect(body).not.toMatch(/rework_completed_at: \{ not: null \}/);
+  });
+
+  it('completeRework refuses a round that was cancelled', () => {
+    // The worker may still have the screen open when the three-day write-off
+    // lands. Without this the submission succeeds and the row ends up both
+    // cancelled and completed, with a reason that still reads "not completed
+    // for 3 days" -- and a shift already taken off the schedule.
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    const body = src.slice(src.indexOf('async completeRework('), src.indexOf('async assertCanInspect'));
+    const guard = body.indexOf('existing.cancelled_at');
+    expect(guard).toBeGreaterThan(-1);
+    // Inside the transaction, so a cancellation committing between the upload
+    // and the write is caught rather than raced past.
+    expect(guard).toBeGreaterThan(body.indexOf('$transaction'));
+    expect(guard).toBeLessThan(body.indexOf('reworkRound.updateMany'));
+  });
+
+  it('serializes assignRework on the verification row before checking for an open round', () => {
+    // Found against a real database: two concurrent callers BOTH succeeded and
+    // the worker got two rework shifts and two 20-minute clocks for one
+    // failure.
+    //
+    // The open-round lookup is check-then-act, and Postgres READ COMMITTED
+    // gives every statement its own snapshot -- so both callers saw no open
+    // round, and the second's round-number query then ran after the first
+    // committed, saw round 1 and allocated round 2. No unique violation, two
+    // winners. FOR UPDATE makes the second wait, so its check runs against the
+    // finished state and answers 409.
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    const body = src.slice(src.indexOf('async assignRework('), src.indexOf('private async createReworkAssignment'));
+    const lock = body.indexOf('FOR UPDATE');
+    expect(lock).toBeGreaterThan(-1);
+    // The lock must come BEFORE the open-round read, or it serializes nothing.
+    expect(lock).toBeLessThan(body.indexOf('reworkRound.findFirst'));
+  });
+
+  it('the DTO does not treat a cancelled round as still open', () => {
+    // Otherwise the worker keeps being offered "go to your rework" for a shift
+    // that was cancelled off their schedule three days earlier.
+    //
+    // Falsy, not `=== null`: a row that simply lacks the field -- an older
+    // shape, a narrower select -- must read as "not cancelled" and stay open
+    // rather than silently hiding the worker's way to the work.
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    expect(src).toMatch(/completed_at === null && !r\.cancelled_at/);
   });
 
   it('completeRework claims THE ROUND, not the check', () => {

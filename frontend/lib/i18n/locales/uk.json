@@ -1104,7 +1104,11 @@
     "originalCheckTitle": "Що виявив перевіряючий",
     "roomLabelShort": "Номер",
     "yourEvidenceTitle": "Що ви надіслали ({{count}})",
-    "canAddMoreEvidence": "За потреби можна додати ще фото."
+    "canAddMoreEvidence": "За потреби можна додати ще фото.",
+    "reworkCancelled": "Скасовано",
+    "reworkCancelledBody": "Цю переробку не виконано за 3 дні, і її скасовано.",
+    "reworkWaitingOnSite": "Очікує",
+    "reworkWaitingOnSiteBody": "Почнеться під час наступної реєстрації в цьому готелі."
   },
   "ratings": {
     "comment": "Коментар",
