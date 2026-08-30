@@ -48,6 +48,7 @@ import type {
   Contract,
   ListAbsencesQuery,
   ListAssignmentsQuery,
+  ReworkRoundPhotos,
   ListAttendanceQuery,
   ListCalendarEntriesQuery,
   ListGeoCheckinsQuery,
@@ -591,9 +592,13 @@ export const qualityApi = {
    * dead by the time anyone looked at it.
    */
   verificationPhotos: (verificationId: string) =>
-    apiFetch<{ verification_id: string; photos: { key: string; url: string | null }[] }>(
-      `/quality/verifications/${verificationId}/photos`,
-    ),
+    apiFetch<{
+      verification_id: string;
+      /** The CHECKER's own photographs. */
+      photos: { key: string; url: string | null }[];
+      /** One group per rework attempt, each with that attempt's evidence. */
+      rework_rounds: ReworkRoundPhotos[];
+    }>(`/quality/verifications/${verificationId}/photos`),
 
   /** CRR §14: assign rework for a failed inspection to the same worker. */
   assignRework: (input: { verification_id: string; notes: string }) =>

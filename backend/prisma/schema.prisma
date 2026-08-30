@@ -392,6 +392,8 @@ model User {
   attendance_records                             Attendance[]                       @relation("attendee")
   attendance_verified                            Attendance[]                       @relation("attendance_verifier")
   verifications_performed                        QualityVerification[]              @relation("verifier")
+  // Rounds this user sent back (checker or manager).
+  rework_rounds_assigned                         ReworkRound[]                      @relation("rework_assigner")
   // Was ratings_received/ratings_given on the Rating model, merged into
   // QualityVerification 2026-08-29. `verifications_performed` above is the
   // other side (the checker); this is the worker being inspected.
@@ -1058,6 +1060,8 @@ model WorkerAssignment {
   rework_of_assignment_id String?
   rework_of_assignment    WorkerAssignment?    @relation("AssignmentRework", fields: [rework_of_assignment_id], references: [id], onDelete: SetNull)
   rework_children         WorkerAssignment[]   @relation("AssignmentRework")
+  // The rework round this shift exists to carry out (2026-08-30).
+  rework_round            ReworkRound[]        @relation("ReworkRoundAssignment")
   rework_verification_id  String?
   rework_verification     QualityVerification? @relation("VerificationRework", fields: [rework_verification_id], references: [id], onDelete: SetNull)
 
@@ -1211,6 +1215,16 @@ model QualityVerification {
   status              VerificationStatus @default(PASSED)
   notes               String?
   photo_urls          String[] // evidence uploaded to object storage
+  // These four are a DENORMALIZED MIRROR of the newest ReworkRound since
+  // 2026-08-30, not an independent record. Every existing consumer reads them
+  // -- the analytics ratios (ADR-069), the worker's "go to rework" button, the
+  // check DTO -- and rewriting all of them to walk the rounds relation would
+  // have been a far larger change than the feature. They are written in the
+  // same transaction as the round they mirror, so the two cannot drift.
+  //
+  // `rework_completed_at` returns to NULL when a second round opens: it means
+  // "the current attempt is finished", not "this room was ever fixed". The
+  // per-round history is in ReworkRound and is never overwritten.
   rework_required     Boolean            @default(false)
   rework_notes        String?
   rework_completed_at DateTime?
@@ -1230,6 +1244,10 @@ model QualityVerification {
   digest_notified_at  DateTime?
   // ADR-069: the rework assignment(s) this inspection produced.
   rework_assignments  WorkerAssignment[] @relation("VerificationRework")
+  // Owner decision (2026-08-30): a room can be sent back more than once, and
+  // each attempt's evidence has to stay separable from the checker's original
+  // photographs and from every other attempt. See ReworkRound.
+  rework_rounds       ReworkRound[]
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 
@@ -1264,6 +1282,63 @@ model QualityVerification {
 // quality/service.ts is the single writer (GD-04), and since 2026-08-29 it
 // reads QualityVerification rather than the retired Rating model.
 // Avoids expensive AVG() scans on marketplace listing pages.
+/// One attempt at fixing a room the checker sent back.
+///
+/// Owner decision (2026-08-30). Before this, a check carried a single rework:
+/// one note, one completion time, and the worker's photographs APPENDED into
+/// the same `photo_urls` array as the checker's own, with nothing marking
+/// where one ended and the other began. So the checker could not tell which
+/// pictures were the proof of the fix, and a second attempt was impossible --
+/// `assignRework` claimed on `rework_required: false`, which is only ever
+/// true once.
+///
+/// A round owns its own evidence. There is deliberately no "accept" step: the
+/// checker either lets the round stand or opens another one, which is what
+/// they asked for -- the score is never re-written, so a room that was found
+/// dirty still reads as having been found dirty however many times it was
+/// sent back.
+model ReworkRound {
+  id              String              @id @default(cuid())
+  verification_id String
+  verification    QualityVerification @relation(fields: [verification_id], references: [id], onDelete: Cascade)
+  /// 1-based, and unique per verification. The number the checker and worker
+  /// both see ("Round 2"), so it is stored rather than derived from ordering
+  /// -- a deleted row must not renumber the rounds that came after it.
+  round_number    Int
+  /// What the checker asked for. Required: a round with no instruction is a
+  /// shift the worker cannot act on.
+  notes           String
+  assigned_by_id  String
+  assigned_by     User                @relation("rework_assigner", fields: [assigned_by_id], references: [id], onDelete: Restrict)
+  assigned_at     DateTime            @default(now())
+  completed_at    DateTime?
+  /// THIS round's evidence, uploaded by the worker. Separate from the
+  /// verification's `photo_urls`, which holds the checker's original
+  /// photographs -- keeping them apart is the point of the model.
+  ///
+  /// Empty for rounds backfilled from before this table existed: those photos
+  /// were appended into `photo_urls` with no boundary recorded, so they cannot
+  /// be split retroactively. Such a round still shows its status and note;
+  /// only the per-round grouping of its pictures is unavailable.
+  photo_urls      String[]
+  /// The linked shift the worker actually does this round on. Nullable because
+  /// the assignment may be deleted independently, and because backfilled rows
+  /// may not resolve to one.
+  assignment_id   String?
+  assignment      WorkerAssignment?   @relation("ReworkRoundAssignment", fields: [assignment_id], references: [id], onDelete: SetNull)
+  /// Per-round escalation marker. On the verification this was a single field,
+  /// which cannot express "round 1 escalated, round 2 has not" -- and round
+  /// 1's overdue shift would otherwise make round 2 look instantly overdue.
+  escalated_at    DateTime?
+  created_at      DateTime            @default(now())
+  updated_at      DateTime            @updatedAt
+
+  @@unique([verification_id, round_number])
+  @@index([verification_id])
+  /// The escalation job's scan: open rounds, oldest first.
+  @@index([completed_at, escalated_at, assigned_at])
+}
+
 model WorkerOverallRating {
   id                   String    @id @default(cuid())
   worker_id            String    @unique

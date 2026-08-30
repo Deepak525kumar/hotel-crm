@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { usePhotoPicker } from '@/hooks/usePhotoPicker';
 import { api } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
+import type { QualityCheck } from '@/types/api';
 
 /**
  * CRR §14: "Worker uploads a photo and clicks work done."
@@ -26,7 +27,37 @@ export default function ReworkScreen() {
   const { id, notes } = useLocalSearchParams<{ id: string; notes?: string }>();
   const picker = usePhotoPicker();
   const [saving, setSaving] = useState(false);
+  // What the checker actually found. The push payload carries only the
+  // one-line note; a worker standing in the room with "redo the bathroom" and
+  // no picture of what was wrong cannot reliably fix it (owner decision,
+  // 2026-08-30). Loaded separately so a failure here still leaves the upload
+  // form usable -- the instruction in `notes` is enough to proceed on.
+  const [check, setCheck] = useState<(QualityCheck & { current_round_number: number }) | null>(null);
+  const [evidence, setEvidence] = useState<{ key: string; url: string | null }[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const c = await api.quality.checkForRework(id);
+        if (cancelled) return;
+        setCheck(c);
+        // The checker's own photographs only. Round evidence is what the
+        // worker is about to produce, so showing it back to them here would
+        // just be their own previous attempt.
+        const p = await api.quality.checkPhotos(c.id);
+        if (!cancelled) setEvidence(p.photos ?? []);
+      } catch {
+        // Deliberately silent: this is context, not the task. The upload form
+        // below still works, and surfacing an error banner for missing context
+        // would read as though the rework itself could not be loaded.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   const submit = async () => {
     setError(null);
@@ -52,6 +83,19 @@ export default function ReworkScreen() {
     content: { padding: 16, gap: 16 },
     card: { backgroundColor: theme.backgroundElement, borderRadius: 14, padding: 16, gap: 12 },
     actions: { flexDirection: 'row', gap: 8 },
+    headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    photo: { width: 96, height: 96, borderRadius: 10, backgroundColor: theme.background },
+    missing: {
+      width: 96,
+      height: 96,
+      borderRadius: 10,
+      backgroundColor: theme.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 6,
+    },
+    missingText: { color: theme.textSecondary, fontSize: 10, textAlign: 'center' },
     action: {
       flex: 1,
       paddingVertical: 12,
@@ -78,9 +122,55 @@ export default function ReworkScreen() {
         {/* The checker's note is the whole instruction -- it is mandatory when
             they assign rework, so it is always present and worth showing
             prominently rather than tucked into a subtitle. */}
-        {notes ? (
+        {/* What the checker found: the room, their score, their note, and the
+            photographs they took. This screen used to show only `notes` from
+            the push payload. */}
+        {check ? (
           <View style={styles.card}>
-            <ThemedText type="small">{notes}</ThemedText>
+            <View style={styles.headRow}>
+              <ThemedText type="smallBold">
+                {t('quality.roomLabel')} {check.room_number}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('quality.reworkRoundTitle', { number: check.current_round_number })}
+              </ThemedText>
+            </View>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.originalCheckTitle')}
+              {check.checked_by ? ` · ${check.checked_by.first_name}` : ''}
+            </ThemedText>
+            {check.notes ? <ThemedText type="small">{check.notes}</ThemedText> : null}
+            {evidence.length > 0 ? (
+              <View style={styles.grid}>
+                {evidence.map((photo) =>
+                  photo.url ? (
+                    <Pressable key={photo.key} onPress={() => void Linking.openURL(photo.url as string)}>
+                      <Image source={{ uri: photo.url }} style={styles.photo} resizeMode="cover" />
+                    </Pressable>
+                  ) : (
+                    // Storage unconfigured. Shown, not hidden: a broken bucket
+                    // must read as a missing image, not as an inspection with
+                    // no evidence behind it.
+                    <View key={photo.key} style={styles.missing}>
+                      <Text style={styles.missingText}>{t('quality.photoUnavailable')}</Text>
+                    </View>
+                  )
+                )}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* The instruction for THIS round. Mandatory when a checker assigns
+            rework, so it is always present and worth showing prominently.
+            Prefers the freshly loaded round's note over the one the push
+            carried, which is stale once a second round opens. */}
+        {check?.rework_notes ?? notes ? (
+          <View style={styles.card}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.checkerNotesTitle')}
+            </ThemedText>
+            <ThemedText type="small">{check?.rework_notes ?? notes}</ThemedText>
           </View>
         ) : null}
 

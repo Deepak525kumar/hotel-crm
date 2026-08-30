@@ -88,6 +88,22 @@ export const QUALITY_CHECK_SELECT = {
   // owner decision 2026-08-29), but modelled as a list because the schema
   // permits more.
   rework_assignments: { select: { id: true, status: true, day: true } },
+  // Every attempt at fixing the room, newest last (2026-08-30). Carries each
+  // round's own note, timing and evidence, so a screen can show the checker
+  // which photographs prove which fix instead of one undifferentiated grid.
+  rework_rounds: {
+    select: {
+      id: true,
+      round_number: true,
+      notes: true,
+      assigned_at: true,
+      completed_at: true,
+      photo_urls: true,
+      assignment_id: true,
+      assigned_by: { select: { id: true, first_name: true, last_name: true } },
+    },
+    orderBy: { round_number: 'asc' },
+  },
 } satisfies Prisma.QualityVerificationSelect;
 
 type QualityCheckRow = Prisma.QualityVerificationGetPayload<{
@@ -100,6 +116,13 @@ type QualityCheckRow = Prisma.QualityVerificationGetPayload<{
  * them in a list would widen it into a directory of private storage paths.
  */
 export function toCheckDto(row: QualityCheckRow) {
+  // The round still awaiting the worker, if any. Rounds are selected in
+  // round_number order, so the last incomplete one is the current attempt.
+  const openRound = [...row.rework_rounds].reverse().find((r) => r.completed_at === null) ?? null;
+  const openAssignment = openRound
+    ? (row.rework_assignments.find((a) => a.id === openRound.assignment_id) ?? null)
+    : null;
+
   return {
     id: row.id,
     assignment_id: row.assignment_id,
@@ -126,13 +149,33 @@ export function toCheckDto(row: QualityCheckRow) {
           last_name: row.verified_by.last_name,
         }
       : null,
-    // What the worker's "go to your rework" button needs.
-    rework_assignment: row.rework_assignments[0]
-      ? {
-          id: row.rework_assignments[0].id,
-          status: row.rework_assignments[0].status,
-          day: row.rework_assignments[0].day,
-        }
+    // Every attempt, in order, each with its own evidence.
+    rework_rounds: row.rework_rounds.map((r) => ({
+      id: r.id,
+      round_number: r.round_number,
+      notes: r.notes,
+      assigned_at: r.assigned_at,
+      completed_at: r.completed_at,
+      assignment_id: r.assignment_id,
+      assigned_by: r.assigned_by
+        ? { id: r.assigned_by.id, first_name: r.assigned_by.first_name, last_name: r.assigned_by.last_name }
+        : null,
+      // Count, not keys -- same rule as the check's own photos: a key is
+      // useless without a presigned URL, and listing them would turn this into
+      // a directory of private storage paths.
+      photo_count: r.photo_urls.length,
+    })),
+    // What the worker's "go to your rework" button needs: the shift for the
+    // round still OPEN.
+    //
+    // This used to be `rework_assignments[0]`, which was fine while a check
+    // could only ever be sent back once. With rounds it points at whichever
+    // shift the database happened to return first -- in practice round 1's,
+    // long since completed -- so the worker tapping "go to your rework" would
+    // land on a finished shift while round 2 sat untouched. There is also no
+    // orderBy on that relation, so "first" was never defined to begin with.
+    rework_assignment: openAssignment
+      ? { id: openAssignment.id, status: openAssignment.status, day: openAssignment.day }
       : null,
   };
 }
@@ -516,11 +559,36 @@ export class QualityService extends BaseService {
       // escalation timers for one failure. This conditional update is a
       // compare-and-swap -- whoever flips false->true wins, the loser matches
       // zero rows and gets the same 409 a sequential duplicate would.
+      //
+      // The predicate is "no round is currently OPEN", not "never sent back"
+      // (owner decision, 2026-08-30: a room can be sent back again if the fix
+      // is not good enough). Claiming on `rework_required: false` alone made a
+      // second round impossible, since that flag is only ever true once.
+      //
+      // Two concurrent callers on an already-completed round both match this
+      // predicate on read, but not on write: the loser blocks on the row lock,
+      // re-evaluates against the winner's committed version where
+      // rework_completed_at is no longer set, matches nothing, and gets the
+      // same 409 a sequential duplicate would. The unique index on
+      // (verification_id, round_number) is the second line of defence.
       const claimed = await tx.qualityVerification.updateMany({
-        where: { id: verification.id, rework_required: false },
+        where: {
+          id: verification.id,
+          OR: [
+            { rework_required: false },
+            { rework_required: true, rework_completed_at: { not: null } },
+          ],
+        },
         data: {
           rework_required: true,
           rework_notes: input.notes,
+          // The new round is OPEN, and carries its own escalation clock. Both
+          // are reset or the mirror would describe the round that just ended:
+          // the worker's "go to rework" button reads rework_completed_at, and
+          // a stale rework_escalated_at would suppress the 20-minute
+          // escalation for the new round entirely.
+          rework_completed_at: null,
+          rework_escalated_at: null,
           // The decision overrides the score-derived status. Without this a
           // row can say PASSED while carrying a rework assignment -- which is
           // self-contradictory in the record, renders as a green PASSED badge
@@ -536,15 +604,20 @@ export class QualityService extends BaseService {
         },
       });
       if (claimed.count === 0) {
-        throw new ConflictError('Rework has already been assigned for this verification');
+        throw new ConflictError('A rework round is already open for this verification');
       }
 
-      return this.createReworkAssignment(tx, {
+      // Only the assignment is returned: this endpoint's response shape is the
+      // rework SHIFT, which the checker app and the web both read. The round
+      // is an internal record; exposing it here would change an existing
+      // contract for no caller's benefit.
+      const { reworkAssignment } = await this.createReworkAssignment(tx, {
         original,
         verificationId: verification.id,
         notes: input.notes,
         actorId: actor.userId,
       });
+      return reworkAssignment;
     });
   }
 
@@ -572,6 +645,19 @@ export class QualityService extends BaseService {
     }
   ) {
     const { original, verificationId, notes, actorId } = params;
+
+    // The round number, allocated inside the caller's transaction. The unique
+    // index on (verification_id, round_number) is the real guard: two
+    // concurrent assigners both reading max=1 will both try to write round 2,
+    // and exactly one succeeds -- the other's transaction aborts and its
+    // rework shift is rolled back with it, rather than leaving a second
+    // orphaned shift and a second 20-minute clock for one failure.
+    const previous = await tx.reworkRound.findFirst({
+      where: { verification_id: verificationId },
+      orderBy: { round_number: 'desc' },
+      select: { round_number: true },
+    });
+    const roundNumber = (previous?.round_number ?? 0) + 1;
 
     const reworkAssignment = await tx.workerAssignment.create({
       data: {
@@ -612,7 +698,20 @@ export class QualityService extends BaseService {
       tx
     );
 
-    return reworkAssignment;
+    // The round owns this attempt's identity and, later, its evidence. Created
+    // after the shift so it can point at it.
+    const round = await tx.reworkRound.create({
+      data: {
+        verification_id: verificationId,
+        round_number: roundNumber,
+        notes,
+        assigned_by_id: actorId,
+        assignment_id: reworkAssignment.id,
+        photo_urls: [],
+      },
+    });
+
+    return { reworkAssignment, round };
   }
 
   /**
@@ -645,18 +744,42 @@ export class QualityService extends BaseService {
       // Same compare-and-swap as assignRework, for the same reason: a
       // double-tap on "mark done" would otherwise notify the checker twice
       // and append the photos twice.
-      const claimed = await tx.qualityVerification.updateMany({
-        where: { id: verification.id, rework_completed_at: null },
-        data: {
-          rework_completed_at: new Date(),
-          // Appended, not replaced: the checker needs the before/after pair,
-          // so inspection and rework evidence both stay on the record.
-          photo_urls: { push: photoKeys },
-        },
+      const completedAt = new Date();
+
+      // Claim the ROUND, not the verification. The round is what this shift
+      // exists to carry out, and claiming it is what makes a double-tap on
+      // "mark done" idempotent -- previously this claimed the verification's
+      // flat rework_completed_at, which cannot distinguish round 2 from
+      // round 1 and would refuse a legitimate second submission outright.
+      //
+      // Matched by assignment_id: that is the shift the worker is standing in,
+      // and it is unique to one round.
+      const claimedRound = await tx.reworkRound.updateMany({
+        where: { assignment_id: assignmentId, completed_at: null },
+        data: { completed_at: completedAt, photo_urls: { push: photoKeys } },
       });
-      if (claimed.count === 0) {
+      if (claimedRound.count === 0) {
         throw new ConflictError('This rework has already been completed');
       }
+
+      const round = await tx.reworkRound.findFirst({
+        where: { assignment_id: assignmentId },
+        select: { id: true, round_number: true },
+      });
+
+      // Mirror onto the verification so every existing consumer -- the
+      // analytics ratios, the worker's "go to rework" button, the check DTO --
+      // keeps reading the newest round without being rewritten. Same
+      // transaction as the round, so the two cannot drift.
+      //
+      // photo_urls is NO LONGER appended here. The worker's evidence lives on
+      // the round, which is the whole point: appending it left the checker
+      // with one flat grid in which their own photographs and the worker's
+      // proof of the fix were indistinguishable.
+      await tx.qualityVerification.updateMany({
+        where: { id: verification.id },
+        data: { rework_completed_at: completedAt },
+      });
 
       await tx.workerAssignment.update({
         where: { id: assignmentId },
@@ -669,10 +792,14 @@ export class QualityService extends BaseService {
           recipientId: verification.verified_by_id,
           type: 'REWORK_COMPLETED',
           title: 'Rework completed',
-          message: 'The worker uploaded evidence and marked the rework done.',
+          message: round
+            ? `The worker uploaded evidence for round ${round.round_number} and marked it done.`
+            : 'The worker uploaded evidence and marked the rework done.',
           data: {
             verification_id: verification.id,
             rework_assignment_id: assignmentId,
+            rework_round_id: round?.id ?? null,
+            round_number: round?.round_number ?? null,
             photo_keys: photoKeys,
           },
           hotelId: reworkAssignment.hotel_id,
@@ -915,7 +1042,7 @@ export class QualityService extends BaseService {
         // is no concurrent claimant to lose to. The duplicate this guards
         // against upstream -- two rework rows and two escalation timers for
         // one failure -- is prevented by `assignment_id @unique` instead.
-        const reworkAssignment = await this.createReworkAssignment(tx, {
+        const { reworkAssignment } = await this.createReworkAssignment(tx, {
           original: assignment,
           verificationId: verification.id,
           notes: reworkNotes,
@@ -1196,24 +1323,57 @@ export class QualityService extends BaseService {
   async getVerificationPhotos(verificationId: string, actor: Actor) {
     const verification = await this.prisma.qualityVerification.findUnique({
       where: { id: verificationId },
-      include: { assignment: { select: { worker_id: true } } },
+      include: {
+        assignment: { select: { worker_id: true } },
+        rework_rounds: {
+          select: {
+            id: true,
+            round_number: true,
+            notes: true,
+            assigned_at: true,
+            completed_at: true,
+            photo_urls: true,
+          },
+          orderBy: { round_number: 'asc' },
+        },
+      },
     });
     if (!verification) throw new NotFoundError('Verification not found');
 
     await this.assertCanViewVerification(verification, actor);
 
     const storage = await getStorageClient();
-    const photos = await Promise.all(
-      verification.photo_urls.map(async (key) => ({
-        key,
-        // null when storage is unconfigured (the stub). Surfaced rather than
-        // hidden so a broken bucket shows as a missing image, not as an
-        // inspection that never had evidence.
-        url: await storage.getPresignedUrl(key),
+    const sign = async (key: string) => ({
+      key,
+      // null when storage is unconfigured (the stub). Surfaced rather than
+      // hidden so a broken bucket shows as a missing image, not as an
+      // inspection that never had evidence.
+      url: await storage.getPresignedUrl(key),
+    });
+
+    // The checker's OWN photographs. Since 2026-08-30 this array holds only
+    // those: the worker's proof of a fix lives on its round, so the two are no
+    // longer mixed into one undifferentiated grid.
+    const photos = await Promise.all(verification.photo_urls.map(sign));
+
+    // One group per attempt, so a screen can say which pictures show which
+    // fix. Authorization is the check's -- whoever may see the inspection may
+    // see the evidence for it -- so no second gate is introduced here.
+    const rounds = await Promise.all(
+      // `?? []` rather than assuming the relation is present: a check with no
+      // rework has no rounds, and this endpoint must render evidence for an
+      // ordinary passing inspection without a rework section at all.
+      (verification.rework_rounds ?? []).map(async (r) => ({
+        id: r.id,
+        round_number: r.round_number,
+        notes: r.notes,
+        assigned_at: r.assigned_at,
+        completed_at: r.completed_at,
+        photos: await Promise.all(r.photo_urls.map(sign)),
       }))
     );
 
-    return { verification_id: verification.id, photos };
+    return { verification_id: verification.id, photos, rework_rounds: rounds };
   }
 
   /**
@@ -1454,6 +1614,35 @@ export class QualityService extends BaseService {
     );
 
     return toCheckDto(check);
+  }
+
+  /**
+   * The check a rework shift exists to correct, looked up BY that shift.
+   *
+   * Owner decision (2026-08-30): the worker doing a rework should see what the
+   * checker actually found -- the room, the score, the note and the checker's
+   * photographs -- not just the one-line instruction that rode along in the
+   * push payload. Standing in the room with "redo the bathroom" and no picture
+   * of what was wrong is not enough to fix it.
+   *
+   * Resolved through the round rather than through
+   * WorkerAssignment.rework_verification_id, because the round is what ties a
+   * specific shift to a specific attempt; the verification link is shared by
+   * every round on the same check.
+   *
+   * Authorization is getCheck's, unchanged: whoever may see the inspection may
+   * see it here. No new reach is granted -- the worker being corrected is the
+   * worker on the check.
+   */
+  async getCheckForReworkAssignment(reworkAssignmentId: string, actor: Actor) {
+    const round = await this.prisma.reworkRound.findFirst({
+      where: { assignment_id: reworkAssignmentId },
+      select: { verification_id: true, round_number: true },
+    });
+    if (!round) throw new NotFoundError('Rework not found');
+
+    const check = await this.getCheck(round.verification_id, actor);
+    return { ...check, current_round_number: round.round_number };
   }
 
   async getLeaderboard(

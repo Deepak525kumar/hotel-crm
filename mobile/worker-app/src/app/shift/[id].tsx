@@ -34,6 +34,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function CheckRow({ check, onPress }: { check: QualityCheck; onPress: () => void }) {
   const { t } = useTranslation();
   const theme = useTheme();
+  // Newest round number, or 0 when the server predates rounds.
+  const rounds = check.rework_rounds?.length ?? 0;
 
   const tone =
     check.status === 'PASSED'
@@ -59,9 +61,21 @@ function CheckRow({ check, onPress }: { check: QualityCheck; onPress: () => void
         </ThemedText>
         {/* Rework is the reason a worker opens this list, so it is called out
             rather than left to be inferred from the status word. */}
+        {/* Rework state, both directions (owner decision, 2026-08-30). This
+            showed only the PENDING case, so a worker who had finished their
+            rework saw the row fall silent -- indistinguishable from a room
+            that was never sent back. The round number is included because a
+            room can now be sent back more than once, and "completed" without
+            it does not say WHICH attempt finished. */}
         {check.rework_required && !check.rework_completed_at ? (
           <ThemedText type="small" style={{ color: theme.warning }}>
-            {t('quality.reworkPending')}
+            {rounds > 0 ? t('quality.reworkRoundOpenShort', { number: rounds }) : t('quality.reworkPending')}
+          </ThemedText>
+        ) : check.rework_required && check.rework_completed_at ? (
+          <ThemedText type="small" style={{ color: theme.success }}>
+            {rounds > 0
+              ? t('quality.reworkRoundCompletedShort', { number: rounds })
+              : t('quality.reworkCompleted')}
           </ThemedText>
         ) : null}
       </View>

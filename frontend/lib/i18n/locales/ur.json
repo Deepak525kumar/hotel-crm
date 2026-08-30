@@ -1092,7 +1092,18 @@
     "workerUnavailable": "ورکر دستیاب نہیں",
     "overallScoreTitle": "Overall Score (0-100)",
     "searchChecksPlaceholder": "کمرہ، نوٹ یا نتیجہ سے تلاش کریں",
-    "searchChecksNoMatch": "اس تلاش سے کوئی چیک نہیں ملا۔"
+    "searchChecksNoMatch": "اس تلاش سے کوئی چیک نہیں ملا۔",
+    "checkerEvidenceTitle": "چیکر کے شواہد",
+    "reworkRoundTitle": "دوبارہ کام راؤنڈ {{number}}",
+    "reworkNoRoundPhotos": "اس راؤنڈ کے لیے کوئی تصویر ریکارڈ نہیں ہوئی۔",
+    "reworkAwaitingPhotos": "ورکر کے شواہد کا انتظار ہے۔",
+    "assignReworkAgain": "دوبارہ کام پھر تفویض کریں",
+    "reworkRoundsTitle": "دوبارہ کام",
+    "reworkRoundCompletedShort": "راؤنڈ {{number}} مکمل",
+    "reworkRoundOpenShort": "راؤنڈ {{number}} جاری",
+    "checkerNotesTitle": "چیکر کے نوٹس",
+    "originalCheckTitle": "چیکر کو کیا ملا",
+    "roomLabelShort": "کمرہ"
   },
   "ratings": {
     "comment": "تبصرہ",

@@ -21,7 +21,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
 import { checklistItemLabelKey, INSPECTION_CHECKLIST_ITEMS } from '@/lib/inspection-checklist';
-import type { QualityVerification } from '@/types/api';
+import type { QualityVerification, ReworkRoundPhotos } from '@/types/api';
 
 /**
  * The inspection record and its evidence.
@@ -39,6 +39,41 @@ import type { QualityVerification } from '@/types/api';
  * photos. Previously the checker app had no rework capability at all: no API
  * method, no UI, so the one role the requirement names could not do it.
  */
+/**
+ * One evidence photo. Shared by the checker's own section and every rework
+ * round, so a picture looks and behaves the same wherever it appears.
+ *
+ * Styles are passed in because this screen builds them from the theme inside
+ * the component; the tile has no business rebuilding them.
+ */
+function PhotoTile({
+  photo,
+  styles,
+  label,
+}: {
+  photo: { key: string; url: string | null };
+  styles: { photo: object; missing: object; missingText: object };
+  label: string;
+}) {
+  // Tap opens full size: a thumbnail is not enough to re-inspect a room, which
+  // is the entire point of the evidence.
+  if (photo.url) {
+    return (
+      <Pressable onPress={() => void Linking.openURL(photo.url as string)}>
+        <Image source={{ uri: photo.url }} style={styles.photo} resizeMode="cover" />
+      </Pressable>
+    );
+  }
+  // url === null means storage is unconfigured. Shown rather than hidden, so a
+  // broken bucket reads as a missing image and not as an inspection that never
+  // had evidence.
+  return (
+    <View style={styles.missing}>
+      <Text style={styles.missingText}>{label}</Text>
+    </View>
+  );
+}
+
 export default function VerificationEvidenceScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -46,6 +81,7 @@ export default function VerificationEvidenceScreen() {
 
   const [verification, setVerification] = useState<QualityVerification | null>(null);
   const [photos, setPhotos] = useState<{ key: string; url: string | null }[] | null>(null);
+  const [rounds, setRounds] = useState<ReworkRoundPhotos[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reworkNotes, setReworkNotes] = useState('');
   const [assigning, setAssigning] = useState(false);
@@ -62,6 +98,9 @@ export default function VerificationEvidenceScreen() {
       ]);
       setVerification(v);
       setPhotos(p.photos);
+      // Rounds are optional on the wire so an older server (or a check with no
+      // rework at all) simply renders no round sections rather than throwing.
+      setRounds(p.rework_rounds ?? []);
     } catch (e) {
       setError(translateApiError(e, t, 'errors.generic'));
     }
@@ -96,11 +135,19 @@ export default function VerificationEvidenceScreen() {
   // which meant a checker who scored a room 75 and then found something that
   // had to be redone had no way to say so from the evidence screen either.
   //
-  // The one remaining condition is that rework has not already been assigned:
-  // the server enforces that with a compare-and-swap and answers 409, and a
-  // second rework row would start a second 20-minute escalation timer for one
-  // failure.
-  const canAssignRework = verification !== null && verification.rework_required !== true;
+  // The one remaining condition is that no round is currently OPEN (owner
+  // decision, 2026-08-30: a room can be sent back again if the fix is not good
+  // enough, with no accept step in between -- the checker either lets the
+  // round stand or opens another).
+  //
+  // This used to be `rework_required !== true`, which hid the button forever
+  // after the first time. What must not happen is a SECOND open round: that
+  // would give the worker two shifts and two 20-minute clocks for one failure.
+  // The server enforces exactly this with a compare-and-swap and answers 409;
+  // the button follows the same rule so the checker is not offered an action
+  // that is going to be refused.
+  const openRound = rounds.find((r) => r.completed_at === null) ?? null;
+  const canAssignRework = verification !== null && openRound === null;
 
   const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
@@ -247,57 +294,89 @@ export default function VerificationEvidenceScreen() {
           </View>
         ) : null}
 
-        {/* CRR §14: the checker is notified with the photo, and this is where
-            they see it. Once rework is assigned the worker's completion photos
-            are APPENDED to the same photo_urls, so the grid below shows the
-            before-and-after pair on one screen -- which is the comparison the
-            checker actually has to make. This banner says which state it is
-            in, so an empty-looking grid is never mistaken for lost evidence. */}
-        {verification?.rework_required ? (
-          <View style={styles.card}>
-            <ThemedText type="small" themeColor="textSecondary">
-              {t('quality.reworkEvidenceTitle')}
-            </ThemedText>
-            <Text style={styles.notes}>
-              {verification.rework_completed_at
-                ? t('quality.reworkCompleted')
-                : t('quality.reworkAwaitingWorker')}
-            </Text>
-            {verification.rework_notes ? (
-              <Text style={styles.notes}>{verification.rework_notes}</Text>
-            ) : null}
-          </View>
-        ) : null}
+        {/* Evidence, grouped by who produced it (owner decision, 2026-08-30).
+            This was one flat grid: the checker's own photographs and the
+            worker's proof of the fix appended into the same array, in upload
+            order, with nothing marking the boundary. The checker could not
+            tell which pictures showed the room fixed -- which is the entire
+            comparison they open this screen to make.
 
-        {photos && photos.length === 0 ? (
+            The grid also sat OUTSIDE any card while every other block on this
+            screen sat inside one, so it alone had no padding and no surface.
+            Both sections use the same card as the rest of the screen. */}
+        <View style={styles.card}>
           <ThemedText type="small" themeColor="textSecondary">
-            {t('quality.photosHint', { max: 6 })}
+            {t('quality.checkerEvidenceTitle')}
           </ThemedText>
-        ) : null}
-
-        <View style={styles.grid}>
-          {(photos ?? []).map((photo) =>
-            photo.url ? (
-              // Tap opens full size: a thumbnail is not enough to re-inspect a
-              // room, which is the entire point of the evidence.
-              <Pressable key={photo.key} onPress={() => void Linking.openURL(photo.url as string)}>
-                <Image source={{ uri: photo.url }} style={styles.photo} resizeMode="cover" />
-              </Pressable>
-            ) : (
-              // url === null means storage is unconfigured. Shown rather than
-              // hidden, so a broken bucket reads as a missing image and not as
-              // an inspection that never had evidence.
-              <View key={photo.key} style={styles.missing}>
-                <Text style={styles.missingText}>{t('quality.photoUnavailable')}</Text>
-              </View>
-            ),
+          {photos && photos.length === 0 ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.photosHint', { max: 6 })}
+            </ThemedText>
+          ) : (
+            <View style={styles.grid}>
+              {(photos ?? []).map((photo) => (
+                <PhotoTile
+                  key={photo.key}
+                  photo={photo}
+                  styles={styles}
+                  label={t('quality.photoUnavailable')}
+                />
+              ))}
+            </View>
           )}
         </View>
+
+        {/* One card per attempt, oldest first, each carrying its own note,
+            state and pictures. A second round no longer overwrites the first:
+            both stay on screen, so the checker can see what they asked for
+            last time and whether it was actually done. */}
+        {rounds.map((round) => (
+          <View key={round.id} style={styles.card}>
+            <View style={styles.row}>
+              <ThemedText type="smallBold">
+                {t('quality.reworkRoundTitle', { number: round.round_number })}
+              </ThemedText>
+              <ThemedText
+                type="small"
+                style={{ color: round.completed_at ? theme.success : theme.warning }}
+              >
+                {round.completed_at
+                  ? t('quality.reworkCompleted')
+                  : t('quality.reworkAwaitingWorker')}
+              </ThemedText>
+            </View>
+            <Text style={styles.notes}>{round.notes}</Text>
+            {round.photos.length > 0 ? (
+              <View style={styles.grid}>
+                {round.photos.map((photo) => (
+                  <PhotoTile
+                    key={photo.key}
+                    photo={photo}
+                    styles={styles}
+                    label={t('quality.photoUnavailable')}
+                  />
+                ))}
+              </View>
+            ) : (
+              // Two different silences: still being worked on, versus a round
+              // finished before per-round evidence was recorded. Saying which
+              // stops an empty section reading as lost evidence.
+              <ThemedText type="small" themeColor="textSecondary">
+                {round.completed_at
+                  ? t('quality.reworkNoRoundPhotos')
+                  : t('quality.reworkAwaitingPhotos')}
+              </ThemedText>
+            )}
+          </View>
+        ))}
 
         {canAssignRework ? (
           <View style={styles.card}>
             <ThemedText type="small" themeColor="textSecondary">
-              {t('quality.assignRework')}
+              {/* Named for what it does THIS time: after a completed round the
+                  same control opens another one, and calling it "assign
+                  rework" again would read as though the first never happened. */}
+              {rounds.length > 0 ? t('quality.assignReworkAgain') : t('quality.assignRework')}
             </ThemedText>
             <TextInput
               style={styles.input}

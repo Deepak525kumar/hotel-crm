@@ -119,6 +119,16 @@ router.get('/checks/:check_id', (req, res, next) =>
   qualityController.getCheck(req, res, next)
 );
 
+// The check a rework shift corrects, addressed BY the shift. The worker
+// standing in the room has the rework assignment id and nothing else; without
+// this they see only the one-line note the push carried, with no picture of
+// what was actually wrong. No permission gate, same as /checks/:id above: the
+// subject of an inspection may always read it, and the service applies the
+// identical view check.
+router.get('/rework-assignments/:assignment_id/check', (req, res, next) =>
+  qualityController.getCheckForRework(req, res, next)
+);
+
 router.get('/leaderboard', requirePermission('quality:read'), (req, res, next) =>
   qualityController.getLeaderboard(req, res, next)
 );

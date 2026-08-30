@@ -163,8 +163,42 @@ export interface QualityCheck {
   worker: { id: string; first_name: string; last_name: string } | null;
   hotel: { id: string; name: string; city: string } | null;
   checked_by: { id: string; first_name: string; last_name: string } | null;
-  /** Present when this check sent work back; drives the "go to your rework" button. */
+  /**
+   * Present when this check sent work back; drives the "go to your rework"
+   * button. Points at the shift for the round still OPEN -- not the first
+   * round's, which by round 2 is long completed.
+   */
   rework_assignment: { id: string; status: AssignmentStatus; day: string } | null;
+  /** Every attempt at fixing this room, oldest first (2026-08-30). */
+  rework_rounds: ReworkRound[];
+}
+
+/**
+ * One attempt at fixing a room the checker sent back.
+ *
+ * Each round owns its evidence. Before rounds, the worker's photos were
+ * appended into the checker's own array with nothing marking the boundary, so
+ * neither side could tell which pictures proved the fix.
+ */
+export interface ReworkRound {
+  id: string;
+  round_number: number;
+  notes: string;
+  assigned_at: string;
+  completed_at: string | null;
+  assignment_id: string | null;
+  assigned_by?: { id: string; first_name: string; last_name: string } | null;
+  photo_count: number;
+}
+
+/** A round with its evidence resolved to viewable URLs. */
+export interface ReworkRoundPhotos {
+  id: string;
+  round_number: number;
+  notes: string;
+  assigned_at: string;
+  completed_at: string | null;
+  photos: { key: string; url: string | null }[];
 }
 
 export type PushPlatform = 'IOS' | 'ANDROID';

@@ -1091,7 +1091,18 @@
     "workerUnavailable": "Працівник недоступний",
     "overallScoreTitle": "Overall Score (0-100)",
     "searchChecksPlaceholder": "Пошук за номером, приміткою або результатом",
-    "searchChecksNoMatch": "Немає перевірок, що відповідають пошуку."
+    "searchChecksNoMatch": "Немає перевірок, що відповідають пошуку.",
+    "checkerEvidenceTitle": "Докази перевіряючого",
+    "reworkRoundTitle": "Переробка, раунд {{number}}",
+    "reworkNoRoundPhotos": "Для цього раунду фото не зафіксовано.",
+    "reworkAwaitingPhotos": "Очікуємо докази від працівника.",
+    "assignReworkAgain": "Призначити переробку ще раз",
+    "reworkRoundsTitle": "Переробка",
+    "reworkRoundCompletedShort": "Раунд {{number}} завершено",
+    "reworkRoundOpenShort": "Раунд {{number}} триває",
+    "checkerNotesTitle": "Нотатки перевіряючого",
+    "originalCheckTitle": "Що виявив перевіряючий",
+    "roomLabelShort": "Номер"
   },
   "ratings": {
     "comment": "Коментар",

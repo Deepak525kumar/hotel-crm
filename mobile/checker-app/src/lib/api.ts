@@ -1,4 +1,5 @@
 import type {
+  ReworkRoundPhotos,
   AcceptBroadcastResult,
   Broadcast,
   BroadcastEligibility,
@@ -648,7 +649,13 @@ export const api = {
       request<OwnInspection>(`/quality/checks/${encodeURIComponent(checkId)}`),
 
     verificationPhotos: (verificationId: string) =>
-      request<{ verification_id: string; photos: { key: string; url: string | null }[] }>(
+      request<{
+        verification_id: string;
+        /** The CHECKER's own photographs. */
+        photos: { key: string; url: string | null }[];
+        /** One group per rework attempt, each with that attempt's evidence. */
+        rework_rounds: ReworkRoundPhotos[];
+      }>(
         `/quality/verifications/${encodeURIComponent(verificationId)}/photos`
       ),
 

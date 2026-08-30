@@ -1091,7 +1091,18 @@
     "workerUnavailable": "Mitarbeiter nicht verfügbar",
     "overallScoreTitle": "Overall Score (0-100)",
     "searchChecksPlaceholder": "Nach Zimmer, Notiz oder Ergebnis suchen",
-    "searchChecksNoMatch": "Keine Prüfungen entsprechen dieser Suche."
+    "searchChecksNoMatch": "Keine Prüfungen entsprechen dieser Suche.",
+    "checkerEvidenceTitle": "Nachweise des Prüfers",
+    "reworkRoundTitle": "Nacharbeit Runde {{number}}",
+    "reworkNoRoundPhotos": "Für diese Runde wurden keine Fotos erfasst.",
+    "reworkAwaitingPhotos": "Warten auf den Nachweis des Mitarbeiters.",
+    "assignReworkAgain": "Erneut Nacharbeit zuweisen",
+    "reworkRoundsTitle": "Nacharbeit",
+    "reworkRoundCompletedShort": "Runde {{number}} abgeschlossen",
+    "reworkRoundOpenShort": "Runde {{number}} läuft",
+    "checkerNotesTitle": "Anmerkungen des Prüfers",
+    "originalCheckTitle": "Feststellung des Prüfers",
+    "roomLabelShort": "Zimmer"
   },
   "ratings": {
     "comment": "Kommentar",

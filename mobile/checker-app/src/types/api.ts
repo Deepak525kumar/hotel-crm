@@ -123,6 +123,7 @@ export interface QualityVerification {
   rework_required?: boolean;
   rework_notes?: string | null;
   rework_completed_at?: string | null;
+  rework_rounds?: ReworkRound[];
   rework_escalated_at?: string | null;
   /**
    * TREQ-005 inspection checklist. Lives on the check since the Rating merge
@@ -209,6 +210,7 @@ export interface OwnInspection {
   rework_required: boolean;
   rework_notes: string | null;
   rework_completed_at: string | null;
+  rework_rounds: ReworkRound[];
   created_at: string;
   worker: { id: string; first_name: string; last_name: string } | null;
   hotel: { id: string; name: string; city: string } | null;
@@ -555,4 +557,34 @@ export interface InspectableWorker {
   hotel_id: string;
   hotel_name: string | null;
   status: AssignmentStatus;
+}
+
+/**
+ * One attempt at fixing a room the checker sent back (2026-08-30).
+ *
+ * A room can be sent back more than once, and each attempt owns its own
+ * evidence -- which is the point. Before rounds, the worker's proof of a fix
+ * was appended into the same photo array as the checker's original
+ * photographs, so the checker saw one grid and could not tell which pictures
+ * showed the room fixed.
+ */
+export interface ReworkRound {
+  id: string;
+  round_number: number;
+  notes: string;
+  assigned_at: string;
+  completed_at: string | null;
+  assignment_id: string | null;
+  assigned_by?: { id: string; first_name: string; last_name: string } | null;
+  photo_count: number;
+}
+
+/** A round with its evidence resolved to viewable URLs. */
+export interface ReworkRoundPhotos {
+  id: string;
+  round_number: number;
+  notes: string;
+  assigned_at: string;
+  completed_at: string | null;
+  photos: { key: string; url: string | null }[];
 }

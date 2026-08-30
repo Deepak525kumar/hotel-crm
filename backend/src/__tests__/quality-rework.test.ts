@@ -25,28 +25,42 @@ describe('REWORK_DEADLINE_MS', () => {
   });
 });
 
+// The job scans ReworkRound, not QualityVerification, since 2026-08-30: a room
+// can be sent back more than once, and a single escalated_at on the check
+// cannot express "round 1 escalated, round 2 has not".
 function makePrisma(overdue: any[]) {
   const updateMany = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
   updateMany.mockResolvedValue({ count: 1 });
+  const verificationUpdateMany = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+  verificationUpdateMany.mockResolvedValue({ count: 1 });
   const findMany = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
   findMany.mockResolvedValue(overdue);
-  const tx = { qualityVerification: { updateMany } };
+  const tx = {
+    reworkRound: { updateMany },
+    qualityVerification: { updateMany: verificationUpdateMany },
+  };
   return {
     prisma: {
-      qualityVerification: { findMany },
+      reworkRound: { findMany },
       $transaction: (fn: any) => fn(tx),
     } as any,
     findMany,
     updateMany,
+    verificationUpdateMany,
   };
 }
 
 const overdueRow = {
-  id: 'v1',
-  hotel_id: 'h1',
-  verified_by_id: 'checker1',
-  assignment: { worker_id: 'w1', hotel_id: 'h1' },
-  hotel: { manager_user_id: 'mgr1' },
+  id: 'round1',
+  round_number: 1,
+  verification: {
+    id: 'v1',
+    hotel_id: 'h1',
+    verified_by_id: 'checker1',
+    room_number: '412',
+    assignment: { worker_id: 'w1', hotel_id: 'h1' },
+    hotel: { manager_user_id: 'mgr1' },
+  },
 };
 
 beforeEach(() => {
@@ -81,11 +95,11 @@ describe('ReworkEscalationJob', () => {
     // 20-minute alarm, which is how people learn to ignore the real ones.
     const where = updateMany.mock.calls[0][0].where;
     expect(where).toEqual({
-      id: 'v1',
-      rework_escalated_at: null,
-      rework_completed_at: null,
+      id: 'round1',
+      escalated_at: null,
+      completed_at: null,
     });
-    expect(updateMany.mock.calls[0][0].data.rework_escalated_at).toBeInstanceOf(Date);
+    expect(updateMany.mock.calls[0][0].data.escalated_at).toBeInstanceOf(Date);
   });
 
   it('sends nothing when the worker completed between the select and the claim', async () => {
@@ -107,14 +121,14 @@ describe('ReworkEscalationJob', () => {
 
   it('still notifies the checker when the hotel has no manager', async () => {
     // An escalation that cannot reach one party must still reach the other.
-    const { prisma } = makePrisma([{ ...overdueRow, hotel: { manager_user_id: null } }]);
+    const { prisma } = makePrisma([{ ...overdueRow, verification: { ...overdueRow.verification, hotel: { manager_user_id: null } } }]);
     await new ReworkEscalationJob(prisma, { intervalMs: 1000 }).run();
     expect(mockEnqueue).toHaveBeenCalledTimes(1);
     expect(mockEnqueue.mock.calls[0][0].recipientId).toBe('checker1');
   });
 
   it('does not notify the same person twice when checker IS the manager', async () => {
-    const { prisma } = makePrisma([{ ...overdueRow, hotel: { manager_user_id: 'checker1' } }]);
+    const { prisma } = makePrisma([{ ...overdueRow, verification: { ...overdueRow.verification, hotel: { manager_user_id: 'checker1' } } }]);
     await new ReworkEscalationJob(prisma, { intervalMs: 1000 }).run();
     expect(mockEnqueue).toHaveBeenCalledTimes(1);
   });
@@ -123,15 +137,20 @@ describe('ReworkEscalationJob', () => {
     const { prisma, findMany } = makePrisma([]);
     await new ReworkEscalationJob(prisma, { intervalMs: 1000 }).run();
     const where = findMany.mock.calls[0][0].where;
-    expect(where.rework_required).toBe(true);
-    expect(where.rework_completed_at).toBeNull();
-    expect(where.rework_escalated_at).toBeNull();
-    // Measured from when the worker was told, i.e. the rework assignment.
-    expect(where.rework_assignments.some.confirmed_at.lte).toBeInstanceOf(Date);
+    // Scoped to OPEN rounds, past the deadline, not yet escalated. The old
+    // query keyed off the verification and `rework_assignments: { some: ... }`,
+    // which round 1's long-finished shift satisfies forever -- so opening
+    // round 2 would have escalated it instantly.
+    expect(where.completed_at).toBeNull();
+    expect(where.escalated_at).toBeNull();
+    expect(where.assigned_at.lte).toBeInstanceOf(Date);
   });
 
   it('one failing row does not abort the batch', async () => {
-    const { prisma } = makePrisma([overdueRow, { ...overdueRow, id: 'v2' }]);
+    const { prisma } = makePrisma([
+      overdueRow,
+      { ...overdueRow, id: 'round2', verification: { ...overdueRow.verification, id: 'v2' } },
+    ]);
     mockEnqueue.mockRejectedValueOnce(new Error('boom'));
     await expect(
       new ReworkEscalationJob(prisma, { intervalMs: 1000 }).run()
@@ -197,14 +216,34 @@ describe('rework claims are compare-and-swap, not check-then-act', () => {
     expect(body).toContain('claimed.count === 0');
   });
 
-  it('completeRework claims on rework_completed_at === null', () => {
+  it('completeRework claims THE ROUND, not the check', () => {
     const src = readFileSync('src/modules/quality/service.ts', 'utf8');
     const body = src.slice(src.indexOf('async completeRework('));
-    // Without this a double-tap on "mark done" notifies the checker twice and
-    // appends the photos twice.
-    expect(body).toContain('rework_completed_at: null');
-    expect(body).toContain('updateMany');
-    expect(body).toContain('claimed.count === 0');
+    // Without a claim, a double-tap on "mark done" notifies the checker twice
+    // and stores the photos twice.
+    //
+    // The claim moved from the check's flat rework_completed_at to the round
+    // (2026-08-30). That field cannot tell round 2 apart from round 1, so
+    // claiming on it would have refused a legitimate second submission -- the
+    // worker doing the second round would be told their work was "already
+    // completed". The round is matched by the shift the worker is standing in,
+    // which belongs to exactly one round.
+    expect(body).toMatch(/reworkRound\.updateMany\(\s*\{[\s\S]*?assignment_id: assignmentId/);
+    expect(body).toMatch(/completed_at: null/);
+    expect(body).toContain('claimedRound.count === 0');
+  });
+
+  it('completeRework stores the evidence ON the round, not in the check’s photos', () => {
+    // The defect this whole model exists to fix: the worker's proof of the fix
+    // was appended into the SAME photo_urls array as the checker's original
+    // photographs, so the checker saw one flat grid and could not tell which
+    // pictures showed the room fixed.
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    const body = src.slice(src.indexOf('async completeRework('), src.indexOf('async assertCanInspect'));
+    expect(body).toMatch(/reworkRound\.updateMany\([\s\S]*?photo_urls: \{ push: photoKeys \}/);
+    // ...and NOT onto the verification.
+    const vUpdate = body.slice(body.indexOf('qualityVerification.updateMany'));
+    expect(vUpdate.slice(0, vUpdate.indexOf('});'))).not.toContain('photo_urls');
   });
 
   it('the rework notification carries the notes the mobile deep link reads', () => {

@@ -19,7 +19,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
 import { checklistItemLabelKey, INSPECTION_CHECKLIST_ITEMS } from '@/lib/inspection-checklist';
-import type { QualityCheck } from '@/types/api';
+import type { ReworkRoundPhotos, QualityCheck } from '@/types/api';
 
 /**
  * One check, from the worker's side.
@@ -36,6 +36,38 @@ import type { QualityCheck } from '@/types/api';
  *
  * The addition is the rework button, which the checker's copy has no use for.
  */
+/**
+ * One evidence photo, shared by the checker's section and every rework round
+ * so a picture looks and behaves the same wherever it appears.
+ */
+function EvidencePhoto({
+  photo,
+  styles,
+  label,
+}: {
+  photo: { key: string; url: string | null };
+  styles: { photo: object; missing: object; missingText: object };
+  label: string;
+}) {
+  // Tap opens full size: a 150px thumbnail cannot settle what the checker was
+  // looking at, which is the point of keeping it.
+  if (photo.url) {
+    return (
+      <Pressable onPress={() => void Linking.openURL(photo.url as string)}>
+        <Image source={{ uri: photo.url }} style={styles.photo} resizeMode="cover" />
+      </Pressable>
+    );
+  }
+  // url === null means storage is unconfigured. Shown rather than hidden, so a
+  // broken bucket reads as a missing image and not as a check that never had
+  // evidence.
+  return (
+    <View style={styles.missing}>
+      <Text style={styles.missingText}>{label}</Text>
+    </View>
+  );
+}
+
 export default function CheckDetailScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -44,6 +76,7 @@ export default function CheckDetailScreen() {
 
   const [check, setCheck] = useState<QualityCheck | null>(null);
   const [photos, setPhotos] = useState<{ key: string; url: string | null }[] | null>(null);
+  const [rounds, setRounds] = useState<ReworkRoundPhotos[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -58,6 +91,9 @@ export default function CheckDetailScreen() {
       ]);
       setCheck(c);
       setPhotos(p.photos);
+      // Optional on the wire: a check with no rework simply renders no round
+      // sections rather than throwing.
+      setRounds(p.rework_rounds ?? []);
     } catch (e) {
       setError(translateApiError(e, t, 'errors.generic'));
     }
@@ -189,30 +225,60 @@ export default function CheckDetailScreen() {
           </View>
         ) : null}
 
-        {photos && photos.length === 0 ? (
+        {/* Evidence grouped by who produced it, and the photo grid moved
+            INSIDE a card (2026-08-30). It previously sat bare in the scroll
+            view while every other block was carded, so it alone had no padding
+            -- and the checker's photographs and the worker's own rework proof
+            were mixed into one undifferentiated grid. */}
+        <View style={styles.card}>
           <ThemedText type="small" themeColor="textSecondary">
-            {t('quality.noPhotos')}
+            {t('quality.checkerEvidenceTitle')}
           </ThemedText>
-        ) : null}
-
-        <View style={styles.grid}>
-          {(photos ?? []).map((photo) =>
-            photo.url ? (
-              // Tap opens full size: a 150px thumbnail cannot settle what the
-              // checker was looking at, which is the point of keeping it.
-              <Pressable key={photo.key} onPress={() => void Linking.openURL(photo.url as string)}>
-                <Image source={{ uri: photo.url }} style={styles.photo} resizeMode="cover" />
-              </Pressable>
-            ) : (
-              // url === null means storage is unconfigured. Shown rather than
-              // hidden, so a broken bucket reads as a missing image and not as
-              // a check that never had evidence.
-              <View key={photo.key} style={styles.missing}>
-                <Text style={styles.missingText}>{t('quality.photoUnavailable')}</Text>
-              </View>
-            )
+          {photos && photos.length === 0 ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.noPhotos')}
+            </ThemedText>
+          ) : (
+            <View style={styles.grid}>
+              {(photos ?? []).map((photo) => (
+                <EvidencePhoto key={photo.key} photo={photo} styles={styles} label={t('quality.photoUnavailable')} />
+              ))}
+            </View>
           )}
         </View>
+
+        {/* The worker's own attempts, one card each. Seeing what they already
+            submitted for round 1 is what tells them what a second round is
+            actually asking for. */}
+        {rounds.map((round) => (
+          <View key={round.id} style={styles.card}>
+            <View style={styles.row}>
+              <ThemedText type="smallBold">
+                {t('quality.reworkRoundTitle', { number: round.round_number })}
+              </ThemedText>
+              <ThemedText
+                type="small"
+                style={{ color: round.completed_at ? theme.success : theme.warning }}
+              >
+                {round.completed_at ? t('quality.reworkCompleted') : t('quality.reworkAwaitingWorker')}
+              </ThemedText>
+            </View>
+            <ThemedText type="small">{round.notes}</ThemedText>
+            {round.photos.length > 0 ? (
+              <View style={styles.grid}>
+                {round.photos.map((photo) => (
+                  <EvidencePhoto key={photo.key} photo={photo} styles={styles} label={t('quality.photoUnavailable')} />
+                ))}
+              </View>
+            ) : (
+              <ThemedText type="small" themeColor="textSecondary">
+                {round.completed_at
+                  ? t('quality.reworkNoRoundPhotos')
+                  : t('quality.reworkAwaitingPhotos')}
+              </ThemedText>
+            )}
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );

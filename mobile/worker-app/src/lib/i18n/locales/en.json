@@ -1091,7 +1091,18 @@
     "workerUnavailable": "Worker unavailable",
     "overallScoreTitle": "Overall Score (0-100)",
     "searchChecksPlaceholder": "Search by room, note or outcome",
-    "searchChecksNoMatch": "No checks match that search."
+    "searchChecksNoMatch": "No checks match that search.",
+    "checkerEvidenceTitle": "Checker's evidence",
+    "reworkRoundTitle": "Rework round {{number}}",
+    "reworkNoRoundPhotos": "No photos were recorded for this round.",
+    "reworkAwaitingPhotos": "Waiting for the worker to upload evidence.",
+    "assignReworkAgain": "Assign rework again",
+    "reworkRoundsTitle": "Rework",
+    "reworkRoundCompletedShort": "Round {{number}} completed",
+    "reworkRoundOpenShort": "Round {{number}} in progress",
+    "checkerNotesTitle": "Checker's notes",
+    "originalCheckTitle": "What the checker found",
+    "roomLabelShort": "Room"
   },
   "ratings": {
     "comment": "Comment",
