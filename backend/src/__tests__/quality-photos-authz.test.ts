@@ -36,6 +36,9 @@ const VERIFICATION = {
   id: 'v1',
   hotel_id: 'h1',
   photo_urls: ['quality/a1/inspection/u/p.jpg'],
+  // Rounds carry the worker's evidence separately from the checker's own
+  // photographs (2026-08-30); a check with none renders no round sections.
+  rework_rounds: [],
   assignment: { worker_id: 'subject-worker' },
 };
 

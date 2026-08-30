@@ -37,45 +37,66 @@ export class ReworkEscalationJob implements ScheduledJob {
   async run(): Promise<void> {
     const cutoff = new Date(Date.now() - REWORK_DEADLINE_MS);
 
-    const overdue = await this.prisma.qualityVerification.findMany({
+    // Scoped to ROUNDS since 2026-08-30, not to the verification's flat
+    // fields. A room can now be sent back more than once, and the old query
+    // could not express "round 1 escalated, round 2 has not" -- it matched on
+    // `rework_assignments: { some: { confirmed_at: { lte: cutoff } } }`, and
+    // round 1's long-finished shift satisfies `some` forever. Opening round 2
+    // would therefore have escalated it to the manager and checker
+    // immediately, before the worker could possibly have started. A false
+    // 20-minute alarm is exactly what teaches people to ignore the real ones.
+    //
+    // Each round carries its own assigned_at and its own escalated_at, so the
+    // clock is per attempt, which is what CRR §14 actually describes.
+    const overdue = await this.prisma.reworkRound.findMany({
       where: {
-        rework_required: true,
-        rework_completed_at: null,
-        rework_escalated_at: null,
-        // Measured from when the rework assignment was created, which is when
-        // the worker was actually told -- not from the inspection, which may
-        // have happened earlier. WorkerAssignment has no created_at; its
-        // confirmed_at defaults to now() at insert, so it is the creation
-        // timestamp for a row this job created.
-        rework_assignments: { some: { confirmed_at: { lte: cutoff } } },
+        completed_at: null,
+        escalated_at: null,
+        assigned_at: { lte: cutoff },
       },
       include: {
-        assignment: { select: { worker_id: true, hotel_id: true } },
-        hotel: { select: { manager_user_id: true } },
+        verification: {
+          select: {
+            id: true,
+            hotel_id: true,
+            verified_by_id: true,
+            room_number: true,
+            assignment: { select: { worker_id: true } },
+            hotel: { select: { manager_user_id: true } },
+          },
+        },
       },
+      orderBy: { assigned_at: 'asc' },
       take: this.batchSize,
     });
 
-    for (const v of overdue) {
+    for (const round of overdue) {
       try {
         await this.prisma.$transaction(async (tx) => {
-          // Claim the row first. A concurrent worker process that already
-          // escalated it will have moved rework_escalated_at, so this update
-          // matches nothing and we skip -- rather than double-notifying.
-          const claimed = await tx.qualityVerification.updateMany({
-            // `rework_completed_at: null` is re-checked HERE, not just in the
+          // Claim the round first. A concurrent worker process that already
+          // escalated it will have moved escalated_at, so this update matches
+          // nothing and we skip -- rather than double-notifying.
+          const claimed = await tx.reworkRound.updateMany({
+            // `completed_at: null` is re-checked HERE, not just in the
             // findMany above, and that is the whole point of re-stating it.
             // The select and this claim are separated by the batch loop -- up
-            // to `batchSize` rows, one transaction each -- so a worker can
-            // finish their rework in between. Claiming on
-            // rework_escalated_at alone would then succeed and notify the
-            // manager AND checker that work is overdue seconds after it was
-            // actually completed. A false 20-minute alarm is exactly the kind
-            // of thing that teaches people to ignore the real ones.
-            where: { id: v.id, rework_escalated_at: null, rework_completed_at: null },
-            data: { rework_escalated_at: new Date() },
+            // to `batchSize` rounds, one transaction each -- so a worker can
+            // finish their rework in between. Claiming on escalated_at alone
+            // would then succeed and tell the manager and checker that work is
+            // overdue seconds after it was actually completed.
+            where: { id: round.id, escalated_at: null, completed_at: null },
+            data: { escalated_at: new Date() },
           });
           if (claimed.count === 0) return;
+
+          const v = round.verification;
+
+          // Mirrored onto the verification so anything still reading the flat
+          // field agrees with the round that actually escalated.
+          await tx.qualityVerification.updateMany({
+            where: { id: v.id, rework_escalated_at: null },
+            data: { rework_escalated_at: new Date() },
+          });
 
           // CRR §14 says BOTH, explicitly. The manager may be unset on a hotel
           // with no assigned manager; the checker always exists (they are the
@@ -91,9 +112,11 @@ export class ReworkEscalationJob implements ScheduledJob {
                 recipientId,
                 type: NotificationType.REWORK_OVERDUE,
                 title: 'Rework overdue',
-                message: 'Rework was not completed within 20 minutes.',
+                message: `Rework was not completed within 20 minutes (room ${v.room_number}, round ${round.round_number}).`,
                 data: {
                   verification_id: v.id,
+                  rework_round_id: round.id,
+                  round_number: round.round_number,
                   worker_id: v.assignment?.worker_id ?? null,
                 },
                 hotelId: v.hotel_id,
@@ -109,7 +132,7 @@ export class ReworkEscalationJob implements ScheduledJob {
         // One bad row must not stop the batch: the next tick retries it,
         // because a failed transaction leaves rework_escalated_at null.
         logger.error('rework_escalation_failed', {
-          verificationId: v.id,
+          reworkRoundId: round.id,
           error: error instanceof Error ? error.message : String(error),
         });
       }

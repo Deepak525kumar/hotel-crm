@@ -1691,4 +1691,31 @@ export interface SubjectRightsBundle {
   audit_trail: SubjectRightsSourceResult<{ data: AuditLogEntry[]; total: number }>;
 }
 
+/**
+ * One attempt at fixing a room the checker sent back (2026-08-30).
+ *
+ * Each round owns its evidence. Before rounds, the worker's proof of a fix was
+ * appended into the checker's own photo array with nothing marking the
+ * boundary, so a manager reviewing a shift saw one flat strip in which the two
+ * were indistinguishable.
+ */
+export interface ReworkRound {
+  id: string;
+  round_number: number;
+  notes: string;
+  assigned_at: string;
+  completed_at: string | null;
+  assignment_id: string | null;
+  assigned_by?: { id: string; first_name: string; last_name: string } | null;
+  photo_count: number;
+}
 
+/** A round with its evidence resolved to viewable URLs. */
+export interface ReworkRoundPhotos {
+  id: string;
+  round_number: number;
+  notes: string;
+  assigned_at: string;
+  completed_at: string | null;
+  photos: { key: string; url: string | null }[];
+}

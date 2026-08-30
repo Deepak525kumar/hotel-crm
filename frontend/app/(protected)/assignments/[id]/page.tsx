@@ -32,6 +32,7 @@ import {
 } from "@/components/ui";
 import { BackLink } from "@/components/ui/BackLink";
 import type {
+  ReworkRoundPhotos,
   InspectionChecklistItem,
   QualityVerification,
   RoomsCompletedEntry,
@@ -803,6 +804,7 @@ function LogRoomsCompletedModal({
 function VerificationEvidence({ verificationId }: { verificationId: string }) {
   const { t } = useTranslation();
   const [photos, setPhotos] = useState<{ key: string; url: string | null }[] | null>(null);
+  const [rounds, setRounds] = useState<ReworkRoundPhotos[]>([]);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -810,7 +812,11 @@ function VerificationEvidence({ verificationId }: { verificationId: string }) {
     void qualityApi
       .verificationPhotos(verificationId)
       .then((r) => {
-        if (!cancelled) setPhotos(r.photos);
+        if (cancelled) return;
+        setPhotos(r.photos);
+        // Optional on the wire, so a check with no rework renders no round
+        // sections rather than throwing.
+        setRounds(r.rework_rounds ?? []);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -822,7 +828,9 @@ function VerificationEvidence({ verificationId }: { verificationId: string }) {
 
   // An inspection with no photos is normal (they are optional), so render
   // nothing rather than an empty state that implies something is missing.
-  if (failed || !photos || photos.length === 0) return null;
+  // Rounds count too: a check may carry no checker photos but still have
+  // rework evidence worth showing.
+  if (failed || !photos || (photos.length === 0 && rounds.length === 0)) return null;
 
   return (
     <div className="space-y-2">
@@ -858,6 +866,61 @@ function VerificationEvidence({ verificationId }: { verificationId: string }) {
           ),
         )}
       </div>
+
+      {/* One block per rework attempt (2026-08-30). The worker's proof of a fix
+          used to be appended into the array above, so a manager reviewing a
+          shift saw one flat strip in which the checker's original photographs
+          and the worker's corrections were indistinguishable. */}
+      {rounds.map((round) => (
+        <div key={round.id} className="space-y-2 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              {t("quality.reworkRoundTitle", { number: round.round_number })}
+            </p>
+            <span
+              className={
+                round.completed_at
+                  ? "text-xs text-green-700 dark:text-green-400"
+                  : "text-xs text-amber-700 dark:text-amber-400"
+              }
+            >
+              {round.completed_at
+                ? t("quality.reworkCompleted")
+                : t("quality.reworkAwaitingWorker")}
+            </span>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-400">{round.notes}</p>
+          {round.photos.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {round.photos.map((photo) =>
+                photo.url ? (
+                  <a key={photo.key} href={photo.url} target="_blank" rel="noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- presigned URL */}
+                    <img
+                      src={photo.url}
+                      alt=""
+                      className="h-20 w-20 rounded object-cover"
+                    />
+                  </a>
+                ) : (
+                  <div
+                    key={photo.key}
+                    className="flex h-20 w-20 items-center justify-center rounded bg-gray-200 p-1 text-center text-[10px] text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                  >
+                    {t("quality.photoUnavailable")}
+                  </div>
+                )
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {round.completed_at
+                ? t("quality.reworkNoRoundPhotos")
+                : t("quality.reworkAwaitingPhotos")}
+            </p>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

@@ -1092,7 +1092,18 @@
     "workerUnavailable": "الموظف غير متاح",
     "overallScoreTitle": "Overall Score (0-100)",
     "searchChecksPlaceholder": "ابحث حسب الغرفة أو الملاحظة أو النتيجة",
-    "searchChecksNoMatch": "لا توجد فحوصات تطابق هذا البحث."
+    "searchChecksNoMatch": "لا توجد فحوصات تطابق هذا البحث.",
+    "checkerEvidenceTitle": "أدلة المفتش",
+    "reworkRoundTitle": "جولة إعادة العمل {{number}}",
+    "reworkNoRoundPhotos": "لم يتم تسجيل صور لهذه الجولة.",
+    "reworkAwaitingPhotos": "في انتظار رفع الأدلة من الموظف.",
+    "assignReworkAgain": "تعيين إعادة عمل مرة أخرى",
+    "reworkRoundsTitle": "إعادة العمل",
+    "reworkRoundCompletedShort": "اكتملت الجولة {{number}}",
+    "reworkRoundOpenShort": "الجولة {{number}} قيد التنفيذ",
+    "checkerNotesTitle": "ملاحظات المفتش",
+    "originalCheckTitle": "ما وجده المفتش",
+    "roomLabelShort": "الغرفة"
   },
   "ratings": {
     "comment": "تعليق",

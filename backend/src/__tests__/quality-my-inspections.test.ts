@@ -65,6 +65,20 @@ const ROW = {
   rework_assignments: [
     { id: 'rework-1', status: 'CONFIRMED', day: new Date('2026-08-26T00:00:00.000Z') },
   ],
+  // A room can be sent back more than once (2026-08-30). The open round is
+  // what the worker's button must point at -- round 1 here, still incomplete.
+  rework_rounds: [
+    {
+      id: 'round-1',
+      round_number: 1,
+      notes: 'redo the balcony',
+      assigned_at: new Date('2026-08-26T11:06:00.000Z'),
+      completed_at: null,
+      photo_urls: [],
+      assignment_id: 'rework-1',
+      assigned_by: { id: 'checker-1', first_name: 'Cal', last_name: 'Checker' },
+    },
+  ],
 };
 
 function makeReq(query: Record<string, unknown> = {}, auth = CHECKER): Request {
@@ -152,6 +166,56 @@ describe('QualityService.listOwnChecks', () => {
   it('exposes the rework assignment the worker’s button needs', async () => {
     const [check] = (await service.listOwnChecks(CHECKER)).checks;
     expect(check!.rework_assignment).toMatchObject({ id: 'rework-1' });
+  });
+
+  it('points the worker’s button at the OPEN round, not the first one', async () => {
+    // With one round this was `rework_assignments[0]`, which was adequate
+    // while a check could only be sent back once. With two it returns
+    // whichever shift the database listed first -- round 1's, long completed --
+    // so the worker would tap "go to your rework" and land on finished work
+    // while the open round sat untouched.
+    mockQualityVerification.findMany.mockResolvedValue([
+      {
+        ...ROW,
+        rework_assignments: [
+          { id: 'rework-1', status: 'COMPLETED', day: new Date('2026-08-26T00:00:00.000Z') },
+          { id: 'rework-2', status: 'CONFIRMED', day: new Date('2026-08-27T00:00:00.000Z') },
+        ],
+        rework_rounds: [
+          { ...ROW.rework_rounds[0], completed_at: new Date('2026-08-26T12:00:00.000Z') },
+          {
+            id: 'round-2',
+            round_number: 2,
+            notes: 'still not clean',
+            assigned_at: new Date('2026-08-27T09:00:00.000Z'),
+            completed_at: null,
+            photo_urls: [],
+            assignment_id: 'rework-2',
+            assigned_by: { id: 'checker-1', first_name: 'Cal', last_name: 'Checker' },
+          },
+        ],
+      },
+    ]);
+
+    const [check] = (await service.listOwnChecks(CHECKER)).checks;
+    expect(check!.rework_assignment).toMatchObject({ id: 'rework-2' });
+  });
+
+  it('exposes every round, in order, with per-round photo counts', async () => {
+    const [check] = (await service.listOwnChecks(CHECKER)).checks;
+    expect(check!.rework_rounds).toHaveLength(1);
+    expect(check!.rework_rounds[0]).toMatchObject({ round_number: 1, photo_count: 0 });
+  });
+
+  it('never leaks a round’s storage keys', async () => {
+    // Same rule as the check's own photos: a key without a presigned URL is
+    // useless, and listing them turns this into a directory of private paths.
+    mockQualityVerification.findMany.mockResolvedValue([
+      { ...ROW, rework_rounds: [{ ...ROW.rework_rounds[0], photo_urls: ['quality/secret/rework/a.jpg'] }] },
+    ]);
+    const result = await service.listOwnChecks(CHECKER);
+    expect(result.checks[0]!.rework_rounds[0]!.photo_count).toBe(1);
+    expect(JSON.stringify(result)).not.toContain('quality/secret');
   });
 
   it('returns photo COUNTS, never storage keys', async () => {

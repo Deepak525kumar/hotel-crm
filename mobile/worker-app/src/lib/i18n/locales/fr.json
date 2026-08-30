@@ -1091,7 +1091,18 @@
     "workerUnavailable": "Employé indisponible",
     "overallScoreTitle": "Overall Score (0-100)",
     "searchChecksPlaceholder": "Rechercher par chambre, note ou résultat",
-    "searchChecksNoMatch": "Aucun contrôle ne correspond à cette recherche."
+    "searchChecksNoMatch": "Aucun contrôle ne correspond à cette recherche.",
+    "checkerEvidenceTitle": "Preuves du contrôleur",
+    "reworkRoundTitle": "Reprise – tour {{number}}",
+    "reworkNoRoundPhotos": "Aucune photo n’a été enregistrée pour ce tour.",
+    "reworkAwaitingPhotos": "En attente des preuves de l’employé.",
+    "assignReworkAgain": "Assigner une nouvelle reprise",
+    "reworkRoundsTitle": "Reprise",
+    "reworkRoundCompletedShort": "Tour {{number}} terminé",
+    "reworkRoundOpenShort": "Tour {{number}} en cours",
+    "checkerNotesTitle": "Notes du contrôleur",
+    "originalCheckTitle": "Constat du contrôleur",
+    "roomLabelShort": "Chambre"
   },
   "ratings": {
     "comment": "Commentaire",

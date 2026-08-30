@@ -1,5 +1,6 @@
 import type { UiLocale } from '@/lib/locales';
 import type {
+  ReworkRoundPhotos,
   EmploymentRecordDto,
   QualityCheck,
   User,
@@ -508,6 +509,18 @@ export const api = {
      * permission gate on the route: the subject of an inspection may always
      * read it, and the server confirms it is their assignment.
      */
+    /**
+     * The check a rework shift exists to correct, addressed by that shift.
+     *
+     * The worker doing a rework holds the rework assignment id and nothing
+     * else; without this they see only the one-line note the push carried,
+     * with no picture of what was actually wrong.
+     */
+    checkForRework: (reworkAssignmentId: string) =>
+      request<QualityCheck & { current_round_number: number }>(
+        `/quality/rework-assignments/${encodeURIComponent(reworkAssignmentId)}/check`
+      ),
+
     checksForAssignment: (assignmentId: string) =>
       request<{ assignment_id: string; checks: QualityCheck[] }>(
         `/quality/assignments/${encodeURIComponent(assignmentId)}/checks`
@@ -522,10 +535,17 @@ export const api = {
       request<QualityCheck>(`/quality/checks/${encodeURIComponent(checkId)}`),
 
     /** Presigned URLs for one check's photos, including any rework evidence. */
+    /**
+     * `photos` is the CHECKER's own photographs; `rework_rounds` carries each
+     * attempt's evidence separately (2026-08-30). They used to be one array,
+     * which is why neither side could tell which pictures proved the fix.
+     */
     checkPhotos: (checkId: string) =>
-      request<{ verification_id: string; photos: { key: string; url: string | null }[] }>(
-        `/quality/verifications/${encodeURIComponent(checkId)}/photos`
-      ),
+      request<{
+        verification_id: string;
+        photos: { key: string; url: string | null }[];
+        rework_rounds: ReworkRoundPhotos[];
+      }>(`/quality/verifications/${encodeURIComponent(checkId)}/photos`),
 
     // The leaderboard lives here, not under /analytics. /analytics/leaderboard
     // is gated requireRole(['admin','manager','regional_manager']) -- a worker

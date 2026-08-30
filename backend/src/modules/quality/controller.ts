@@ -251,6 +251,26 @@ export class QualityController {
     }
   }
 
+  async getCheckForRework(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const id = req.params.assignment_id;
+      if (!id) throw new ValidationError('assignment_id is required');
+      const result = await qualityService.getCheckForReworkAssignment(id, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope ?? null,
+      });
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getLeaderboard(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');
