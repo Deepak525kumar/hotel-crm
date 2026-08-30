@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -34,7 +34,14 @@ export default function ReworkScreen() {
   // form usable -- the instruction in `notes` is enough to proceed on.
   const [check, setCheck] = useState<(QualityCheck & { current_round_number: number }) | null>(null);
   const [evidence, setEvidence] = useState<{ key: string; url: string | null }[]>([]);
+  // What the worker has ALREADY sent for this round. Without it they submit
+  // into silence: the screen looked identical before and after uploading, so
+  // the only way to confirm anything arrived was to ask the checker.
+  const [mine, setMine] = useState<{ key: string; url: string | null }[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = useCallback(() => setReloadKey((n) => n + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +54,14 @@ export default function ReworkScreen() {
         // worker is about to produce, so showing it back to them here would
         // just be their own previous attempt.
         const p = await api.quality.checkPhotos(c.id);
-        if (!cancelled) setEvidence(p.photos ?? []);
+        if (cancelled) return;
+        setEvidence(p.photos ?? []);
+        // This round's own evidence, matched by round number rather than by
+        // position: rounds are ordered but a screen should not depend on that.
+        const thisRound = (p.rework_rounds ?? []).find(
+          (r) => r.round_number === c.current_round_number
+        );
+        setMine(thisRound?.photos ?? []);
       } catch {
         // Deliberately silent: this is context, not the task. The upload form
         // below still works, and surfacing an error banner for missing context
@@ -57,7 +71,7 @@ export default function ReworkScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const submit = async () => {
     setError(null);
@@ -68,6 +82,10 @@ export default function ReworkScreen() {
     setSaving(true);
     try {
       await api.quality.completeRework(id, picker.photos);
+      // Re-read so the section below shows what was just sent. The worker can
+      // submit again -- to add a shot they missed, or replace a bad one -- and
+      // seeing the result is what tells them whether they need to.
+      void reload();
       Alert.alert(t('common.submitted'), t('quality.reworkDone', { when: '' }), [
         { text: t('common.ok'), onPress: () => router.back() },
       ]);
@@ -171,6 +189,36 @@ export default function ReworkScreen() {
               {t('quality.checkerNotesTitle')}
             </ThemedText>
             <ThemedText type="small">{check?.rework_notes ?? notes}</ThemedText>
+          </View>
+        ) : null}
+
+        {/* What the worker has already sent for this round. Placed above the
+            upload controls so it answers "did that go through?" before they
+            reach for the camera again. */}
+        {mine.length > 0 ? (
+          <View style={styles.card}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.yourEvidenceTitle', { count: mine.length })}
+            </ThemedText>
+            <View style={styles.grid}>
+              {mine.map((photo) =>
+                photo.url ? (
+                  <Pressable key={photo.key} onPress={() => void Linking.openURL(photo.url as string)}>
+                    <Image source={{ uri: photo.url }} style={styles.photo} resizeMode="cover" />
+                  </Pressable>
+                ) : (
+                  <View key={photo.key} style={styles.missing}>
+                    <Text style={styles.missingText}>{t('quality.photoUnavailable')}</Text>
+                  </View>
+                )
+              )}
+            </View>
+            {/* Says plainly that sending more is allowed. The server used to
+                refuse a second submission outright, so a worker who noticed a
+                bad photo had no way to correct it. */}
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.canAddMoreEvidence')}
+            </ThemedText>
           </View>
         ) : null}
 

@@ -746,26 +746,49 @@ export class QualityService extends BaseService {
       // and append the photos twice.
       const completedAt = new Date();
 
-      // Claim the ROUND, not the verification. The round is what this shift
-      // exists to carry out, and claiming it is what makes a double-tap on
-      // "mark done" idempotent -- previously this claimed the verification's
-      // flat rework_completed_at, which cannot distinguish round 2 from
-      // round 1 and would refuse a legitimate second submission outright.
+      const existing = await tx.reworkRound.findFirst({
+        where: { assignment_id: assignmentId },
+        select: { id: true, round_number: true, completed_at: true, updated_at: true },
+      });
+      if (!existing) throw new NotFoundError('Rework not found');
+
+      // OPTIMISTIC LOCK on updated_at, not a "completed_at is null" claim.
       //
-      // Matched by assignment_id: that is the shift the worker is standing in,
-      // and it is unique to one round.
+      // The null claim could not tell a double-tap apart from a deliberate
+      // re-submission, so it refused BOTH: a worker who noticed they had
+      // uploaded the wrong photo, or who was asked for more, was told "this
+      // rework has already been completed" and had no way to send anything
+      // else. Adding evidence to your own round is a legitimate thing to do.
+      //
+      // Two requests racing still read the same updated_at, so exactly one
+      // matches and the other gets the 409 -- the double-tap protection is
+      // unchanged. A submission made minutes later reads the NEW updated_at
+      // and simply succeeds.
       const claimedRound = await tx.reworkRound.updateMany({
-        where: { assignment_id: assignmentId, completed_at: null },
-        data: { completed_at: completedAt, photo_urls: { push: photoKeys } },
+        where: { id: existing.id, updated_at: existing.updated_at },
+        data: {
+          // The FIRST completion time is kept. It records when the worker said
+          // the room was done, which later evidence does not change; -
+          // overwriting it would quietly restart the 20-minute story.
+          completed_at: existing.completed_at ?? completedAt,
+          photo_urls: { push: photoKeys },
+        },
       });
       if (claimedRound.count === 0) {
-        throw new ConflictError('This rework has already been completed');
+        throw new ConflictError('This rework was updated at the same time; try again');
       }
 
-      const round = await tx.reworkRound.findFirst({
-        where: { assignment_id: assignmentId },
-        select: { id: true, round_number: true },
+      const round = { id: existing.id, round_number: existing.round_number };
+
+      // Is this the newest round? Re-submitting evidence for round 1 while
+      // round 2 is open must NOT mark the check complete -- the mirror
+      // describes the newest round, and round 2 is still outstanding.
+      const newest = await tx.reworkRound.findFirst({
+        where: { verification_id: verification.id },
+        orderBy: { round_number: 'desc' },
+        select: { id: true },
       });
+      const isNewest = newest?.id === existing.id;
 
       // Mirror onto the verification so every existing consumer -- the
       // analytics ratios, the worker's "go to rework" button, the check DTO --
@@ -776,15 +799,21 @@ export class QualityService extends BaseService {
       // the round, which is the whole point: appending it left the checker
       // with one flat grid in which their own photographs and the worker's
       // proof of the fix were indistinguishable.
-      await tx.qualityVerification.updateMany({
-        where: { id: verification.id },
-        data: { rework_completed_at: completedAt },
-      });
+      if (isNewest) {
+        await tx.qualityVerification.updateMany({
+          where: { id: verification.id },
+          data: { rework_completed_at: existing.completed_at ?? completedAt },
+        });
+      }
 
-      await tx.workerAssignment.update({
-        where: { id: assignmentId },
-        data: { status: AssignmentStatus.COMPLETED, completed_at: new Date() },
-      });
+      // Only on the FIRST submission. Re-stamping completed_at every time the
+      // worker adds a photo would keep moving the moment the shift finished.
+      if (!existing.completed_at) {
+        await tx.workerAssignment.update({
+          where: { id: assignmentId },
+          data: { status: AssignmentStatus.COMPLETED, completed_at: new Date() },
+        });
+      }
 
       // CRR §14: "Checker is notified with the photo + details."
       await notificationService.enqueue(
@@ -792,9 +821,12 @@ export class QualityService extends BaseService {
           recipientId: verification.verified_by_id,
           type: 'REWORK_COMPLETED',
           title: 'Rework completed',
-          message: round
-            ? `The worker uploaded evidence for round ${round.round_number} and marked it done.`
-            : 'The worker uploaded evidence and marked the rework done.',
+          // Named for what happened: a first completion and a later addition
+          // are different events, and telling the checker "rework completed"
+          // twice for one round reads as though it was done twice.
+          message: existing.completed_at
+            ? `The worker added more evidence for round ${round.round_number}.`
+            : `The worker uploaded evidence for round ${round.round_number} and marked it done.`,
           data: {
             verification_id: verification.id,
             rework_assignment_id: assignmentId,

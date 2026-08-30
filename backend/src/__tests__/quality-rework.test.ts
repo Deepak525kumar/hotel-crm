@@ -219,18 +219,59 @@ describe('rework claims are compare-and-swap, not check-then-act', () => {
   it('completeRework claims THE ROUND, not the check', () => {
     const src = readFileSync('src/modules/quality/service.ts', 'utf8');
     const body = src.slice(src.indexOf('async completeRework('));
-    // Without a claim, a double-tap on "mark done" notifies the checker twice
-    // and stores the photos twice.
+    // Without a claim, two interleaved requests both append and the checker is
+    // notified twice for one upload.
     //
-    // The claim moved from the check's flat rework_completed_at to the round
-    // (2026-08-30). That field cannot tell round 2 apart from round 1, so
-    // claiming on it would have refused a legitimate second submission -- the
-    // worker doing the second round would be told their work was "already
-    // completed". The round is matched by the shift the worker is standing in,
-    // which belongs to exactly one round.
-    expect(body).toMatch(/reworkRound\.updateMany\(\s*\{[\s\S]*?assignment_id: assignmentId/);
-    expect(body).toMatch(/completed_at: null/);
+    // The claim targets the round -- located by the shift the worker is
+    // standing in, which belongs to exactly one round -- rather than the
+    // check's flat rework_completed_at, which cannot tell round 2 from round 1
+    // and would refuse a legitimate second round outright.
+    expect(body).toMatch(/reworkRound\.updateMany\(\s*\{\s*where: \{ id: existing\.id/);
+    expect(body).toMatch(/findFirst\(\{\s*where: \{ assignment_id: assignmentId/);
     expect(body).toContain('claimedRound.count === 0');
+  });
+
+  it('lets a worker submit again instead of refusing with "already completed"', () => {
+    // Reported from the app: a worker who uploaded the wrong photo, or was
+    // asked for another, tapped "mark as done" and got "This rework has
+    // already been completed" with no way forward.
+    //
+    // The old claim was `completed_at: null`, which cannot tell a deliberate
+    // re-submission from a double-tap, so it refused both. An optimistic lock
+    // on updated_at separates them: two interleaved requests read the same
+    // value and only one matches, while a submission made later reads the new
+    // value and succeeds.
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    const body = src.slice(src.indexOf('async completeRework('), src.indexOf('async assertCanInspect'));
+    expect(body).toMatch(/updated_at: existing\.updated_at/);
+    expect(body).not.toMatch(/reworkRound\.updateMany\(\{\s*where: \{ assignment_id: assignmentId, completed_at: null \}/);
+  });
+
+  it('keeps the FIRST completion time when more evidence is added', () => {
+    // Overwriting it would restart the story of when the room was reported
+    // done, and the 20-minute escalation reads that moment.
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    const body = src.slice(src.indexOf('async completeRework('), src.indexOf('async assertCanInspect'));
+    expect(body).toMatch(/completed_at: existing\.completed_at \?\? completedAt/);
+  });
+
+  it('does not re-complete the shift when evidence is added later', () => {
+    // Re-stamping the assignment's completed_at on every upload would keep
+    // moving the moment the shift finished.
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    const body = src.slice(src.indexOf('async completeRework('), src.indexOf('async assertCanInspect'));
+    const guard = body.indexOf('if (!existing.completed_at)');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(body.indexOf('AssignmentStatus.COMPLETED'));
+  });
+
+  it('only mirrors completion when the round is the NEWEST', () => {
+    // Adding a photo to round 1 while round 2 is open must not mark the check
+    // complete: the mirror describes the newest round, and that one is still
+    // outstanding.
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    const body = src.slice(src.indexOf('async completeRework('), src.indexOf('async assertCanInspect'));
+    expect(body).toMatch(/if \(isNewest\) \{[\s\S]*?rework_completed_at/);
   });
 
   it('completeRework stores the evidence ON the round, not in the check’s photos', () => {
