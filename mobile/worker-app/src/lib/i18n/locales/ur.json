@@ -1103,7 +1103,9 @@
     "reworkRoundOpenShort": "راؤنڈ {{number}} جاری",
     "checkerNotesTitle": "چیکر کے نوٹس",
     "originalCheckTitle": "چیکر کو کیا ملا",
-    "roomLabelShort": "کمرہ"
+    "roomLabelShort": "کمرہ",
+    "yourEvidenceTitle": "آپ نے کیا بھیجا ({{count}})",
+    "canAddMoreEvidence": "ضرورت ہو تو مزید تصاویر شامل کر سکتے ہیں۔"
   },
   "ratings": {
     "comment": "تبصرہ",

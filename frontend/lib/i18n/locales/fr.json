@@ -1102,7 +1102,9 @@
     "reworkRoundOpenShort": "Tour {{number}} en cours",
     "checkerNotesTitle": "Notes du contrôleur",
     "originalCheckTitle": "Constat du contrôleur",
-    "roomLabelShort": "Chambre"
+    "roomLabelShort": "Chambre",
+    "yourEvidenceTitle": "Ce que vous avez envoyé ({{count}})",
+    "canAddMoreEvidence": "Vous pouvez ajouter d’autres photos si nécessaire."
   },
   "ratings": {
     "comment": "Commentaire",

@@ -1102,7 +1102,9 @@
     "reworkRoundOpenShort": "Runde {{number}} läuft",
     "checkerNotesTitle": "Anmerkungen des Prüfers",
     "originalCheckTitle": "Feststellung des Prüfers",
-    "roomLabelShort": "Zimmer"
+    "roomLabelShort": "Zimmer",
+    "yourEvidenceTitle": "Was Sie gesendet haben ({{count}})",
+    "canAddMoreEvidence": "Sie können bei Bedarf weitere Fotos hinzufügen."
   },
   "ratings": {
     "comment": "Kommentar",
