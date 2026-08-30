@@ -17,6 +17,7 @@ import {
 } from './recency-weighting.js';
 import { attendanceScore, blendQualityAndAttendance } from './overall-rating.js';
 import { notificationService } from '../notifications/service.js';
+import { logger } from '../../lib/logger.js';
 // Shared with the assignments search: every free-text search needs this, and a
 // second copy of the rule is a second chance to get it wrong.
 import { escapeLikeTerm } from '../../lib/like-escape.js';
@@ -100,6 +101,9 @@ export const QUALITY_CHECK_SELECT = {
       completed_at: true,
       photo_urls: true,
       assignment_id: true,
+      timer_started_at: true,
+      cancelled_at: true,
+      cancellation_reason: true,
       assigned_by: { select: { id: true, first_name: true, last_name: true } },
     },
     orderBy: { round_number: 'asc' },
@@ -157,6 +161,14 @@ export function toCheckDto(row: QualityCheckRow) {
       assigned_at: r.assigned_at,
       completed_at: r.completed_at,
       assignment_id: r.assignment_id,
+      // Null means the 20-minute clock has NOT started: the round was raised
+      // after the worker's shift ended and waits until they next check in at
+      // this hotel. Exposed so a screen can say "next time you're here"
+      // instead of implying a deadline that is not running.
+      timer_started_at: r.timer_started_at,
+      // Closed without the room being fixed, after three days unworked.
+      cancelled_at: r.cancelled_at,
+      cancellation_reason: r.cancellation_reason,
       assigned_by: r.assigned_by
         ? { id: r.assigned_by.id, first_name: r.assigned_by.first_name, last_name: r.assigned_by.last_name }
         : null,
@@ -638,13 +650,28 @@ export class QualityService extends BaseService {
   private async createReworkAssignment(
     tx: DatabaseTransaction,
     params: {
-      original: { id: string; worker_id: string; hotel_id: string };
+      original: { id: string; worker_id: string; hotel_id: string; status: AssignmentStatus };
       verificationId: string;
       notes: string;
       actorId: string;
     }
   ) {
     const { original, verificationId, notes, actorId } = params;
+
+    // Does the 20-minute clock start now, or wait?
+    //
+    // Owner decision (2026-08-30). A checker often inspects after the worker
+    // has gone home, and starting the clock then guaranteed an escalation
+    // nobody could have prevented: the worker was not on site, and a
+    // 20-minute alarm that cannot be beaten is exactly what teaches people to
+    // ignore the real ones.
+    //
+    // IN_PROGRESS means the worker is here, so the clock starts. Anything else
+    // -- COMPLETED above all -- defers it until they next check in AT THIS
+    // HOTEL (attendance check-in wakes it), which is the first moment they
+    // could actually walk to the room.
+    const workerIsOnSite = original.status === AssignmentStatus.IN_PROGRESS;
+    const timerStartedAt = workerIsOnSite ? new Date() : null;
 
     // The round number, allocated inside the caller's transaction. The unique
     // index on (verification_id, round_number) is the real guard: two
@@ -683,12 +710,19 @@ export class QualityService extends BaseService {
         recipientId: original.worker_id,
         type: 'REWORK_REQUIRED',
         title: 'Rework required',
-        message: notes,
+        // The instruction either way, but only the on-site case is asking for
+        // something in the next 20 minutes. Telling a worker who has gone home
+        // to hurry is how a notification becomes noise.
+        message: workerIsOnSite
+          ? notes
+          : `${notes}\n\nYou can do this next time you check in at this hotel.`,
         data: {
           verification_id: verificationId,
           original_assignment_id: original.id,
           rework_assignment_id: reworkAssignment.id,
           notes,
+          // So the app can say "due now" rather than implying a running clock.
+          deferred: !workerIsOnSite,
         },
         hotelId: original.hotel_id,
         transports: [OutboxTransport.PUSH],
@@ -708,6 +742,7 @@ export class QualityService extends BaseService {
         assigned_by_id: actorId,
         assignment_id: reworkAssignment.id,
         photo_urls: [],
+        timer_started_at: timerStartedAt,
       },
     });
 
@@ -1365,6 +1400,9 @@ export class QualityService extends BaseService {
             assigned_at: true,
             completed_at: true,
             photo_urls: true,
+            timer_started_at: true,
+            cancelled_at: true,
+            cancellation_reason: true,
           },
           orderBy: { round_number: 'asc' },
         },
@@ -1401,6 +1439,9 @@ export class QualityService extends BaseService {
         notes: r.notes,
         assigned_at: r.assigned_at,
         completed_at: r.completed_at,
+        timer_started_at: r.timer_started_at,
+        cancelled_at: r.cancelled_at,
+        cancellation_reason: r.cancellation_reason,
         photos: await Promise.all(r.photo_urls.map(sign)),
       }))
     );
@@ -1646,6 +1687,105 @@ export class QualityService extends BaseService {
     );
 
     return toCheckDto(check);
+  }
+
+  /**
+   * Wake any rework this worker has waiting AT THIS HOTEL, and start its clock.
+   *
+   * Owner decision (2026-08-30). Rework raised against a finished shift is
+   * deferred -- the worker has gone home, and a 20-minute clock they cannot
+   * beat is worse than no clock at all. This is the moment it becomes real:
+   * they have checked in, they are on site, they can walk to the room.
+   *
+   * Scoped to the SAME hotel, deliberately. A worker checking in at a
+   * different property cannot fix a room in this one, so starting the clock
+   * there would recreate exactly the unbeatable deadline this defers.
+   *
+   * Called from attendance check-in and deliberately non-fatal there: a
+   * notification that fails to send must never stop someone starting their
+   * shift.
+   */
+  async startDeferredReworkOnCheckIn(params: {
+    workerId: string;
+    hotelId: string;
+    day: Date;
+  }): Promise<{ started: number }> {
+    const { workerId, hotelId, day } = params;
+
+    const waiting = await this.prisma.reworkRound.findMany({
+      where: {
+        timer_started_at: null,
+        completed_at: null,
+        cancelled_at: null,
+        verification: { worker_id: workerId, hotel_id: hotelId },
+      },
+      select: {
+        id: true,
+        round_number: true,
+        notes: true,
+        assignment_id: true,
+        verification: { select: { id: true, room_number: true, hotel_id: true } },
+      },
+    });
+
+    let started = 0;
+    for (const round of waiting) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          // Claim on timer_started_at still being null: two check-ins racing
+          // (a retried request, two devices) must start the clock once, or the
+          // worker gets two reminders and the deadline moves under them.
+          const claimed = await tx.reworkRound.updateMany({
+            where: { id: round.id, timer_started_at: null, completed_at: null, cancelled_at: null },
+            data: { timer_started_at: new Date() },
+          });
+          if (claimed.count === 0) return;
+
+          // Move the rework shift onto today. It was dated when the checker
+          // raised it, which by now is in the past -- the worker would have to
+          // scroll back through their schedule to find work that is due right
+          // now (owner decision: move it to the day they check in).
+          if (round.assignment_id) {
+            await tx.workerAssignment.updateMany({
+              where: { id: round.assignment_id, status: { not: AssignmentStatus.CANCELLED } },
+              data: { day },
+            });
+          }
+
+          await notificationService.enqueue(
+            {
+              recipientId: workerId,
+              type: 'REWORK_REQUIRED',
+              title: 'Rework still to do',
+              message: `Room ${round.verification.room_number} still needs rework: ${round.notes}`,
+              data: {
+                verification_id: round.verification.id,
+                rework_assignment_id: round.assignment_id,
+                rework_round_id: round.id,
+                round_number: round.round_number,
+                notes: round.notes,
+              },
+              hotelId: round.verification.hotel_id,
+              transports: [OutboxTransport.PUSH],
+              sourceModule: OutboxSourceModule.QUALITY,
+              producerService: 'QualityService',
+            },
+            tx
+          );
+          started += 1;
+        });
+      } catch (error) {
+        // One round must not stop the others, and must never fail the
+        // check-in. A failed transaction leaves timer_started_at null, so the
+        // worker's next check-in retries it.
+        logger.error('deferred_rework_start_failed', {
+          reworkRoundId: round.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return { started };
   }
 
   /**

@@ -298,6 +298,11 @@ const envSchema = z.object({
   // feels to a worker.
   INSPECTION_DIGEST_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
   INSPECTION_DIGEST_BATCH_SIZE: z.coerce.number().int().positive().default(50),
+  // The 3-day rework write-off. Hourly is enough: the deadline is measured in
+  // days, and a job that scans every minute for a three-day condition is pure
+  // load.
+  REWORK_EXPIRY_INTERVAL_MS: z.coerce.number().int().positive().default(3600000),
+  REWORK_EXPIRY_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   GEO_RETENTION_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
   GEO_RETENTION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
 

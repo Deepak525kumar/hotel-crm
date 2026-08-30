@@ -189,6 +189,9 @@ export interface ReworkRound {
   assignment_id: string | null;
   assigned_by?: { id: string; first_name: string; last_name: string } | null;
   photo_count: number;
+  timer_started_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
 }
 
 /** A round with its evidence resolved to viewable URLs. */
@@ -199,6 +202,9 @@ export interface ReworkRoundPhotos {
   assigned_at: string;
   completed_at: string | null;
   photos: { key: string; url: string | null }[];
+  timer_started_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
 }
 
 export type PushPlatform = 'IOS' | 'ANDROID';

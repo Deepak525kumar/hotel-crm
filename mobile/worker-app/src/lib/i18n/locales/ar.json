@@ -1105,7 +1105,11 @@
     "originalCheckTitle": "ما وجده المفتش",
     "roomLabelShort": "الغرفة",
     "yourEvidenceTitle": "ما أرسلته ({{count}})",
-    "canAddMoreEvidence": "يمكنك إضافة المزيد من الصور عند الحاجة."
+    "canAddMoreEvidence": "يمكنك إضافة المزيد من الصور عند الحاجة.",
+    "reworkCancelled": "ملغاة",
+    "reworkCancelledBody": "لم تُنجز إعادة العمل خلال 3 أيام وتم إلغاؤها.",
+    "reworkWaitingOnSite": "في الانتظار",
+    "reworkWaitingOnSiteBody": "تبدأ عند تسجيل الحضور القادم في هذا الفندق."
   },
   "ratings": {
     "comment": "تعليق",

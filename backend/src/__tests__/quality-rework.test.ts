@@ -98,6 +98,9 @@ describe('ReworkEscalationJob', () => {
       id: 'round1',
       escalated_at: null,
       completed_at: null,
+      // A round cancelled after three days is closed; escalating it would
+      // chase work that has already been written off.
+      cancelled_at: null,
     });
     expect(updateMany.mock.calls[0][0].data.escalated_at).toBeInstanceOf(Date);
   });
@@ -143,7 +146,13 @@ describe('ReworkEscalationJob', () => {
     // round 2 would have escalated it instantly.
     expect(where.completed_at).toBeNull();
     expect(where.escalated_at).toBeNull();
-    expect(where.assigned_at.lte).toBeInstanceOf(Date);
+    expect(where.cancelled_at).toBeNull();
+    // Measured from when the clock STARTED, not when the round was assigned
+    // (owner decision, 2026-08-30). A round raised against a finished shift
+    // has timer_started_at NULL, and `{ lte }` never matches NULL -- so it
+    // cannot escalate until the worker checks in and the clock is set.
+    expect(where.timer_started_at.lte).toBeInstanceOf(Date);
+    expect(where.assigned_at).toBeUndefined();
   });
 
   it('one failing row does not abort the batch', async () => {

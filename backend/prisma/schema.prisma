@@ -1298,20 +1298,20 @@ model QualityVerification {
 /// dirty still reads as having been found dirty however many times it was
 /// sent back.
 model ReworkRound {
-  id              String              @id @default(cuid())
-  verification_id String
-  verification    QualityVerification @relation(fields: [verification_id], references: [id], onDelete: Cascade)
+  id                  String              @id @default(cuid())
+  verification_id     String
+  verification        QualityVerification @relation(fields: [verification_id], references: [id], onDelete: Cascade)
   /// 1-based, and unique per verification. The number the checker and worker
   /// both see ("Round 2"), so it is stored rather than derived from ordering
   /// -- a deleted row must not renumber the rounds that came after it.
-  round_number    Int
+  round_number        Int
   /// What the checker asked for. Required: a round with no instruction is a
   /// shift the worker cannot act on.
-  notes           String
-  assigned_by_id  String
-  assigned_by     User                @relation("rework_assigner", fields: [assigned_by_id], references: [id], onDelete: Restrict)
-  assigned_at     DateTime            @default(now())
-  completed_at    DateTime?
+  notes               String
+  assigned_by_id      String
+  assigned_by         User                @relation("rework_assigner", fields: [assigned_by_id], references: [id], onDelete: Restrict)
+  assigned_at         DateTime            @default(now())
+  completed_at        DateTime?
   /// THIS round's evidence, uploaded by the worker. Separate from the
   /// verification's `photo_urls`, which holds the checker's original
   /// photographs -- keeping them apart is the point of the model.
@@ -1320,23 +1320,45 @@ model ReworkRound {
   /// were appended into `photo_urls` with no boundary recorded, so they cannot
   /// be split retroactively. Such a round still shows its status and note;
   /// only the per-round grouping of its pictures is unavailable.
-  photo_urls      String[]
+  photo_urls          String[]
   /// The linked shift the worker actually does this round on. Nullable because
   /// the assignment may be deleted independently, and because backfilled rows
   /// may not resolve to one.
-  assignment_id   String?
-  assignment      WorkerAssignment?   @relation("ReworkRoundAssignment", fields: [assignment_id], references: [id], onDelete: SetNull)
+  assignment_id       String?
+  assignment          WorkerAssignment?   @relation("ReworkRoundAssignment", fields: [assignment_id], references: [id], onDelete: SetNull)
   /// Per-round escalation marker. On the verification this was a single field,
   /// which cannot express "round 1 escalated, round 2 has not" -- and round
   /// 1's overdue shift would otherwise make round 2 look instantly overdue.
-  escalated_at    DateTime?
-  created_at      DateTime            @default(now())
-  updated_at      DateTime            @updatedAt
+  escalated_at        DateTime?
+  /// When the 20-minute clock actually STARTED, which is not when the round
+  /// was assigned (owner decision, 2026-08-30).
+  ///
+  /// A checker often inspects after the worker has gone home. Starting the
+  /// clock at assignment then guaranteed an escalation the worker could not
+  /// possibly have prevented -- they were not on site, and a 20-minute alarm
+  /// nobody can beat is exactly what teaches people to ignore the real ones.
+  ///
+  /// NULL means deferred: the round is waiting for the worker to next check in
+  /// AT THIS HOTEL, which is when it becomes actionable and the clock begins.
+  /// Set immediately when rework is raised on a shift still in progress, since
+  /// the worker is standing there.
+  timer_started_at    DateTime?
+  /// Set when a round is given up on (see ReworkExpiryJob). A cancelled round
+  /// is closed but explicitly NOT completed -- the room was never fixed, and
+  /// the record has to keep saying so.
+  cancelled_at        DateTime?
+  /// Why it was cancelled, in words, so the history reads without needing the
+  /// job's source to interpret it.
+  cancellation_reason String?
+  created_at          DateTime            @default(now())
+  updated_at          DateTime            @updatedAt
 
   @@unique([verification_id, round_number])
   @@index([verification_id])
-  /// The escalation job's scan: open rounds, oldest first.
-  @@index([completed_at, escalated_at, assigned_at])
+  /// The escalation job's scan: rounds whose clock is running, oldest first.
+  @@index([completed_at, escalated_at, timer_started_at])
+  /// The expiry job's scan: rounds still open, by age.
+  @@index([completed_at, cancelled_at, assigned_at])
 }
 
 model WorkerOverallRating {

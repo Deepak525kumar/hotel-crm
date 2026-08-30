@@ -52,7 +52,16 @@ export class ReworkEscalationJob implements ScheduledJob {
       where: {
         completed_at: null,
         escalated_at: null,
-        assigned_at: { lte: cutoff },
+        // Cancelled rounds are closed. Escalating one would chase work that
+        // has already been written off.
+        cancelled_at: null,
+        // Measured from when the clock STARTED, not when the round was
+        // assigned (owner decision, 2026-08-30). A round raised against a
+        // finished shift has timer_started_at NULL and is skipped entirely --
+        // `{ lte: cutoff }` never matches NULL, so a deferred round cannot
+        // escalate. It becomes eligible the moment the worker checks in at
+        // that hotel and the clock is set.
+        timer_started_at: { lte: cutoff },
       },
       include: {
         verification: {
@@ -66,7 +75,7 @@ export class ReworkEscalationJob implements ScheduledJob {
           },
         },
       },
-      orderBy: { assigned_at: 'asc' },
+      orderBy: { timer_started_at: 'asc' },
       take: this.batchSize,
     });
 
@@ -84,7 +93,7 @@ export class ReworkEscalationJob implements ScheduledJob {
             // finish their rework in between. Claiming on escalated_at alone
             // would then succeed and tell the manager and checker that work is
             // overdue seconds after it was actually completed.
-            where: { id: round.id, escalated_at: null, completed_at: null },
+            where: { id: round.id, escalated_at: null, completed_at: null, cancelled_at: null },
             data: { escalated_at: new Date() },
           });
           if (claimed.count === 0) return;

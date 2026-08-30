@@ -1105,7 +1105,11 @@
     "originalCheckTitle": "چیکر کو کیا ملا",
     "roomLabelShort": "کمرہ",
     "yourEvidenceTitle": "آپ نے کیا بھیجا ({{count}})",
-    "canAddMoreEvidence": "ضرورت ہو تو مزید تصاویر شامل کر سکتے ہیں۔"
+    "canAddMoreEvidence": "ضرورت ہو تو مزید تصاویر شامل کر سکتے ہیں۔",
+    "reworkCancelled": "منسوخ",
+    "reworkCancelledBody": "یہ دوبارہ کام 3 دن میں مکمل نہیں ہوا اور منسوخ کر دیا گیا۔",
+    "reworkWaitingOnSite": "زیرِ التوا",
+    "reworkWaitingOnSiteBody": "اس ہوٹل میں اگلی چیک اِن پر شروع ہوگا۔"
   },
   "ratings": {
     "comment": "تبصرہ",
