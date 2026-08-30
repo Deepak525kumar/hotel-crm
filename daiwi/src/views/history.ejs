@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head><title>Release history</title><%- include("partials/head") %></head>
+<body>
+  <%- include("partials/nav", { active: 'history' }) %>
+
+  <main class="container">
+    <section class="panel">
+      <h2 class="panel-title">Release history</h2>
+      <p class="muted">
+        Every version ever published, kept permanently. Deleting a release removes the binary from
+        storage but never removes its record here.
+      </p>
+
+      <div class="table-scroll">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Uploaded</th>
+              <th>Platform</th>
+              <th>Channel</th>
+              <th>File</th>
+              <th>Version</th>
+              <th>Build</th>
+              <th>Min OS</th>
+              <th>Size</th>
+              <th>By</th>
+              <th>Binary</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% history.forEach(h => { %>
+              <tr class="<%= h.binaryDeletedAt ? 'row-retired' : '' %>">
+                <td class="mono nowrap"><%= h.uploadedAt.toISOString().slice(0, 16).replace('T', ' ') %></td>
+                <td><span class="platform-badge platform-<%= h.platform.toLowerCase() %>"><%= h.platform === 'IOS' ? 'iOS' : 'Android' %></span></td>
+                <td><span class="channel-badge channel-<%= h.channel.toLowerCase() %>"><%= h.channelLabel %></span></td>
+                <td class="mono"><%= h.fileName %></td>
+                <td><%= h.version %></td>
+                <td class="mono"><%= h.buildNumber %></td>
+                <td><%= h.minOs || '—' %></td>
+                <td class="nowrap"><%= h.sizeMb %> MB</td>
+                <td class="muted small"><%= h.uploadedByEmail %></td>
+                <td>
+                  <% if (h.binaryDeletedAt) { %>
+                    <span class="muted small" title="Deleted by <%= h.binaryDeletedBy %>">
+                      deleted <%= h.binaryDeletedAt.toISOString().slice(0, 10) %>
+                    </span>
+                  <% } else { %>
+                    <span class="status status-ready">available</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+            <% if (history.length === 0) { %>
+              <tr><td colspan="10" class="muted">Nothing published yet.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted small">
+        SHA-256 of each binary is recorded alongside these rows in the database for verification.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

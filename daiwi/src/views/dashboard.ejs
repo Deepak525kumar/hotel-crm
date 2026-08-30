@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head><title>Version Control</title><%- include("partials/head") %></head>
+<body>
+  <%- include("partials/nav", { active: 'builds' }) %>
+
+  <main class="container">
+    <section class="panel">
+      <h2 class="panel-title">Publish a new version</h2>
+      <div class="dropzone" id="dropzone" data-upload-url="<%= adminPath %>/api/builds/upload">
+        <p><strong>Drop an .ipa or .apk here</strong> or click to choose a file</p>
+        <input type="file" id="fileInput" accept=".ipa,.apk" hidden />
+        <div class="upload-row">
+          <input type="text" id="notesInput" placeholder="Release notes (optional)" maxlength="2000" />
+          <input type="text" id="minOsInput" placeholder="Min OS override (e.g. 16.0)" maxlength="32" />
+        </div>
+        <p class="hint muted">
+          The minimum OS is read from the binary automatically. Fill the override only to advertise
+          something stricter than the build declares.
+        </p>
+        <div class="progress" id="progressWrap" hidden>
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <p class="error" id="uploadError"></p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Current releases</h2>
+      <div class="builds" id="buildsList">
+        <% builds.forEach(b => { %>
+          <div class="build-card" data-id="<%= b.id %>" data-slug="<%= b.slug %>" data-status="<%= b.status %>">
+            <% if (b.iconKey) { %>
+              <img class="icon" src="<%= installPath %>/<%= b.slug %>/icon" alt="" />
+            <% } else { %>
+              <div class="icon placeholder"></div>
+            <% } %>
+
+            <div class="build-info">
+              <div class="build-title">
+                <%= b.appName %>
+                <span class="platform-badge platform-<%= b.platform.toLowerCase() %>"><%= b.platform === 'IOS' ? 'iOS' : 'Android' %></span>
+                <span class="channel-badge channel-<%= b.channel.toLowerCase() %>"><%= b.channelLabel %></span>
+                <% if (b.isLive) { %><span class="status status-ready">live</span><% } %>
+              </div>
+              <div class="muted">
+                <%= b.version %> (<%= b.buildNumber %>) · <%= b.sizeMb %> MB
+                <% if (b.minOs) { %> · <%= b.minOs %><% } %>
+                · <span class="status status-<%= b.status.toLowerCase() %>"><%= b.status %></span>
+              </div>
+              <div class="muted small mono"><%= b.fileName %></div>
+              <% if (b.notes) { %><div class="notes"><%= b.notes %></div><% } %>
+              <% if (b.status === 'READY') { %>
+                <div class="link-row">
+                  <span class="mono link-text"><%= b.installUrl %></span>
+                </div>
+              <% } %>
+            </div>
+
+            <div class="build-actions">
+              <% if (b.status === 'READY') { %>
+                <a class="btn" href="<%= b.installUrl %>" target="_blank" rel="noopener">Open</a>
+                <button class="btn copy-btn" type="button" data-url="<%= b.installUrl %>">Copy link</button>
+                <button class="btn qr-btn" type="button" data-qr="<%= adminPath %>/api/builds/<%= b.id %>/qr">QR</button>
+              <% } %>
+              <button class="btn danger delete-btn" type="button" data-id="<%= b.id %>">Delete</button>
+            </div>
+          </div>
+        <% }) %>
+        <% if (builds.length === 0) { %><p class="muted">No releases yet — upload one above.</p><% } %>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="channelDialog" class="qr-dialog channel-dialog">
+    <form method="dialog">
+      <h3>Is this a development or production build?</h3>
+      <p class="muted small" id="channelFileName"></p>
+      <div class="channel-choices">
+        <% channels.forEach(c => { %>
+          <button class="btn channel-choice" type="submit" value="<%= c.value %>"><%= c.label %></button>
+        <% }) %>
+      </div>
+      <p class="muted small">
+        Production builds can be promoted to the workers' install page. Development builds never appear there.
+      </p>
+      <button class="link-btn" type="submit" value="cancel">Cancel</button>
+    </form>
+  </dialog>
+
+  <dialog id="qrDialog" class="qr-dialog">
+    <img id="qrImage" alt="QR code for the install link" width="280" height="280" />
+    <button class="btn" type="button" id="qrClose">Close</button>
+  </dialog>
+
+  <script src="<%= assetBase %>/js/dashboard.js"></script>
+</body>
+</html>

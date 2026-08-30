@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head><title><%= build.appName %></title><%- include("partials/head") %></head>
+<body class="native-page">
+  <header class="native-topbar">
+    <span class="native-title"><%= build.appName %></span>
+  </header>
+
+  <main class="native-list">
+
+    <section class="group">
+      <div class="group-label">App overview</div>
+      <div class="row row-overview">
+        <span class="row-label"><%= build.appName %></span>
+        <% if (iconUrl) { %><img class="row-icon" src="<%= iconUrl %>" alt="" /><% } else { %><div class="row-icon placeholder"></div><% } %>
+      </div>
+      <div class="row"><span class="row-label">Version</span><span class="row-value"><%= build.version %></span></div>
+      <div class="row"><span class="row-label">Build</span><span class="row-value"><%= build.buildNumber %></span></div>
+      <% if (build.minOs) { %>
+        <div class="row"><span class="row-label">Requires</span><span class="row-value"><%= build.minOs %></span></div>
+      <% } %>
+    </section>
+
+    <section class="group">
+      <div class="group-label">Installation</div>
+
+      <% if (metadata.warnings && metadata.warnings.length) { %>
+        <% metadata.warnings.forEach(w => { %><div class="row-note warning">⚠️ <%= w %></div><% }) %>
+      <% } %>
+
+      <% if (ua.platform === 'ios' && ua.isInAppBrowser) { %>
+        <div class="row-note">Open this link in <strong>Safari</strong> to install — in-app browsers (WhatsApp, Slack, Instagram, etc.) can't trigger the installer.</div>
+        <button class="row row-link copy-btn" type="button" data-url="<%= pageUrl %>"><span class="row-label">Copy link</span><span class="chevron">›</span></button>
+      <% } else if (ua.platform === 'ios' && ua.isSafari) { %>
+        <% if (installHref) { %>
+          <a class="row row-link" href="<%= installHref %>">
+            <span class="row-icon-inline">⬆️</span>
+            <span class="row-label">Install application</span>
+            <span class="chevron">›</span>
+          </a>
+          <div class="row-note muted">Tap to start the installation</div>
+        <% } else { %>
+          <div class="row-note warning">This link is served over plain HTTP, so iOS can't install it. Deploy behind HTTPS (set <code>PUBLIC_BASE_URL</code>) to enable installation.</div>
+        <% } %>
+        <% if (metadata.profile && metadata.profile.type === 'development') { %>
+          <div class="row-note muted">Development build — after installing, enable Developer Mode in Settings → Privacy &amp; Security if prompted.</div>
+        <% } %>
+      <% } else if (ua.platform === 'ios') { %>
+        <div class="row-note">Open this link in <strong>Safari</strong> to install — other iOS browsers can't trigger the installer.</div>
+        <button class="row row-link copy-btn" type="button" data-url="<%= pageUrl %>"><span class="row-label">Copy link</span><span class="chevron">›</span></button>
+      <% } else if (ua.platform === 'android') { %>
+        <a class="row row-link" href="<%= downloadHref %>">
+          <span class="row-icon-inline">⬇️</span>
+          <span class="row-label">Download APK</span>
+          <span class="chevron">›</span>
+        </a>
+        <div class="row-note muted">If installation is blocked, allow "install unknown apps" for your browser in Android settings.</div>
+      <% } else { %>
+        <div class="row-note">Scan the QR code below with your phone's camera to open this page and install.</div>
+      <% } %>
+    </section>
+
+    <section class="group">
+      <div class="group-label">Open on another device</div>
+      <div class="row-note">Scan this code, or copy the link, to open this install page on a phone.</div>
+      <div class="qr-box"><img src="<%= qrDataUrl %>" alt="QR code for this install page" width="200" height="200" /></div>
+      <div class="row">
+        <span class="row-value mono link-text"><%= pageUrl %></span>
+      </div>
+      <button class="row row-link copy-btn" type="button" data-url="<%= pageUrl %>">
+        <span class="row-label">Copy link</span>
+        <span class="chevron">›</span>
+      </button>
+    </section>
+
+    <section class="group">
+      <div class="group-label">App details</div>
+      <div class="row"><span class="row-label">Bundle identifier</span><span class="row-value"><%= build.bundleId %></span></div>
+      <div class="row"><span class="row-label">Size</span><span class="row-value"><%= build.sizeMb %> MB</span></div>
+      <% if (build.platform === 'IOS') { %>
+        <% if (deviceFamily) { %><div class="row"><span class="row-label">Device family</span><span class="row-value"><%= deviceFamily %></span></div><% } %>
+        <% if (metadata.requiredDeviceCapabilities && metadata.requiredDeviceCapabilities.length) { %>
+          <div class="row"><span class="row-label">Required device capabilities</span><span class="row-value badge"><%= metadata.requiredDeviceCapabilities.length %></span></div>
+        <% } %>
+        <div class="row"><span class="row-label">Supported architectures</span><span class="row-value">arm64</span></div>
+      <% } %>
+    </section>
+
+    <% if (build.platform === 'IOS' && metadata.profile) { %>
+      <section class="group">
+        <div class="group-label">Provisioning profile</div>
+        <div class="row"><span class="row-label">Profile type</span><span class="row-value"><%= metadata.profile.type %></span></div>
+        <% if (metadata.profile.expirationDate) { %>
+          <div class="row"><span class="row-label">Profile expiration</span><span class="row-value"><%= new Date(metadata.profile.expirationDate).toISOString().slice(0,16).replace('T',' ') %> UTC</span></div>
+        <% } %>
+        <% if (metadata.profile.type === 'ad-hoc' || metadata.profile.type === 'development') { %>
+          <div class="row"><span class="row-label">Provisioned devices</span><span class="row-value badge"><%= JSON.parse(build.provisionedUdids).length %></span></div>
+          <div class="row-note muted">This build only installs on devices registered to the profile. If your device isn't registered, installation fails with no error message from iOS.</div>
+        <% } %>
+      </section>
+    <% } %>
+
+    <% if (build.notes) { %>
+      <section class="group">
+        <div class="group-label">Release notes</div>
+        <div class="row-note"><%= build.notes %></div>
+      </section>
+    <% } %>
+
+    <section class="group">
+      <div class="group-label">Other information</div>
+      <div class="row"><span class="row-label">Published</span><span class="row-value"><%= new Date(build.createdAt).toISOString().slice(0,16).replace('T',' ') %> UTC</span></div>
+      <div class="row"><span class="row-label">All apps</span><span class="row-value"><a href="<%= installPath %>">Back to install page</a></span></div>
+    </section>
+
+  </main>
+
+  <footer class="native-footer muted small">Internal distribution — for staff devices only.</footer>
+
+  <script src="<%= assetBase %>/js/copy.js"></script>
+</body>
+</html>

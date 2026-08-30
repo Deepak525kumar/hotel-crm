@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head><title>Account</title><%- include("partials/head") %></head>
+<body>
+  <%- include("partials/nav", { active: 'account' }) %>
+
+  <main class="container container-narrow">
+    <section class="panel">
+      <h2 class="panel-title">Your account</h2>
+      <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
+
+      <dl class="detail-list">
+        <div class="detail-row">
+          <dt>Email</dt>
+          <dd class="mono"><%= user.email %></dd>
+        </div>
+        <div class="detail-row">
+          <dt>Password</dt>
+          <dd class="muted">••••••••••••</dd>
+        </div>
+        <div class="detail-row">
+          <dt>Account created</dt>
+          <dd><%= user.createdAt.toISOString().slice(0, 16).replace('T', ' ') %> UTC</dd>
+        </div>
+        <div class="detail-row">
+          <dt>Last sign-in</dt>
+          <dd><%= user.lastLoginAt ? user.lastLoginAt.toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '—' %></dd>
+        </div>
+        <div class="detail-row">
+          <dt>Builds uploaded</dt>
+          <dd><%= uploads %></dd>
+        </div>
+        <div class="detail-row">
+          <dt>Releases promoted</dt>
+          <dd><%= promotions %></dd>
+        </div>
+      </dl>
+
+      <p class="muted small">
+        This account holds nothing but an email address and a password hash — no phone number
+        and no personal details are stored.
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Change password</h2>
+      <% if (error) { %><p class="error"><%= error %></p><% } %>
+
+      <form method="post" action="<%= adminPath %>/account/password" class="stacked-form">
+        <label>Current password
+          <input type="password" name="currentPassword" required autocomplete="current-password" />
+        </label>
+        <label>New password (<%= minLength %>+ characters)
+          <input type="password" name="newPassword" required minlength="<%= minLength %>" autocomplete="new-password" />
+        </label>
+        <label>Confirm new password
+          <input type="password" name="confirmPassword" required minlength="<%= minLength %>" autocomplete="new-password" />
+        </label>
+        <button class="btn primary" type="submit">Update password</button>
+        <p class="muted small">Changing your password signs out every other browser you are signed in on.</p>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
