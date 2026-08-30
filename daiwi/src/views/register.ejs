@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><title>Version Control — Register</title><%- include("partials/head") %></head>
+<body class="auth-page">
+  <form class="auth-card" method="post" action="<%= adminPath %>/register">
+    <h1>Create account</h1>
+    <% if (error) { %><p class="error"><%= error %></p><% } %>
+    <% if (needsInviteCode) { %>
+      <label>Invite code<input type="text" name="inviteCode" required autocomplete="off" /></label>
+    <% } %>
+    <label>Email<input type="email" name="email" required autocomplete="username" /></label>
+    <label>Password (12+ characters)<input type="password" name="password" required minlength="12" autocomplete="new-password" /></label>
+    <button type="submit">Register</button>
+    <p class="muted">Already have an account? <a href="<%= adminPath %>/login">Log in</a></p>
+  </form>
+</body>
+</html>

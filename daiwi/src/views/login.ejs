@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><title>Version Control — Log in</title><%- include("partials/head") %></head>
+<body class="auth-page">
+  <form class="auth-card" method="post" action="<%= adminPath %>/login">
+    <h1>Version Control</h1>
+    <% if (error) { %><p class="error"><%= error %></p><% } %>
+    <label>Email<input type="email" name="email" required autofocus autocomplete="username" /></label>
+    <label>Password<input type="password" name="password" required autocomplete="current-password" /></label>
+    <button type="submit">Log in</button>
+    <p class="muted"><a href="<%= adminPath %>/forgot-password">Forgot your password?</a></p>
+    <% if (allowRegistration) { %>
+      <p class="muted">No account? <a href="<%= adminPath %>/register">Register</a></p>
+    <% } %>
+  </form>
+</body>
+</html>

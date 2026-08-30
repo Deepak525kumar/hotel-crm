@@ -1,0 +1,13 @@
+<header class="topbar">
+  <div class="brand">Version Control</div>
+  <nav class="topbar-nav">
+    <a class="nav-link <%= active === 'builds' ? 'active' : '' %>" href="<%= adminPath %>/">Upload</a>
+    <a class="nav-link <%= active === 'production' ? 'active' : '' %>" href="<%= adminPath %>/production">Production</a>
+    <a class="nav-link <%= active === 'development' ? 'active' : '' %>" href="<%= adminPath %>/development">Development</a>
+    <a class="nav-link <%= active === 'history' ? 'active' : '' %>" href="<%= adminPath %>/history">History</a>
+  </nav>
+  <div class="topbar-right">
+    <a class="nav-link <%= active === 'account' ? 'active' : '' %>" href="<%= adminPath %>/account">Account</a>
+    <form method="post" action="<%= adminPath %>/logout"><button class="link-btn" type="submit">Log out</button></form>
+  </div>
+</header>

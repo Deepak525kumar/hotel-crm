@@ -1,0 +1,158 @@
+// Runs against the same PostgreSQL server as the Hotel CRM API, but as its own
+// role (hotelcrm_vc) in its own schema (?schema=version_control in DATABASE_URL).
+// That role has no privileges on the CRM's `public` schema at all, so a
+// compromise here cannot read CRM data — see scripts/provision-db.sql.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  /// Bumped on every password change or reset. The session cookie carries this
+  /// number, so changing a password immediately invalidates every session signed
+  /// before it — the only way to revoke a stateless JWT.
+  tokenVersion Int      @default(0)
+  createdAt    DateTime @default(now())
+  lastLoginAt  DateTime?
+  builds       Build[]
+  resetTokens  PasswordResetToken[]
+}
+
+/// Single-use, short-lived password reset grants. Only the SHA-256 of the token
+/// is stored: a leaked database backup must not yield usable reset links.
+model PasswordResetToken {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  requestedIp String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// The live catalogue. A Build is soft-deleted (deletedAt) when its binary is
+/// removed from S3; the permanent record of that version lives in ReleaseHistory,
+/// which is never deleted.
+model Build {
+  id               String    @id @default(uuid())
+  slug             String    @unique
+  platform         String // IOS | ANDROID
+  /// PRODUCTION | DEVELOPMENT — chosen by the operator at upload time. It decides
+  /// which dashboard the build appears under and which catalogue it can be
+  /// promoted into; it is never inferred from the binary.
+  channel          String    @default("PRODUCTION")
+  /// Original uploaded filename (e.g. HotelCRMWorker.ipa). appName is overwritten
+  /// by the parser with the display name, so the filename is kept separately —
+  /// it is one of the things the history table exists to preserve.
+  fileName         String    @default("")
+  appName          String
+  bundleId         String
+  version          String
+  buildNumber      String
+  /// Auto-detected from the binary: MinimumOSVersion (iOS) / minSdkVersion (Android).
+  minOsVersion     String?
+  /// Operator-supplied override shown on the public page instead of minOsVersion
+  /// when set (e.g. "16.0" when the binary claims 13.0 but you only support 16+).
+  minOsOverride    String?
+  storageKey       String
+  iconKey          String?
+  sha256           String
+  sizeBytes        BigInt
+  notes            String?
+  status           String // PARSING | READY | FAILED | DELETED
+  metadataJson     String // JSON-encoded parsed dump + warnings
+  profileExpiry    DateTime?
+  provisionsAll    Boolean?
+  provisionedUdids String // JSON-encoded string[]
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  createdAt        DateTime  @default(now())
+  deletedAt        DateTime?
+
+  slots            ReleaseSlot[]
+
+  @@index([userId])
+  @@index([platform, status, createdAt])
+  @@index([channel, platform, status, createdAt])
+}
+
+/// One row per (channel, platform) — four at most: the live build for
+/// production iOS, production Android, development iOS and development Android.
+///
+/// Uploading a build does NOT publish it: an operator drags it into the iOS or
+/// Android box on the relevant dashboard. That deliberate step is what makes the
+/// public link change, so a build can be uploaded and shared by its own link
+/// without every worker's install page moving underneath them.
+model ReleaseSlot {
+  channel         String // PRODUCTION | DEVELOPMENT
+  platform        String // IOS | ANDROID
+  buildId         String
+  build           Build    @relation(fields: [buildId], references: [id])
+  promotedAt      DateTime @default(now())
+  promotedByEmail String
+
+  /// Composite key: a channel/platform pair can only ever name one build.
+  @@id([channel, platform])
+  @@index([buildId])
+}
+
+/// Append-only audit of every promotion and rollback, so "when did workers start
+/// getting this version" has an answer.
+model PromotionEvent {
+  id           String   @id @default(uuid())
+  channel      String   @default("PRODUCTION")
+  platform     String
+  action       String // PROMOTED | CLEARED
+  buildId      String?
+  version      String?
+  buildNumber  String?
+  fileName     String?
+  /// The build this one replaced, for reading the timeline backwards.
+  replacedBuildId String?
+  actorEmail   String
+  createdAt    DateTime @default(now())
+
+  @@index([channel, platform, createdAt])
+}
+
+/// Append-only log of every version ever published, and what happened to it.
+/// Rows are written on upload and updated once on delete; they are never removed,
+/// so the record of "which file, which version, when" outlives the binary itself.
+model ReleaseHistory {
+  id              String    @id @default(uuid())
+  /// Not a foreign key: the Build row may be hard-deleted one day, and this
+  /// record must survive that. Kept as a plain reference for joining while it exists.
+  buildId         String?
+  slug            String
+  platform        String // IOS | ANDROID
+  channel         String    @default("PRODUCTION")
+  fileName        String
+  appName         String
+  bundleId        String
+  version         String
+  buildNumber     String
+  minOsVersion    String?
+  sizeBytes       BigInt
+  sha256          String
+  storageKey      String
+  notes           String?
+  uploadedByEmail String
+  uploadedAt      DateTime  @default(now())
+  /// Set when the binary is removed from S3. The row itself stays forever.
+  binaryDeletedAt DateTime?
+  binaryDeletedBy String?
+
+  @@index([platform, uploadedAt])
+  @@index([buildId])
+}

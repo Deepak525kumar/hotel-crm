@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head><title><%= channelLabel %> releases</title><%- include("partials/head") %></head>
+<body>
+  <%- include("partials/nav", { active: channel === 'PRODUCTION' ? 'production' : 'development' }) %>
+
+  <main class="container">
+    <section class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title"><%= channelLabel %> releases</h2>
+        <% if (publicUrl) { %>
+          <a class="btn" href="<%= publicUrl %>" target="_blank" rel="noopener">View workers' page ↗</a>
+        <% } %>
+      </div>
+      <p class="muted">
+        <% if (channel === 'PRODUCTION') { %>
+          Drag a build into a box to make it the version workers and checkers download.
+          Nothing is published until you do.
+        <% } else { %>
+          Development builds are never shown on the workers' page. Promote one here to
+          mark it as the current test build, then share its link with testers.
+        <% } %>
+      </p>
+
+      <div class="slot-grid" id="slotGrid" data-channel="<%= channel %>" data-api="<%= adminPath %>/api">
+        <% boards.forEach(board => { %>
+          <div class="slot-box" data-platform="<%= board.platform %>" data-channel="<%= channel %>">
+            <div class="slot-head">
+              <span class="platform-badge platform-<%= board.platform.toLowerCase() %>"><%= board.platform === 'IOS' ? 'iOS' : 'Android' %></span>
+              <h3><%= board.label %></h3>
+            </div>
+
+            <div class="slot-target" data-platform="<%= board.platform %>">
+              <% if (board.live) { %>
+                <div class="slot-live">
+                  <div class="build-title"><%= board.live.appName %></div>
+                  <div class="muted small">
+                    Version <%= board.live.version %> (<%= board.live.buildNumber %>) · <%= board.live.sizeMb %> MB
+                    <% if (board.live.minOs) { %> · <%= board.live.minOs %><% } %>
+                  </div>
+                  <div class="muted small mono"><%= board.live.fileName %></div>
+                  <div class="muted small">
+                    Live since <%= board.promotedAt.toISOString().slice(0, 16).replace('T', ' ') %> UTC
+                    · <%= board.promotedByEmail %>
+                  </div>
+                  <div class="slot-actions">
+                    <a class="btn" href="<%= board.live.installUrl %>" target="_blank" rel="noopener">Open link</a>
+                    <button class="btn copy-btn" type="button" data-url="<%= board.live.installUrl %>">Copy link</button>
+                    <button class="btn danger clear-btn" type="button" data-channel="<%= channel %>" data-platform="<%= board.platform %>">Take offline</button>
+                  </div>
+                </div>
+              <% } else { %>
+                <div class="slot-empty">
+                  <strong>Nothing live</strong>
+                  <span class="muted small">Drag a <%= board.platform === 'IOS' ? 'iOS' : 'Android' %> build here</span>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+
+    <% boards.forEach(board => { %>
+      <section class="panel">
+        <h2 class="panel-title">
+          <%= board.label %> builds
+          <span class="muted small">(<%= board.candidates.length %>)</span>
+        </h2>
+
+        <% if (board.candidates.length === 0) { %>
+          <p class="muted">
+            No <%= channelLabel.toLowerCase() %> builds for this platform yet —
+            <a href="<%= adminPath %>/">upload one</a>.
+          </p>
+        <% } else { %>
+          <div class="candidate-list">
+            <% board.candidates.forEach(b => { %>
+              <div
+                class="candidate <%= board.live && board.live.id === b.id ? 'is-live' : '' %>"
+                draggable="true"
+                data-build-id="<%= b.id %>"
+                data-platform="<%= b.platform %>"
+                data-channel="<%= channel %>"
+                tabindex="0"
+                role="button"
+                aria-label="Promote <%= b.appName %> version <%= b.version %>"
+              >
+                <div class="candidate-main">
+                  <div class="build-title"><%= b.appName %> <span class="muted small">v<%= b.version %> (<%= b.buildNumber %>)</span></div>
+                  <div class="muted small mono"><%= b.fileName %></div>
+                  <div class="muted small">
+                    <%= b.sizeMb %> MB
+                    <% if (b.minOs) { %> · <%= b.minOs %><% } %>
+                    · uploaded <%= b.createdAt.toISOString().slice(0, 10) %>
+                  </div>
+                </div>
+                <div class="candidate-actions">
+                  <% if (board.live && board.live.id === b.id) { %>
+                    <span class="status status-ready">live</span>
+                  <% } else { %>
+                    <button class="btn promote-btn" type="button"
+                      data-build-id="<%= b.id %>" data-channel="<%= channel %>" data-platform="<%= b.platform %>">
+                      Make live
+                    </button>
+                  <% } %>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+    <% }) %>
+
+    <% if (channel === 'PRODUCTION') { %>
+      <section class="panel">
+        <a class="dev-box" href="<%= adminPath %>/development">
+          <div>
+            <div class="dev-box-title">Development builds</div>
+            <div class="muted small">Internal test builds — never shown on the workers' page.</div>
+          </div>
+          <span class="chevron">›</span>
+        </a>
+      </section>
+    <% } %>
+  </main>
+
+  <p class="toast" id="toast" hidden></p>
+  <script src="<%= assetBase %>/js/promotion.js"></script>
+</body>
+</html>
