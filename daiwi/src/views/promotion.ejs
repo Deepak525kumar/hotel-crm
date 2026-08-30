@@ -35,7 +35,7 @@
                 <div class="slot-live">
                   <div class="build-title"><%= board.live.appName %></div>
                   <div class="muted small">
-                    Version <%= board.live.version %> (<%= board.live.buildNumber %>) · <%= board.live.sizeMb %> MB
+                    Version <%= board.live.version %> (<%= board.live.buildNumber %>) · <%= board.live.sizeMb %>
                     <% if (board.live.minOs) { %> · <%= board.live.minOs %><% } %>
                   </div>
                   <div class="muted small mono"><%= board.live.fileName %></div>
@@ -90,7 +90,7 @@
                   <div class="build-title"><%= b.appName %> <span class="muted small">v<%= b.version %> (<%= b.buildNumber %>)</span></div>
                   <div class="muted small mono"><%= b.fileName %></div>
                   <div class="muted small">
-                    <%= b.sizeMb %> MB
+                    <%= b.sizeMb %>
                     <% if (b.minOs) { %> · <%= b.minOs %><% } %>
                     · uploaded <%= b.createdAt.toISOString().slice(0, 10) %>
                   </div>
@@ -111,18 +111,6 @@
         <% } %>
       </section>
     <% }) %>
-
-    <% if (channel === 'PRODUCTION') { %>
-      <section class="panel">
-        <a class="dev-box" href="<%= adminPath %>/development">
-          <div>
-            <div class="dev-box-title">Development builds</div>
-            <div class="muted small">Internal test builds — never shown on the workers' page.</div>
-          </div>
-          <span class="chevron">›</span>
-        </a>
-      </section>
-    <% } %>
   </main>
 
   <p class="toast" id="toast" hidden></p>

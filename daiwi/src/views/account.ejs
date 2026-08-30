@@ -8,6 +8,9 @@
     <section class="panel">
       <h2 class="panel-title">Your account</h2>
       <% if (notice) { %><p class="notice"><%= notice %></p><% } %>
+      <%# Shown here rather than beside one form: either form can fail, and an
+          error under the wrong heading reads as a different problem entirely. %>
+      <% if (error) { %><p class="error"><%= error %></p><% } %>
 
       <dl class="detail-list">
         <div class="detail-row">
@@ -43,9 +46,24 @@
     </section>
 
     <section class="panel">
-      <h2 class="panel-title">Change password</h2>
-      <% if (error) { %><p class="error"><%= error %></p><% } %>
+      <h2 class="panel-title">Change email address</h2>
+      <form method="post" action="<%= adminPath %>/account/email" class="stacked-form">
+        <label>New email address
+          <input type="email" name="newEmail" required autocomplete="email" />
+        </label>
+        <label>Current password
+          <input type="password" name="currentPassword" required autocomplete="current-password" />
+        </label>
+        <button class="btn primary" type="submit">Update email</button>
+        <p class="muted small">
+          This is the address you sign in with and the one password resets are sent to, so the
+          change needs your password. Your old address is notified afterwards.
+        </p>
+      </form>
+    </section>
 
+    <section class="panel">
+      <h2 class="panel-title">Change password</h2>
       <form method="post" action="<%= adminPath %>/account/password" class="stacked-form">
         <label>Current password
           <input type="password" name="currentPassword" required autocomplete="current-password" />

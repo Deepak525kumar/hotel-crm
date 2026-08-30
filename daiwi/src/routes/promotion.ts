@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/db.js";
+import { formatSize } from "../lib/format.js";
 import { config } from "../lib/config.js";
 import { requireAuth } from "../lib/auth.js";
 import { promotionLimiter } from "../lib/rateLimits.js";
@@ -29,7 +30,7 @@ function present(build: {
     fileName: build.fileName,
     version: build.version,
     buildNumber: build.buildNumber,
-    sizeMb: (Number(build.sizeBytes) / (1024 * 1024)).toFixed(1),
+    sizeMb: formatSize(build.sizeBytes),
     createdAt: build.createdAt,
     minOs: minOsLabel(build),
     hasIcon: !!build.iconKey,

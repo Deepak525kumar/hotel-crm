@@ -18,26 +18,98 @@ export const accountRouter = Router();
 
 // ── signed-in account page ────────────────────────────────────────────────────
 
-accountRouter.get("/account", requireAuth, async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.session!.userId },
-    select: { email: true, createdAt: true, lastLoginAt: true },
-  });
-  if (!user) return res.redirect(`${config.adminPath}/login`);
+interface AccountUser {
+  id: string;
+  email: string;
+  createdAt: Date;
+  lastLoginAt: Date | null;
+}
 
+/** Single renderer for the account page, so both forms show the same state. */
+async function renderAccount(
+  res: import("express").Response,
+  user: AccountUser,
+  opts: { error?: string | null; notice?: string | null; status?: number } = {}
+) {
   const [uploads, promotions] = await Promise.all([
-    prisma.build.count({ where: { userId: req.session!.userId } }),
-    prisma.promotionEvent.count({ where: { actorEmail: req.session!.email } }),
+    prisma.build.count({ where: { userId: user.id } }),
+    prisma.promotionEvent.count({ where: { actorEmail: user.email } }),
   ]);
 
-  res.render("account", {
+  res.status(opts.status ?? 200).render("account", {
     user,
     uploads,
     promotions,
     minLength: MIN_PASSWORD_LENGTH,
-    error: null,
-    notice: (req.query.changed === "1" ? "Password updated. Other sessions have been signed out." : null),
+    error: opts.error ?? null,
+    notice: opts.notice ?? null,
   });
+}
+
+const CHANGE_NOTICES: Record<string, string> = {
+  "1": "Password updated. Other sessions have been signed out.",
+  password: "Password updated. Other sessions have been signed out.",
+  email: "Email address updated. The previous address has been notified.",
+};
+
+accountRouter.get("/account", requireAuth, async (req, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.session!.userId } });
+  if (!user) return res.redirect(`${config.adminPath}/login`);
+
+  const changed = typeof req.query.changed === "string" ? req.query.changed : "";
+  await renderAccount(res, user, { notice: CHANGE_NOTICES[changed] ?? null });
+});
+
+/**
+ * Changes the sign-in address.
+ *
+ * Gated on the current password for the same reason as a password change: a
+ * borrowed, still-signed-in browser must not be enough to move the account to an
+ * attacker's address, which would otherwise hand them the password-reset route
+ * as well. The old address is notified afterwards, so a change nobody
+ * authorised is visible to the person who actually owns the account.
+ */
+accountRouter.post("/account/email", requireAuth, changePasswordLimiter, async (req, res) => {
+  const userId = req.session!.userId;
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return res.redirect(`${config.adminPath}/login`);
+
+  const currentPassword = String(req.body?.currentPassword ?? "");
+  const newEmail = String(req.body?.newEmail ?? "").trim().toLowerCase();
+
+  const fail = (error: string) => renderAccount(res, user, { error, status: 400 });
+
+  if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+    return fail("Current password is incorrect.");
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newEmail) || newEmail.length > 200) {
+    return fail("Enter a valid email address.");
+  }
+  if (newEmail === user.email) return fail("That is already your email address.");
+
+  const taken = await prisma.user.findUnique({ where: { email: newEmail } });
+  if (taken) return fail("Another account already uses that address.");
+
+  await prisma.user.update({ where: { id: userId }, data: { email: newEmail } });
+
+  // Best effort. A delivery failure must not roll back a change the operator
+  // successfully made, but it must be visible in the log.
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: "Your Version Control sign-in address was changed",
+      text: [
+        `The sign-in address for your Hotel CRM Version Control account was changed to ${newEmail}.`,
+        "",
+        "If you did not do this, contact whoever administers the portal immediately —",
+        "whoever made the change can now request password resets for this account.",
+      ].join("\n"),
+    });
+  } catch (err) {
+    console.error("account/email: could not notify the previous address", err);
+  }
+
+  res.redirect(`${config.adminPath}/account?changed=email`);
 });
 
 accountRouter.post("/account/password", requireAuth, changePasswordLimiter, async (req, res) => {
@@ -45,20 +117,7 @@ accountRouter.post("/account/password", requireAuth, changePasswordLimiter, asyn
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return res.redirect(`${config.adminPath}/login`);
 
-  const render = async (error: string) => {
-    const [uploads, promotions] = await Promise.all([
-      prisma.build.count({ where: { userId } }),
-      prisma.promotionEvent.count({ where: { actorEmail: user.email } }),
-    ]);
-    res.status(400).render("account", {
-      user: { email: user.email, createdAt: user.createdAt, lastLoginAt: user.lastLoginAt },
-      uploads,
-      promotions,
-      minLength: MIN_PASSWORD_LENGTH,
-      error,
-      notice: null,
-    });
-  };
+  const render = (error: string) => renderAccount(res, user, { error, status: 400 });
 
   const currentPassword = String(req.body?.currentPassword ?? "");
   const newPassword = String(req.body?.newPassword ?? "");
@@ -82,7 +141,7 @@ accountRouter.post("/account/password", requireAuth, changePasswordLimiter, asyn
   const updated = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   setSessionCookie(res, { userId, email: updated.email, v: updated.tokenVersion });
 
-  res.redirect(`${config.adminPath}/account?changed=1`);
+  res.redirect(`${config.adminPath}/account?changed=password`);
 });
 
 // ── forgotten password (public, on the login page) ────────────────────────────

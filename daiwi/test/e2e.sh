@@ -67,11 +67,8 @@ body=$(curl -s -b "$J" "$ADMIN/account")
 check "account shows the email" "$body" "$EMAIL"
 
 echo "== upload =="
-body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "file=@$IPA")
-check "upload without a channel is refused" "$body" "development or production"
-
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=NONSENSE" -F "file=@$IPA")
-check "unknown channel is refused" "$body" "development or production"
+check "an unknown channel override is refused" "$body" "Unknown channel"
 
 echo "not-a-zip" > "$SP/fake.ipa"
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "file=@$SP/fake.ipa")
@@ -80,13 +77,25 @@ check "non-zip payload is refused" "$body" "Not a valid zip"
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "file=@$SP/e2e.sh;filename=evil.txt")
 check "wrong extension is refused" "$body" "Only .ipa and .apk"
 
-PROD_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "notes=e2e" -F "file=@$IPA" \
+# No channel is sent: the fixture IPA carries no provisioning profile, so the
+# detector must file it as DEVELOPMENT rather than guessing production.
+AUTO_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "notes=e2e" -F "file=@$IPA" \
   | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
-[[ -n "$PROD_ID" ]] && ok "production upload accepted" || bad "production upload accepted" "empty id"
+
+# An explicit override still wins, and is recorded as a manual choice.
+PROD_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "file=@$IPA" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
 
 DEV_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=DEVELOPMENT" -F "file=@$IPA" \
   | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
-sleep 4
+sleep 5
+
+echo "== channel is detected from the binary =="
+auto=$(q "SELECT channel || '|' || \"channelSource\" || '|' || \"channelReason\" FROM \"Build\" WHERE id='$AUTO_ID';")
+check "unsigned IPA auto-filed as development" "$auto" "DEVELOPMENT|DETECTED"
+check "and says why" "$auto" "provisioning profile"
+manual=$(q "SELECT channel || '|' || \"channelSource\" FROM \"Build\" WHERE id='$PROD_ID';")
+check "an explicit override is kept and marked manual" "$manual" "PRODUCTION|MANUAL"
 
 body=$(curl -s -b "$J" "$ADMIN/api/builds")
 check "parsed the real binary" "$body" '"version":"1.4.2"'
@@ -96,7 +105,7 @@ check "original filename kept" "$body" '"fileName":"HotelCRMWorker.ipa"'
 
 echo "== history is written and permanent =="
 n=$(q "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"uploadedByEmail\"='$EMAIL';")
-check "history rows created" "$n" "2"
+check "history rows created" "$n" "3"
 
 echo "== promotion guards =="
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
@@ -155,6 +164,28 @@ body=$(curl -s "$BASE/install")
 n=$(echo "$body" | grep -c "$DEV_SLUG")
 [[ "$n" == "0" ]] && ok "dev build absent from the workers' page" || bad "dev build absent from the workers' page" "$n"
 
+echo "== install counts are aggregate only =="
+before=$(q "SELECT count(*) FROM \"InstallEvent\";")
+curl -s -o /dev/null "$BASE/install/$SLUG/download"
+after=$(q "SELECT count(*) FROM \"InstallEvent\";")
+[[ "$after" -gt "$before" ]] && ok "a download is counted" || bad "a download is counted" "$before -> $after"
+cols=$(q "SELECT string_agg(column_name, ',' ORDER BY column_name) FROM information_schema.columns WHERE table_name='InstallEvent';")
+if [[ "$cols" != *"ip"* && "$cols" != *"userAgent"* && "$cols" != *"user"* ]]; then
+  ok "no identifying column exists on InstallEvent"
+else
+  bad "no identifying column exists on InstallEvent" "$cols"
+fi
+
+echo "== an operator can correct the detector =="
+body=$(curl -s -b "$J" -X PATCH "$ADMIN/api/builds/$AUTO_ID" -H 'Content-Type: application/json' -d '{"channel":"PRODUCTION"}')
+check "channel can be changed" "$body" '"channel":"PRODUCTION"'
+check "the change is recorded as manual" "$(q "SELECT \"channelSource\" FROM \"Build\" WHERE id='$AUTO_ID';")" "MANUAL"
+body=$(curl -s -b "$J" -X PATCH "$ADMIN/api/builds/$PROD_ID" -H 'Content-Type: application/json' -d '{"channel":"BOGUS"}')
+check "an unknown channel is refused" "$body" "Unknown channel"
+# The live build cannot change channel out from under the public page.
+body=$(curl -s -b "$J" -X PATCH "$ADMIN/api/builds/$PROD_ID" -H 'Content-Type: application/json' -d '{"channel":"DEVELOPMENT"}')
+check "a live build cannot switch channel" "$body" "Take it offline"
+
 echo "== security headers =="
 h=$(curl -s -D- -o /dev/null "$BASE/install")
 check "CSP present" "$h" "default-src 'none'"
@@ -166,12 +197,24 @@ echo "== deletion keeps history, drops the binary =="
 curl -s -b "$J" -X DELETE "$ADMIN/api/builds/$PROD_ID" > /dev/null
 n=$(q "SELECT count(*) FROM \"ReleaseSlot\" WHERE channel='PRODUCTION';")
 check "slot cleared on delete" "$n" "0"
+# Counted against the original address: the email-change test runs later, and
+# history rows deliberately keep whoever uploaded them at the time.
 n=$(q "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"uploadedByEmail\"='$EMAIL';")
-check "history survives deletion" "$n" "2"
+check "history survives deletion" "$n" "3"
 n=$(q "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"binaryDeletedBy\"='$EMAIL';")
 check "deletion is stamped on the history row" "$n" "1"
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/install/$SLUG")
 check "deleted build's link 404s" "$code" "404"
+
+echo "== email address can be changed =="
+NEW_EMAIL="moved-$RANDOM@example.com"
+body=$(curl -s -b "$J" -X POST "$ADMIN/account/email" --data-urlencode "currentPassword=wrong" --data-urlencode "newEmail=$NEW_EMAIL")
+check "wrong password refused" "$body" "Current password is incorrect"
+code=$(curl -s -o /dev/null -w "%{http_code}" -b "$J" -X POST "$ADMIN/account/email" --data-urlencode "currentPassword=$PW" --data-urlencode "newEmail=$NEW_EMAIL")
+check "email change redirects" "$code" "302"
+check "the row really changed" "$(q "SELECT count(*) FROM \"User\" WHERE email='$NEW_EMAIL';")" "1"
+check "the account page shows the new address" "$(curl -s -b "$J" "$ADMIN/account")" "$NEW_EMAIL"
+EMAIL="$NEW_EMAIL"
 
 echo "== password change revokes other sessions =="
 J2="$SP/e2e-cookies2.txt"; rm -f "$J2"

@@ -5,28 +5,76 @@
   <%- include("partials/nav", { active: 'builds' }) %>
 
   <main class="container">
-    <section class="panel">
-      <h2 class="panel-title">Publish a new version</h2>
-      <div class="dropzone" id="dropzone" data-upload-url="<%= adminPath %>/api/builds/upload">
-        <p><strong>Drop an .ipa or .apk here</strong> or click to choose a file</p>
-        <input type="file" id="fileInput" accept=".ipa,.apk" hidden />
-        <div class="upload-row">
-          <input type="text" id="notesInput" placeholder="Release notes (optional)" maxlength="2000" />
-          <input type="text" id="minOsInput" placeholder="Min OS override (e.g. 16.0)" maxlength="32" />
+    <div class="dash-grid">
+      <section class="panel">
+        <h2 class="panel-title">Upload a build</h2>
+        <div class="dropzone" id="dropzone" data-upload-url="<%= adminPath %>/api/builds/upload">
+          <p><strong>Drop an .ipa or .apk here</strong> or click to choose a file</p>
+          <input type="file" id="fileInput" accept=".ipa,.apk" hidden />
+          <div class="upload-row">
+            <input type="text" id="notesInput" placeholder="Release notes (optional)" maxlength="2000" />
+            <input type="text" id="minOsInput" placeholder="Min OS override (e.g. 16.0)" maxlength="32" />
+          </div>
+          <p class="hint muted">
+            Development or production is detected from the build itself, and the minimum OS is read
+            from the binary. You can correct either afterwards.
+          </p>
+          <div class="progress" id="progressWrap" hidden>
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <p class="error" id="uploadError"></p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">Last 30 days</h2>
+        <div class="stat-row">
+          <div class="stat-tile">
+            <div class="stat-label">Uploads</div>
+            <div class="stat-value"><%= stats.uploads.total %></div>
+            <%- stats.uploads.chart %>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">Installations</div>
+            <div class="stat-value"><%= stats.installs.total %></div>
+            <%- stats.installs.chart %>
+          </div>
         </div>
         <p class="hint muted">
-          The minimum OS is read from the binary automatically. Fill the override only to advertise
-          something stricter than the build declares.
+          Counts only. No record is kept of who installed a build or from which device.
         </p>
-        <div class="progress" id="progressWrap" hidden>
-          <div class="progress-bar" id="progressBar"></div>
+      </section>
+    </div>
+
+    <% if (latest) { %>
+      <section class="panel">
+        <h2 class="panel-title">Latest build</h2>
+        <div class="ready-card">
+          <div class="ready-main">
+            <div class="ready-app">
+              <%= latest.appName %>
+              <span class="platform-badge platform-<%= latest.platform.toLowerCase() %>"><%= latest.platform === 'IOS' ? 'iOS' : 'Android' %></span>
+              <span class="channel-badge channel-<%= latest.channel.toLowerCase() %>"><%= latest.channelLabel %></span>
+            </div>
+            <div class="ready-code"><%= latest.slug %></div>
+            <div class="link-row">
+              <a class="mono link-text" href="<%= latest.installUrl %>" target="_blank" rel="noopener"><%= latest.installUrl %></a>
+              <button class="btn copy-btn" type="button" data-url="<%= latest.installUrl %>">Copy link</button>
+            </div>
+            <div class="muted small">
+              Version <%= latest.version %> (<%= latest.buildNumber %>) · <%= latest.sizeMb %><% if (latest.minOs) { %> · <%= latest.minOs %><% } %>
+            </div>
+            <div class="muted small">Send this link to anyone, or have them scan the code.</div>
+          </div>
+          <div class="ready-qr">
+            <img src="<%= adminPath %>/api/builds/<%= latest.id %>/qr" alt="QR code for the install link" width="180" height="180" />
+          </div>
         </div>
-        <p class="error" id="uploadError"></p>
-      </div>
-    </section>
+      </section>
+    <% } %>
 
     <section class="panel">
-      <h2 class="panel-title">Current releases</h2>
+      <h2 class="panel-title">All builds <span class="muted small">(<%= builds.length %>)</span></h2>
       <div class="builds" id="buildsList">
         <% builds.forEach(b => { %>
           <div class="build-card" data-id="<%= b.id %>" data-slug="<%= b.slug %>" data-status="<%= b.status %>">
@@ -44,11 +92,18 @@
                 <% if (b.isLive) { %><span class="status status-ready">live</span><% } %>
               </div>
               <div class="muted">
-                <%= b.version %> (<%= b.buildNumber %>) · <%= b.sizeMb %> MB
+                <%= b.version %> (<%= b.buildNumber %>) · <%= b.sizeMb %>
                 <% if (b.minOs) { %> · <%= b.minOs %><% } %>
                 · <span class="status status-<%= b.status.toLowerCase() %>"><%= b.status %></span>
               </div>
               <div class="muted small mono"><%= b.fileName %></div>
+
+              <% if (b.status === 'READY' && b.channelReason) { %>
+                <div class="muted small channel-why">
+                  <%= b.channelIsManual ? 'Set by hand' : 'Detected' %>: <%= b.channelReason %>
+                </div>
+              <% } %>
+
               <% if (b.notes) { %><div class="notes"><%= b.notes %></div><% } %>
               <% if (b.status === 'READY') { %>
                 <div class="link-row">
@@ -62,37 +117,28 @@
                 <a class="btn" href="<%= b.installUrl %>" target="_blank" rel="noopener">Open</a>
                 <button class="btn copy-btn" type="button" data-url="<%= b.installUrl %>">Copy link</button>
                 <button class="btn qr-btn" type="button" data-qr="<%= adminPath %>/api/builds/<%= b.id %>/qr">QR</button>
+                <% if (!b.isLive) { %>
+                  <button class="btn channel-btn" type="button"
+                    data-id="<%= b.id %>" data-channel="<%= b.otherChannel %>" data-label="<%= b.otherChannelLabel %>">
+                    Move to <%= b.otherChannelLabel %>
+                  </button>
+                <% } %>
               <% } %>
               <button class="btn danger delete-btn" type="button" data-id="<%= b.id %>">Delete</button>
             </div>
           </div>
         <% }) %>
-        <% if (builds.length === 0) { %><p class="muted">No releases yet — upload one above.</p><% } %>
+        <% if (builds.length === 0) { %><p class="muted">No builds yet — upload one above.</p><% } %>
       </div>
     </section>
   </main>
-
-  <dialog id="channelDialog" class="qr-dialog channel-dialog">
-    <form method="dialog">
-      <h3>Is this a development or production build?</h3>
-      <p class="muted small" id="channelFileName"></p>
-      <div class="channel-choices">
-        <% channels.forEach(c => { %>
-          <button class="btn channel-choice" type="submit" value="<%= c.value %>"><%= c.label %></button>
-        <% }) %>
-      </div>
-      <p class="muted small">
-        Production builds can be promoted to the workers' install page. Development builds never appear there.
-      </p>
-      <button class="link-btn" type="submit" value="cancel">Cancel</button>
-    </form>
-  </dialog>
 
   <dialog id="qrDialog" class="qr-dialog">
     <img id="qrImage" alt="QR code for the install link" width="280" height="280" />
     <button class="btn" type="button" id="qrClose">Close</button>
   </dialog>
 
+  <p class="toast" id="toast" hidden></p>
   <script src="<%= assetBase %>/js/dashboard.js"></script>
 </body>
 </html>

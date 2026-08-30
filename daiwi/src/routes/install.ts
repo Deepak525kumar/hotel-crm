@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction, type RequestHan
 import QRCode from "qrcode";
 import { pipeline } from "node:stream/promises";
 import { prisma } from "../lib/db.js";
+import { formatSize } from "../lib/format.js";
 import { config } from "../lib/config.js";
 import { baseUrl, installPageUrl } from "../lib/env.js";
 import {
@@ -48,7 +49,7 @@ function presentBuild(build: Awaited<ReturnType<typeof loadActiveBuild>> & objec
   return {
     ...build,
     minOs: minOsLabel(build),
-    sizeMb: (Number(build.sizeBytes) / (1024 * 1024)).toFixed(1),
+    sizeMb: formatSize(build.sizeBytes),
     pageUrl: installPageUrl(base, build.slug),
   };
 }
@@ -173,6 +174,13 @@ installRouter.get("/:slug/download", downloadLimiter, asyncRoute(async (req, res
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.setHeader("Content-Length", String(size));
   res.setHeader("X-Content-Type-Options", "nosniff");
+
+  // Counted before the bytes move, and deliberately anonymous: build, platform,
+  // channel and a timestamp, nothing that identifies the person or the device.
+  // The dashboard answers "how many installs this month", never "who".
+  await prisma.installEvent.create({
+    data: { buildId: build.id, platform: build.platform, channel: build.channel },
+  });
 
   const body = await storage.getStream(build.storageKey);
   // pipeline() destroys the S3 stream if the client disconnects mid-download,

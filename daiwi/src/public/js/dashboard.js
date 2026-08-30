@@ -12,8 +12,16 @@ const minOsInput = document.getElementById("minOsInput");
 const progressWrap = document.getElementById("progressWrap");
 const progressBar = document.getElementById("progressBar");
 const uploadError = document.getElementById("uploadError");
-const channelDialog = document.getElementById("channelDialog");
-const channelFileName = document.getElementById("channelFileName");
+const toast = document.getElementById("toast");
+
+let toastTimer;
+function showToast(message, isError) {
+  toast.textContent = message;
+  toast.classList.toggle("toast-error", !!isError);
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (toast.hidden = true), 3200);
+}
 
 const uploadUrl = dropzone.dataset.uploadUrl;
 const buildsApi = uploadUrl.replace(/\/upload$/, "");
@@ -32,21 +40,21 @@ dropzone.addEventListener("click", (e) => {
 
 dropzone.addEventListener("drop", (e) => {
   const file = e.dataTransfer.files[0];
-  if (file) chooseChannelThenUpload(file);
+  if (file) uploadFile(file);
 });
 
 fileInput.addEventListener("change", () => {
-  if (fileInput.files[0]) chooseChannelThenUpload(fileInput.files[0]);
+  if (fileInput.files[0]) uploadFile(fileInput.files[0]);
   // Cleared so picking the same file twice in a row still fires `change`.
   fileInput.value = "";
 });
 
 /**
- * Every upload is filed under a channel, and the operator is asked before a
- * single byte is sent. There is deliberately no default: a test build silently
- * landing in production is exactly the mistake this dialog exists to prevent.
+ * No channel is asked for. It is read off the binary while the build parses
+ * (see src/lib/detectChannel.ts) and can be corrected afterwards from the build
+ * card, which keeps the common case to a single drag.
  */
-function chooseChannelThenUpload(file) {
+function uploadFile(file) {
   uploadError.textContent = "";
 
   if (!/\.(ipa|apk)$/i.test(file.name)) {
@@ -54,30 +62,12 @@ function chooseChannelThenUpload(file) {
     return;
   }
 
-  channelFileName.textContent = file.name;
-  channelDialog.showModal();
-
-  channelDialog.addEventListener(
-    "close",
-    () => {
-      const choice = channelDialog.returnValue;
-      if (!choice || choice === "cancel") return;
-      uploadFile(file, choice);
-    },
-    { once: true }
-  );
-}
-
-function uploadFile(file, channel) {
-  uploadError.textContent = "";
-
   const form = new FormData();
   // Fields before the file: the server reads notes/minOsOverride as they
   // arrive, and a field appended after a multi-hundred-megabyte file part
   // would not be parsed until the upload had already finished.
   form.append("notes", notesInput.value);
   form.append("minOsOverride", minOsInput.value);
-  form.append("channel", channel);
   form.append("file", file);
 
   const xhr = new XMLHttpRequest();
@@ -132,12 +122,27 @@ document.querySelectorAll(".qr-btn").forEach((btn) =>
 );
 document.getElementById("qrClose")?.addEventListener("click", () => qrDialog.close());
 
+// Corrects the detector. Recorded as a manual choice, so a re-parse cannot undo it.
+document.querySelectorAll(".channel-btn").forEach((btn) =>
+  btn.addEventListener("click", async () => {
+    const res = await fetch(`${buildsApi}/${btn.dataset.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: btn.dataset.channel }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return showToast(body.error || "Could not change the channel.", true);
+    showToast(`Moved to ${btn.dataset.label}.`);
+    window.location.reload();
+  })
+);
+
 document.querySelectorAll(".delete-btn").forEach((btn) =>
   btn.addEventListener("click", async () => {
     if (!confirm("Delete this release? The binary is removed and the link stops working. The history record is kept.")) return;
     const res = await fetch(`${buildsApi}/${btn.dataset.id}`, { method: "DELETE" });
-    if (res.ok) btn.closest(".build-card").remove();
-    else alert("Delete failed.");
+    if (res.ok) window.location.reload();
+    else showToast("Delete failed.", true);
   })
 );
 

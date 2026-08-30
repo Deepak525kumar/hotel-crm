@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Build" ADD COLUMN     "channelReason" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "channelSource" TEXT NOT NULL DEFAULT 'DETECTED',
+ALTER COLUMN "channel" SET DEFAULT 'DEVELOPMENT';

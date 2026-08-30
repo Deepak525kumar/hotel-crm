@@ -5,6 +5,7 @@ import { storage, newKey } from "./storage.js";
 import { parseIpa } from "./ipa.js";
 import { parseApk } from "./apk.js";
 import { APK_CONTENT_TYPE } from "./manifest.js";
+import { detectIosChannel, detectAndroidChannel, type ChannelDecision } from "./detectChannel.js";
 
 const IPA_CONTENT_TYPE = "application/octet-stream";
 
@@ -29,6 +30,8 @@ interface ParsedFields {
   profileExpiry: Date | null;
   provisionsAll: boolean | null;
   provisionedUdids: string[];
+  /** Development or production, worked out from the binary — see detectChannel.ts. */
+  channel: ChannelDecision;
 }
 
 async function parse(platform: string, filePath: string): Promise<ParsedFields> {
@@ -63,6 +66,12 @@ async function parse(platform: string, filePath: string): Promise<ParsedFields> 
       profileExpiry: info.profile?.expirationDate ?? null,
       provisionsAll: info.profile?.provisionsAllDevices ?? null,
       provisionedUdids: info.profile?.provisionedDevices ?? [],
+      channel: detectIosChannel({
+        hasProfile: !!info.profile,
+        profileType: info.profile?.type,
+        getTaskAllow: info.profile?.getTaskAllow,
+        apsEnvironment: info.profile?.apsEnvironment,
+      }),
     };
   }
 
@@ -74,10 +83,24 @@ async function parse(platform: string, filePath: string): Promise<ParsedFields> 
     buildNumber: info.versionCode,
     minOsVersion: info.minSdkVersion,
     icon: info.icon,
-    metadata: { targetSdkVersion: info.targetSdkVersion, warnings: info.warnings },
+    metadata: {
+      targetSdkVersion: info.targetSdkVersion,
+      debuggable: info.debuggable,
+      hasDevClient: info.hasDevClient,
+      debugSigned: info.debugSigned,
+      warnings: info.warnings,
+    },
     profileExpiry: null,
     provisionsAll: null,
     provisionedUdids: [],
+    channel: detectAndroidChannel({
+      manifestRead: true,
+      debuggable: info.debuggable,
+      debugSigned: info.debugSigned,
+      hasDevClient: info.hasDevClient,
+      packageName: info.packageName,
+      versionName: info.versionName,
+    }),
   };
 }
 
@@ -117,9 +140,17 @@ export async function parseBuildAsync(buildId: string, tmpPath: string): Promise
       await storage.putBuffer(iconKey, info.icon, "image/png");
     }
 
+    // An operator who picked the channel by hand outranks the detector: their
+    // choice must survive a re-parse, so only DETECTED builds are reassigned.
+    const channelFields =
+      build.channelSource === "MANUAL"
+        ? {}
+        : { channel: info.channel.channel, channelReason: info.channel.reason };
+
     const updated = await prisma.build.update({
       where: { id: buildId },
       data: {
+        ...channelFields,
         appName: info.appName,
         bundleId: info.bundleId,
         version: info.version,
