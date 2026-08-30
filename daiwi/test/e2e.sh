@@ -8,7 +8,44 @@ BASE="http://127.0.0.1:3002"
 ADMIN="$BASE/version-control"
 SP="$(dirname "$0")"
 IPA="$SP/HotelCRMWorker.ipa"
-PSQL="docker exec hotel-crm-postgres-1 psql -U hotelcrm -d version_control_dev -tAc"
+# Talks to whichever database the service under test is using: DATABASE_URL in
+# CI, the repo's docker-compose Postgres on a laptop.
+if [[ -n "${DATABASE_URL:-}" ]] && command -v psql > /dev/null; then
+  # `?schema=` is Prisma's, not libpq's — psql rejects the whole URI with
+  # "invalid URI query parameter". Translate it into the equivalent search_path
+  # option and drop Prisma's other pool-tuning parameters, which psql also
+  # does not recognise.
+  PSQL_URL=$(python3 - "$DATABASE_URL" <<'PYEOF'
+import sys
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+
+url = urlsplit(sys.argv[1])
+params = dict(parse_qsl(url.query))
+schema = params.pop("schema", None)
+for prisma_only in ("connection_limit", "pool_timeout", "pgbouncer", "socket_timeout"):
+    params.pop(prisma_only, None)
+if schema:
+    params["options"] = f"-csearch_path={schema}"
+print(urlunsplit((url.scheme, url.netloc, url.path, urlencode(params), "")))
+PYEOF
+)
+  q() { psql "$PSQL_URL" -tAc "$1"; }
+else
+  q() { docker exec hotel-crm-postgres-1 psql -U hotelcrm -d version_control_dev -tAc "$1"; }
+fi
+
+# A silent failure here would make every row count come back empty and be
+# reported as a product bug, which is exactly what happened while writing this.
+if [[ "$(q 'SELECT 1;' 2>&1 | tr -d ' ')" != "1" ]]; then
+  echo "FATAL: cannot query the database" >&2
+  q 'SELECT 1;' >&2 || true
+  exit 1
+fi
+
+# Promotion slots are global state, so a previous run's live build would make
+# the "nothing published yet" assertion fail. Cleared up front rather than
+# depending on a freshly created database.
+q 'DELETE FROM "ReleaseSlot";' > /dev/null
 
 pass=0; fail=0
 ok()   { echo "  PASS  $1"; pass=$((pass+1)); }
@@ -58,7 +95,7 @@ check "min OS auto-detected" "$body" '"minOs":"iOS 16.0+"'
 check "original filename kept" "$body" '"fileName":"HotelCRMWorker.ipa"'
 
 echo "== history is written and permanent =="
-n=$($PSQL "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"uploadedByEmail\"='$EMAIL';")
+n=$(q "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"uploadedByEmail\"='$EMAIL';")
 check "history rows created" "$n" "2"
 
 echo "== promotion guards =="
@@ -94,7 +131,7 @@ body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: applicatio
   -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"PRODUCTION\",\"platform\":\"IOS\"}")
 check "re-promoting the same build is a no-op" "$body" '"unchanged":true'
 
-SLUG=$($PSQL "SELECT b.slug FROM \"ReleaseSlot\" s JOIN \"Build\" b ON b.id=s.\"buildId\" WHERE s.channel='PRODUCTION' AND s.platform='IOS';" | tr -d ' ')
+SLUG=$(q "SELECT b.slug FROM \"ReleaseSlot\" s JOIN \"Build\" b ON b.id=s.\"buildId\" WHERE s.channel='PRODUCTION' AND s.platform='IOS';" | tr -d ' ')
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/install/$SLUG")
 check "per-build page is public" "$code" "200"
 
@@ -110,7 +147,7 @@ body=$(curl -s "$BASE/install/$SLUG/manifest.plist")
 check "manifest refuses a non-https origin" "$body" "requires an HTTPS origin"
 
 echo "== dev channel never leaks into the public page =="
-DEV_SLUG=$($PSQL "SELECT slug FROM \"Build\" WHERE id='$DEV_ID';" | tr -d ' ')
+DEV_SLUG=$(q "SELECT slug FROM \"Build\" WHERE id='$DEV_ID';" | tr -d ' ')
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
   -d "{\"buildId\":\"$DEV_ID\",\"channel\":\"DEVELOPMENT\",\"platform\":\"IOS\"}")
 check "dev build promotes on the dev board" "$body" '"ok":true'
@@ -127,11 +164,11 @@ check "frame denied" "$h" "DENY"
 
 echo "== deletion keeps history, drops the binary =="
 curl -s -b "$J" -X DELETE "$ADMIN/api/builds/$PROD_ID" > /dev/null
-n=$($PSQL "SELECT count(*) FROM \"ReleaseSlot\" WHERE channel='PRODUCTION';")
+n=$(q "SELECT count(*) FROM \"ReleaseSlot\" WHERE channel='PRODUCTION';")
 check "slot cleared on delete" "$n" "0"
-n=$($PSQL "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"uploadedByEmail\"='$EMAIL';")
+n=$(q "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"uploadedByEmail\"='$EMAIL';")
 check "history survives deletion" "$n" "2"
-n=$($PSQL "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"binaryDeletedBy\"='$EMAIL';")
+n=$(q "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"binaryDeletedBy\"='$EMAIL';")
 check "deletion is stamped on the history row" "$n" "1"
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/install/$SLUG")
 check "deleted build's link 404s" "$code" "404"

@@ -23,13 +23,25 @@ function platformForFilename(filename: string): "IOS" | "ANDROID" | null {
   return null;
 }
 
-/** Display value for min OS: the operator's override wins over what the binary declared. */
+/**
+ * Display value for min OS: the operator's override wins over what the binary
+ * declared.
+ *
+ * The override is shown verbatim, and only the auto-detected value is
+ * translated. An Android binary declares an API level (minSdkVersion 28), but
+ * an operator typing in the override box means a version ("9", or "14") — and
+ * those two number ranges overlap, so guessing which was meant would render
+ * "Android 14" as "Android 10". Taking the human's word for it removes the
+ * ambiguity entirely.
+ */
 export function minOsLabel(build: { platform: string; minOsVersion: string | null; minOsOverride: string | null }): string | null {
-  const value = build.minOsOverride || build.minOsVersion;
-  if (!value) return null;
-  if (build.platform === "IOS") return `iOS ${value}+`;
-  // Android binaries declare an API level (minSdkVersion), not a version number.
-  return `Android ${androidVersionForApiLevel(value)}+`;
+  const prefix = build.platform === "IOS" ? "iOS" : "Android";
+
+  if (build.minOsOverride) return `${prefix} ${build.minOsOverride}+`;
+  if (!build.minOsVersion) return null;
+  if (build.platform === "IOS") return `iOS ${build.minOsVersion}+`;
+
+  return `Android ${androidVersionForApiLevel(build.minOsVersion)}+`;
 }
 
 const ANDROID_API_LEVELS: Record<string, string> = {
@@ -39,13 +51,13 @@ const ANDROID_API_LEVELS: Record<string, string> = {
 };
 
 /**
- * An override is typed by a human as a version ("9"), while the parser reports
- * an API level ("28"). Anything <= 40 is treated as an API level, since no real
- * Android *version* number reaches that and no API level below 21 is supported.
+ * Turns the minSdkVersion an APK declares into the version number a worker
+ * would recognise from their phone's settings screen. Only ever applied to the
+ * parsed value, never to an operator's override — see minOsLabel.
  */
 export function androidVersionForApiLevel(value: string): string {
   const n = Number(value);
-  if (!Number.isFinite(n) || n > 40) return value;
+  if (!Number.isInteger(n)) return value;
   return ANDROID_API_LEVELS[String(n)] ?? `API ${n}`;
 }
 

@@ -1,0 +1,140 @@
+name: Version Control (app distribution)
+
+# Scoped to this subproject on purpose. `daiwi/` is an independent service with
+# its own package.json, its own database schema and its own deploy path, so a
+# change to the CRM backend or frontend has nothing to prove here — and a run
+# that cannot fail teaches nobody anything. The `paths` filter below is what
+# keeps this off every unrelated push.
+#
+# The converse also holds: because this workflow is separate from `CI`, it does
+# NOT trigger `Deploy to EC2` (which keys off a successful `CI` run). Deploying
+# this service is a deliberate act — see daiwi/scripts/deploy.sh.
+on:
+  push:
+    branches:
+      - 'feat/**'
+      - 'feature/**'
+      - 'fix/**'
+      - 'docs/**'
+      - 'chore/**'
+      - 'refactor/**'
+      - 'ci/**'
+      - 'claude/**'
+      - develop
+      - main
+    paths:
+      - 'daiwi/**'
+      - '.github/workflows/version-control.yml'
+  pull_request:
+    paths:
+      - 'daiwi/**'
+      - '.github/workflows/version-control.yml'
+
+defaults:
+  run:
+    working-directory: daiwi
+
+concurrency:
+  group: version-control-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: daiwi/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate Prisma client
+        # The client is generated code that the typecheck depends on; without
+        # this, tsc fails on every model reference.
+        run: npx prisma generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Shell scripts parse
+        # Catches an unbalanced quote or heredoc in the deploy path before it is
+        # discovered at 2am on the production host.
+        run: for f in scripts/*.sh test/*.sh; do bash -n "$f"; done
+
+  e2e:
+    name: End-to-end against a real database
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: vc
+          POSTGRES_PASSWORD: vc
+          POSTGRES_DB: version_control_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://vc:vc@localhost:5432/version_control_test?schema=public
+      SESSION_SECRET: ci-session-secret-not-used-anywhere-else
+      PORT: 3002
+      ADMIN_PATH: /version-control
+      INSTALL_PATH: /install
+      STORAGE_DRIVER: local
+      STORAGE_ROOT: ./storage
+      ALLOW_REGISTRATION: '1'
+      NODE_ENV: development
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: daiwi/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Migrate
+        run: npx prisma migrate deploy
+
+      - name: Build
+        run: npm run build
+
+      - name: Start the service
+        run: |
+          node dist/server.js > /tmp/vc.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS --max-time 2 http://127.0.0.1:3002/healthz > /dev/null && exit 0
+            sleep 1
+          done
+          echo "service did not start"; cat /tmp/vc.log; exit 1
+
+      - name: Run the end-to-end suite
+        # Drives the real HTTP surface and reads the real rows: upload, parse,
+        # promote, publish, download, delete, password reset. The suite talks to
+        # Postgres through psql, so the client has to be present.
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          ./test/e2e.sh
+
+      - name: Service log on failure
+        if: failure()
+        run: cat /tmp/vc.log
