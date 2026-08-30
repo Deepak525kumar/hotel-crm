@@ -123,10 +123,19 @@ DATABASE_URL="$DATABASE_URL"
 SESSION_SECRET="$SESSION_SECRET"
 
 STORAGE_DRIVER=s3
-S3_BUCKET=${S3_BUCKET:-hotelcrm-uploads}
-S3_PREFIX=${S3_PREFIX:-app-builds}
-AWS_REGION=${AWS_REGION:-eu-central-1}
+S3_BUCKET="${S3_BUCKET:-hotelcrm-uploads}"
+S3_PREFIX="${S3_PREFIX:-app-builds}"
+AWS_REGION="${AWS_REGION:-eu-central-1}"
 STORAGE_ROOT=/var/lib/hotel-crm-version-control
+
+# Credentials for the scoped IAM user, and the transport for password-reset
+# email. Carried through from .env.production.local; blank if not set there, in
+# which case the SDK falls back to the instance role (which has broader access
+# than this service should hold — see README).
+AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}"
+AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
+RESEND_API_KEY="${RESEND_API_KEY:-}"
+EMAIL_FROM_ADDRESS="${EMAIL_FROM_ADDRESS:-}"
 
 # Closed: operators are created with \`npm run user:create\`.
 ALLOW_REGISTRATION=0
