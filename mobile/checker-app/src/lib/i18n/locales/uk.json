@@ -1102,7 +1102,9 @@
     "reworkRoundOpenShort": "Раунд {{number}} триває",
     "checkerNotesTitle": "Нотатки перевіряючого",
     "originalCheckTitle": "Що виявив перевіряючий",
-    "roomLabelShort": "Номер"
+    "roomLabelShort": "Номер",
+    "yourEvidenceTitle": "Що ви надіслали ({{count}})",
+    "canAddMoreEvidence": "За потреби можна додати ще фото."
   },
   "ratings": {
     "comment": "Коментар",

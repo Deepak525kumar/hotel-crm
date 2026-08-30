@@ -1103,7 +1103,9 @@
     "reworkRoundOpenShort": "الجولة {{number}} قيد التنفيذ",
     "checkerNotesTitle": "ملاحظات المفتش",
     "originalCheckTitle": "ما وجده المفتش",
-    "roomLabelShort": "الغرفة"
+    "roomLabelShort": "الغرفة",
+    "yourEvidenceTitle": "ما أرسلته ({{count}})",
+    "canAddMoreEvidence": "يمكنك إضافة المزيد من الصور عند الحاجة."
   },
   "ratings": {
     "comment": "تعليق",

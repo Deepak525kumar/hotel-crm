@@ -1102,7 +1102,9 @@
     "reworkRoundOpenShort": "Round {{number}} in progress",
     "checkerNotesTitle": "Checker's notes",
     "originalCheckTitle": "What the checker found",
-    "roomLabelShort": "Room"
+    "roomLabelShort": "Room",
+    "yourEvidenceTitle": "What you sent ({{count}})",
+    "canAddMoreEvidence": "You can add more photos if you need to."
   },
   "ratings": {
     "comment": "Comment",
