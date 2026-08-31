@@ -4,7 +4,16 @@
 <body class="auth-page">
   <div class="auth-card">
     <h1>Not found</h1>
-    <p class="muted">This link has expired, been deleted, or never existed.</p>
+    <%# Deliberately does NOT say "expired". Install links never expire — there
+        is no TTL, no retention job and no lifecycle rule anywhere in this
+        service, so a link that stops working was deleted, never timed out.
+        The old copy ("This link has expired, been deleted, or never existed")
+        made a deletion read as an expiry and sent someone looking for an
+        expiry setting that does not exist. %>
+    <p class="muted">
+      This build has been deleted, or this link was never valid.
+      Install links do not expire on their own.
+    </p>
   </div>
 </body>
 </html>
