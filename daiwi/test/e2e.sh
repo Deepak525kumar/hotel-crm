@@ -8,6 +8,8 @@ BASE="http://127.0.0.1:3002"
 ADMIN="$BASE/version-control"
 SP="$(dirname "$0")"
 IPA="$SP/HotelCRMWorker.ipa"
+IPA_CHECKER="$SP/HotelCRMChecker.ipa"
+IPA_UNKNOWN="$SP/HotelCRMUnknown.ipa"
 # Talks to whichever database the service under test is using: DATABASE_URL in
 # CI, the repo's docker-compose Postgres on a laptop.
 if [[ -n "${DATABASE_URL:-}" ]] && command -v psql > /dev/null; then
@@ -66,27 +68,85 @@ check "dashboard rejects anonymous" "$code" "302"
 body=$(curl -s -b "$J" "$ADMIN/account")
 check "account shows the email" "$body" "$EMAIL"
 
-echo "== upload =="
-body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "file=@$IPA")
-check "upload without a channel is refused" "$body" "development or production"
+echo "== upload sections =="
+body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=NONSENSE" -F "app=WORKER" -F "file=@$IPA")
+check "an unknown channel override is refused" "$body" "Unknown channel"
 
-body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=NONSENSE" -F "file=@$IPA")
-check "unknown channel is refused" "$body" "development or production"
+body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "file=@$IPA")
+check "upload with no app section is refused" "$body" "Choose the Worker app or Checker app section"
+
+body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "app=BOGUS" -F "file=@$IPA")
+check "an unknown app section is refused" "$body" "Choose the Worker app or Checker app section"
 
 echo "not-a-zip" > "$SP/fake.ipa"
-body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "file=@$SP/fake.ipa")
+body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "app=WORKER" -F "file=@$SP/fake.ipa")
 check "non-zip payload is refused" "$body" "Not a valid zip"
+rm -f "$SP/fake.ipa"
 
-body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "file=@$SP/e2e.sh;filename=evil.txt")
+body=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "app=WORKER" -F "file=@$SP/e2e.sh;filename=evil.txt")
 check "wrong extension is refused" "$body" "Only .ipa and .apk"
 
-PROD_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "notes=e2e" -F "file=@$IPA" \
+# No channel is sent: the fixture IPA carries no provisioning profile, so the
+# detector must file it as DEVELOPMENT rather than guessing production.
+AUTO_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "app=WORKER" -F "notes=e2e" -F "file=@$IPA" \
   | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
-[[ -n "$PROD_ID" ]] && ok "production upload accepted" || bad "production upload accepted" "empty id"
 
-DEV_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=DEVELOPMENT" -F "file=@$IPA" \
+# An explicit channel override still wins, and is recorded as a manual choice.
+PROD_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "app=WORKER" -F "file=@$IPA" \
   | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
-sleep 4
+
+DEV_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=DEVELOPMENT" -F "app=WORKER" -F "file=@$IPA" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
+
+# A checker build, correctly filed under the Checker section.
+CHECKER_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "channel=PRODUCTION" -F "app=CHECKER" -F "file=@$IPA_CHECKER" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
+
+# The checker binary, dropped into the Worker section — a confirmed mismatch.
+MISMATCH_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "app=WORKER" -F "file=@$IPA_CHECKER" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
+
+# And the reverse: the worker binary dropped into the Checker section.
+MISMATCH2_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "app=CHECKER" -F "file=@$IPA" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
+
+# A bundle id that matches neither app: kept where the operator put it, with a warning.
+UNKNOWN_ID=$(curl -s -b "$J" -X POST "$ADMIN/api/builds/upload" -F "app=WORKER" -F "file=@$IPA_UNKNOWN" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
+
+sleep 6
+
+echo "== app identity is confirmed from the bundle id, not the upload section alone =="
+worker_app=$(q "SELECT app || '|' || \"appReason\" FROM \"Build\" WHERE id='$PROD_ID';")
+check "a build whose bundle id matches its section is confirmed" "$worker_app" "WORKER|Confirmed by bundle id"
+
+checker_app=$(q "SELECT app || '|' || \"appReason\" FROM \"Build\" WHERE id='$CHECKER_ID';")
+check "the checker build is filed under CHECKER" "$checker_app" "CHECKER|Confirmed by bundle id"
+
+mismatch_status=$(q "SELECT status FROM \"Build\" WHERE id='$MISMATCH_ID';")
+check "a checker binary uploaded to the Worker section fails outright" "$mismatch_status" "FAILED"
+mismatch_error=$(q "SELECT \"metadataJson\" FROM \"Build\" WHERE id='$MISMATCH_ID';")
+check "the failure names the actual app" "$mismatch_error" "Checker app"
+check "the failure names where it should have gone" "$mismatch_error" "Worker app section"
+n=$(q "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"buildId\"='$MISMATCH_ID';")
+check "no history row is written for a rejected upload" "$n" "0"
+
+mismatch2_status=$(q "SELECT status FROM \"Build\" WHERE id='$MISMATCH2_ID';")
+check "a worker binary uploaded to the Checker section fails outright" "$mismatch2_status" "FAILED"
+mismatch2_error=$(q "SELECT \"metadataJson\" FROM \"Build\" WHERE id='$MISMATCH2_ID';")
+check "and names the actual app the other way round" "$mismatch2_error" "Worker app"
+
+unknown_app=$(q "SELECT app || '|' || status || '|' || \"appReason\" FROM \"Build\" WHERE id='$UNKNOWN_ID';")
+check "an unrecognised bundle id is kept under the chosen section" "$unknown_app" "WORKER|READY"
+check "and the reason says it is unrecognised" "$unknown_app" "not recognised"
+check "and a warning is surfaced in the metadata" "$(q "SELECT \"metadataJson\" FROM \"Build\" WHERE id='$UNKNOWN_ID';")" "does not match a known app"
+
+echo "== channel is detected from the binary =="
+auto=$(q "SELECT channel || '|' || \"channelSource\" || '|' || \"channelReason\" FROM \"Build\" WHERE id='$AUTO_ID';")
+check "unsigned IPA auto-filed as development" "$auto" "DEVELOPMENT|DETECTED"
+check "and says why" "$auto" "provisioning profile"
+manual=$(q "SELECT channel || '|' || \"channelSource\" FROM \"Build\" WHERE id='$PROD_ID';")
+check "an explicit override is kept and marked manual" "$manual" "PRODUCTION|MANUAL"
 
 body=$(curl -s -b "$J" "$ADMIN/api/builds")
 check "parsed the real binary" "$body" '"version":"1.4.2"'
@@ -95,43 +155,54 @@ check "min OS auto-detected" "$body" '"minOs":"iOS 16.0+"'
 check "original filename kept" "$body" '"fileName":"HotelCRMWorker.ipa"'
 
 echo "== history is written and permanent =="
+# Five uploads reach READY and get a history row: AUTO_ID, PROD_ID, DEV_ID,
+# CHECKER_ID, UNKNOWN_ID. The two mismatched uploads never do.
 n=$(q "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"uploadedByEmail\"='$EMAIL';")
-check "history rows created" "$n" "2"
+check "history rows created" "$n" "5"
 
 echo "== promotion guards =="
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
-  -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"PRODUCTION\",\"platform\":\"ANDROID\"}")
+  -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"PRODUCTION\",\"app\":\"WORKER\",\"platform\":\"ANDROID\"}")
 check "iOS build refused by the Android box" "$body" "cannot go in the Android box"
 
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
-  -d "{\"buildId\":\"$DEV_ID\",\"channel\":\"PRODUCTION\",\"platform\":\"IOS\"}")
+  -d "{\"buildId\":\"$DEV_ID\",\"channel\":\"PRODUCTION\",\"app\":\"WORKER\",\"platform\":\"IOS\"}")
 check "dev build refused by production" "$body" "cannot be promoted here"
 
 body=$(curl -s -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
-  -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"PRODUCTION\",\"platform\":\"IOS\"}")
+  -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"PRODUCTION\",\"app\":\"WORKER\",\"platform\":\"IOS\"}")
 check "anonymous promote refused" "$body" "Session expired"
 
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
-  -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"BOGUS\",\"platform\":\"IOS\"}")
+  -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"BOGUS\",\"app\":\"WORKER\",\"platform\":\"IOS\"}")
 check "unknown channel refused" "$body" "Unknown channel"
+
+body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
+  -d "{\"buildId\":\"$CHECKER_ID\",\"channel\":\"PRODUCTION\",\"app\":\"WORKER\",\"platform\":\"IOS\"}")
+check "a checker build is refused by the Worker app section" "$body" "cannot go in the Worker app section"
 
 echo "== publishing =="
 body=$(curl -s "$BASE/install")
 check "nothing published before promotion" "$body" "No release published yet"
 
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
-  -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"PRODUCTION\",\"platform\":\"IOS\"}")
+  -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"PRODUCTION\",\"app\":\"WORKER\",\"platform\":\"IOS\"}")
 check "valid promote succeeds" "$body" '"ok":true'
 
+body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
+  -d "{\"buildId\":\"$CHECKER_ID\",\"channel\":\"PRODUCTION\",\"app\":\"CHECKER\",\"platform\":\"IOS\"}")
+check "checker build promotes into its own section" "$body" '"ok":true'
+
 body=$(curl -s "$BASE/install")
-check "catalogue now shows the app" "$body" "Hotel CRM Worker"
+check "catalogue shows the worker build" "$body" "Hotel CRM Worker"
+check "catalogue shows the checker build in its own section" "$body" "Hotel CRM Checker"
 check "catalogue states the min OS" "$body" "Requires iOS 16.0+"
 
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
-  -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"PRODUCTION\",\"platform\":\"IOS\"}")
+  -d "{\"buildId\":\"$PROD_ID\",\"channel\":\"PRODUCTION\",\"app\":\"WORKER\",\"platform\":\"IOS\"}")
 check "re-promoting the same build is a no-op" "$body" '"unchanged":true'
 
-SLUG=$(q "SELECT b.slug FROM \"ReleaseSlot\" s JOIN \"Build\" b ON b.id=s.\"buildId\" WHERE s.channel='PRODUCTION' AND s.platform='IOS';" | tr -d ' ')
+SLUG=$(q "SELECT b.slug FROM \"ReleaseSlot\" s JOIN \"Build\" b ON b.id=s.\"buildId\" WHERE s.channel='PRODUCTION' AND s.app='WORKER' AND s.platform='IOS';" | tr -d ' ')
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/install/$SLUG")
 check "per-build page is public" "$code" "200"
 
@@ -149,11 +220,33 @@ check "manifest refuses a non-https origin" "$body" "requires an HTTPS origin"
 echo "== dev channel never leaks into the public page =="
 DEV_SLUG=$(q "SELECT slug FROM \"Build\" WHERE id='$DEV_ID';" | tr -d ' ')
 body=$(curl -s -b "$J" -X POST "$ADMIN/api/promote" -H 'Content-Type: application/json' \
-  -d "{\"buildId\":\"$DEV_ID\",\"channel\":\"DEVELOPMENT\",\"platform\":\"IOS\"}")
+  -d "{\"buildId\":\"$DEV_ID\",\"channel\":\"DEVELOPMENT\",\"app\":\"WORKER\",\"platform\":\"IOS\"}")
 check "dev build promotes on the dev board" "$body" '"ok":true'
 body=$(curl -s "$BASE/install")
 n=$(echo "$body" | grep -c "$DEV_SLUG")
 [[ "$n" == "0" ]] && ok "dev build absent from the workers' page" || bad "dev build absent from the workers' page" "$n"
+
+echo "== install counts are aggregate only =="
+before=$(q "SELECT count(*) FROM \"InstallEvent\";")
+curl -s -o /dev/null "$BASE/install/$SLUG/download"
+after=$(q "SELECT count(*) FROM \"InstallEvent\";")
+[[ "$after" -gt "$before" ]] && ok "a download is counted" || bad "a download is counted" "$before -> $after"
+cols=$(q "SELECT string_agg(column_name, ',' ORDER BY column_name) FROM information_schema.columns WHERE table_name='InstallEvent';")
+if [[ "$cols" != *"ip"* && "$cols" != *"userAgent"* && "$cols" != *"user"* ]]; then
+  ok "no identifying column exists on InstallEvent"
+else
+  bad "no identifying column exists on InstallEvent" "$cols"
+fi
+
+echo "== an operator can correct the detector =="
+body=$(curl -s -b "$J" -X PATCH "$ADMIN/api/builds/$AUTO_ID" -H 'Content-Type: application/json' -d '{"channel":"PRODUCTION"}')
+check "channel can be changed" "$body" '"channel":"PRODUCTION"'
+check "the change is recorded as manual" "$(q "SELECT \"channelSource\" FROM \"Build\" WHERE id='$AUTO_ID';")" "MANUAL"
+body=$(curl -s -b "$J" -X PATCH "$ADMIN/api/builds/$PROD_ID" -H 'Content-Type: application/json' -d '{"channel":"BOGUS"}')
+check "an unknown channel is refused" "$body" "Unknown channel"
+# The live build cannot change channel out from under the public page.
+body=$(curl -s -b "$J" -X PATCH "$ADMIN/api/builds/$PROD_ID" -H 'Content-Type: application/json' -d '{"channel":"DEVELOPMENT"}')
+check "a live build cannot switch channel" "$body" "Take it offline"
 
 echo "== security headers =="
 h=$(curl -s -D- -o /dev/null "$BASE/install")
@@ -164,14 +257,30 @@ check "frame denied" "$h" "DENY"
 
 echo "== deletion keeps history, drops the binary =="
 curl -s -b "$J" -X DELETE "$ADMIN/api/builds/$PROD_ID" > /dev/null
-n=$(q "SELECT count(*) FROM \"ReleaseSlot\" WHERE channel='PRODUCTION';")
+# Scoped to the worker slot: the checker build promoted above is still live and
+# must not be touched by deleting an unrelated worker build.
+n=$(q "SELECT count(*) FROM \"ReleaseSlot\" WHERE channel='PRODUCTION' AND app='WORKER';")
 check "slot cleared on delete" "$n" "0"
+n=$(q "SELECT count(*) FROM \"ReleaseSlot\" WHERE channel='PRODUCTION' AND app='CHECKER';")
+check "the checker slot is untouched by deleting a worker build" "$n" "1"
+# Counted against the original address: the email-change test runs later, and
+# history rows deliberately keep whoever uploaded them at the time.
 n=$(q "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"uploadedByEmail\"='$EMAIL';")
-check "history survives deletion" "$n" "2"
+check "history survives deletion" "$n" "5"
 n=$(q "SELECT count(*) FROM \"ReleaseHistory\" WHERE \"binaryDeletedBy\"='$EMAIL';")
 check "deletion is stamped on the history row" "$n" "1"
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/install/$SLUG")
 check "deleted build's link 404s" "$code" "404"
+
+echo "== email address can be changed =="
+NEW_EMAIL="moved-$RANDOM@example.com"
+body=$(curl -s -b "$J" -X POST "$ADMIN/account/email" --data-urlencode "currentPassword=wrong" --data-urlencode "newEmail=$NEW_EMAIL")
+check "wrong password refused" "$body" "Current password is incorrect"
+code=$(curl -s -o /dev/null -w "%{http_code}" -b "$J" -X POST "$ADMIN/account/email" --data-urlencode "currentPassword=$PW" --data-urlencode "newEmail=$NEW_EMAIL")
+check "email change redirects" "$code" "302"
+check "the row really changed" "$(q "SELECT count(*) FROM \"User\" WHERE email='$NEW_EMAIL';")" "1"
+check "the account page shows the new address" "$(curl -s -b "$J" "$ADMIN/account")" "$NEW_EMAIL"
+EMAIL="$NEW_EMAIL"
 
 echo "== password change revokes other sessions =="
 J2="$SP/e2e-cookies2.txt"; rm -f "$J2"

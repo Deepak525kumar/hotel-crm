@@ -17,6 +17,7 @@
           <thead>
             <tr>
               <th>Uploaded</th>
+              <th>App</th>
               <th>Platform</th>
               <th>Channel</th>
               <th>File</th>
@@ -32,13 +33,14 @@
             <% history.forEach(h => { %>
               <tr class="<%= h.binaryDeletedAt ? 'row-retired' : '' %>">
                 <td class="mono nowrap"><%= h.uploadedAt.toISOString().slice(0, 16).replace('T', ' ') %></td>
+                <td><span class="app-badge app-<%= h.app.toLowerCase() %>"><%= h.appLabel %></span></td>
                 <td><span class="platform-badge platform-<%= h.platform.toLowerCase() %>"><%= h.platform === 'IOS' ? 'iOS' : 'Android' %></span></td>
                 <td><span class="channel-badge channel-<%= h.channel.toLowerCase() %>"><%= h.channelLabel %></span></td>
                 <td class="mono"><%= h.fileName %></td>
                 <td><%= h.version %></td>
                 <td class="mono"><%= h.buildNumber %></td>
                 <td><%= h.minOs || '—' %></td>
-                <td class="nowrap"><%= h.sizeMb %> MB</td>
+                <td class="nowrap"><%= h.sizeMb %></td>
                 <td class="muted small"><%= h.uploadedByEmail %></td>
                 <td>
                   <% if (h.binaryDeletedAt) { %>
@@ -52,7 +54,7 @@
               </tr>
             <% }) %>
             <% if (history.length === 0) { %>
-              <tr><td colspan="10" class="muted">Nothing published yet.</td></tr>
+              <tr><td colspan="11" class="muted">Nothing published yet.</td></tr>
             <% } %>
           </tbody>
         </table>

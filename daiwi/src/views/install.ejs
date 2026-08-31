@@ -76,7 +76,7 @@
     <section class="group">
       <div class="group-label">App details</div>
       <div class="row"><span class="row-label">Bundle identifier</span><span class="row-value"><%= build.bundleId %></span></div>
-      <div class="row"><span class="row-label">Size</span><span class="row-value"><%= build.sizeMb %> MB</span></div>
+      <div class="row"><span class="row-label">Size</span><span class="row-value"><%= build.sizeMb %></span></div>
       <% if (build.platform === 'IOS') { %>
         <% if (deviceFamily) { %><div class="row"><span class="row-label">Device family</span><span class="row-value"><%= deviceFamily %></span></div><% } %>
         <% if (metadata.requiredDeviceCapabilities && metadata.requiredDeviceCapabilities.length) { %>

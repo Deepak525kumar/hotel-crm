@@ -1,65 +1,74 @@
 <!doctype html>
 <html lang="en">
-<head><title>Install the Hotel CRM app</title><%- include("partials/head") %></head>
+<head><title>Install the Hotel CRM apps</title><%- include("partials/head") %></head>
 <body class="native-page">
   <header class="catalogue-header">
     <h1>Install the app</h1>
-    <p class="muted">Choose your phone below, then scan the code or tap the link.</p>
+    <p class="muted">Choose your app and your phone below, then scan the code or tap the link.</p>
   </header>
 
-  <main class="catalogue">
-    <% sections.forEach(section => { %>
-      <section class="platform-card">
-        <div class="platform-head">
-          <span class="platform-badge platform-<%= section.key %>"><%= section.key === 'ios' ? 'iOS' : 'Android' %></span>
-          <h2><%= section.label %></h2>
-        </div>
+  <% appGroups.forEach(group => { %>
+    <section class="catalogue-app-group">
+      <div class="catalogue-app-head">
+        <h2><%= group.label %></h2>
+        <span class="muted small"><%= group.audience %></span>
+      </div>
 
-        <% if (!section.build) { %>
-          <p class="muted">No release published yet.</p>
-        <% } else { %>
-          <div class="platform-body">
-            <div class="platform-meta">
-              <div class="app-line">
-                <% if (section.build.iconKey) { %>
-                  <img class="app-icon" src="<%= installPath %>/<%= section.build.slug %>/icon" alt="" width="48" height="48" />
-                <% } %>
-                <div>
-                  <div class="app-name"><%= section.build.appName %></div>
-                  <div class="muted small">Version <%= section.build.version %> (<%= section.build.buildNumber %>) · <%= section.build.sizeMb %> MB</div>
-                </div>
-              </div>
-
-              <div class="requirement">
-                <strong>Requires <%= section.build.minOs || (section.key === 'ios' ? 'a recent iOS version' : 'a recent Android version') %></strong>
-                <div class="muted small">
-                  <% if (section.key === 'ios') { %>
-                    Open this page in Safari to install — other iOS browsers cannot start the installer.
-                  <% } else { %>
-                    You may need to allow "install unknown apps" for your browser when prompted.
-                  <% } %>
-                </div>
-              </div>
-
-              <a class="cta" href="<%= section.build.pageUrl %>">
-                <%= section.key === 'ios' ? 'Install on iPhone or iPad' : 'Download for Android' %>
-              </a>
-
-              <div class="link-row">
-                <span class="mono link-text"><%= section.build.pageUrl %></span>
-                <button class="btn copy-btn" type="button" data-url="<%= section.build.pageUrl %>">Copy</button>
-              </div>
+      <div class="catalogue">
+        <% group.sections.forEach(section => { %>
+          <section class="platform-card">
+            <div class="platform-head">
+              <span class="platform-badge platform-<%= section.key %>"><%= section.key === 'ios' ? 'iOS' : 'Android' %></span>
+              <h3><%= section.label %></h3>
             </div>
 
-            <div class="platform-qr">
-              <img src="<%= section.qrDataUrl %>" alt="QR code to install the <%= section.label %> app" width="200" height="200" />
-              <div class="muted small">Scan with your phone's camera</div>
-            </div>
-          </div>
-        <% } %>
-      </section>
-    <% }) %>
-  </main>
+            <% if (!section.build) { %>
+              <p class="muted">No release published yet.</p>
+            <% } else { %>
+              <div class="platform-body">
+                <div class="platform-meta">
+                  <div class="app-line">
+                    <% if (section.build.iconKey) { %>
+                      <img class="app-icon" src="<%= installPath %>/<%= section.build.slug %>/icon" alt="" width="48" height="48" />
+                    <% } %>
+                    <div>
+                      <div class="app-name"><%= section.build.appName %></div>
+                      <div class="muted small">Version <%= section.build.version %> (<%= section.build.buildNumber %>) · <%= section.build.sizeMb %></div>
+                    </div>
+                  </div>
+
+                  <div class="requirement">
+                    <strong>Requires <%= section.build.minOs || (section.key === 'ios' ? 'a recent iOS version' : 'a recent Android version') %></strong>
+                    <div class="muted small">
+                      <% if (section.key === 'ios') { %>
+                        Open this page in Safari to install — other iOS browsers cannot start the installer.
+                      <% } else { %>
+                        You may need to allow "install unknown apps" for your browser when prompted.
+                      <% } %>
+                    </div>
+                  </div>
+
+                  <a class="cta" href="<%= section.build.pageUrl %>">
+                    <%= section.key === 'ios' ? 'Install on iPhone or iPad' : 'Download for Android' %>
+                  </a>
+
+                  <div class="link-row">
+                    <span class="mono link-text"><%= section.build.pageUrl %></span>
+                    <button class="btn copy-btn" type="button" data-url="<%= section.build.pageUrl %>">Copy</button>
+                  </div>
+                </div>
+
+                <div class="platform-qr">
+                  <img src="<%= section.qrDataUrl %>" alt="QR code to install <%= group.label %> for <%= section.label %>" width="200" height="200" />
+                  <div class="muted small">Scan with your phone's camera</div>
+                </div>
+              </div>
+            <% } %>
+          </section>
+        <% }) %>
+      </div>
+    </section>
+  <% }) %>
 
   <footer class="native-footer muted small">
     Internal distribution — for staff devices only.

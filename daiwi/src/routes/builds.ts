@@ -6,13 +6,16 @@ import Busboy from "busboy";
 import { nanoid } from "nanoid";
 import QRCode from "qrcode";
 import { prisma } from "../lib/db.js";
+import { formatSize } from "../lib/format.js";
 import { config } from "../lib/config.js";
 import { requireAuth } from "../lib/auth.js";
 import { newKey, storage, TMP_DIR } from "../lib/storage.js";
 import { parseBuildAsync } from "../lib/parseBuild.js";
 import { baseUrl, installPageUrl } from "../lib/env.js";
 import { uploadLimiter, dashboardApiLimiter } from "../lib/rateLimits.js";
-import { CHANNELS, CHANNEL_LABELS, isChannel, type Channel } from "../lib/domain.js";
+import { CHANNEL_LABELS, isChannel, type Channel } from "../lib/domain.js";
+import { APP_DEFINITIONS, APP_LABELS, isAppKey, type AppKey } from "../lib/apps.js";
+import { barChart, toDailySeries } from "../lib/sparkline.js";
 
 export const buildsRouter = Router();
 
@@ -34,6 +37,17 @@ function platformForFilename(filename: string): "IOS" | "ANDROID" | null {
  * "Android 14" as "Android 10". Taking the human's word for it removes the
  * ambiguity entirely.
  */
+/** The error a FAILED build carries — parseBuild.ts writes {error} into metadataJson. */
+export function failureReason(build: { status: string; metadataJson: string }): string | null {
+  if (build.status !== "FAILED") return null;
+  try {
+    const parsed = JSON.parse(build.metadataJson || "{}");
+    return typeof parsed.error === "string" ? parsed.error : null;
+  } catch {
+    return null;
+  }
+}
+
 export function minOsLabel(build: { platform: string; minOsVersion: string | null; minOsOverride: string | null }): string | null {
   const prefix = build.platform === "IOS" ? "iOS" : "Android";
 
@@ -64,23 +78,66 @@ export function androidVersionForApiLevel(value: string): string {
 buildsRouter.get("/", requireAuth, async (req, res) => {
   // Every operator sees every build: this is a shared release catalogue, and a
   // colleague's upload being invisible is how two people ship different versions.
-  const [builds, slots] = await Promise.all([
+  // 30 days of history for the two counters; the charts are zero-filled from it.
+  const since = new Date(Date.now() - 30 * 86_400_000);
+
+  const [builds, slots, uploadDates, installDates] = await Promise.all([
     prisma.build.findMany({ where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 200 }),
     prisma.releaseSlot.findMany(),
+    prisma.build.findMany({
+      where: { createdAt: { gte: since } },
+      select: { createdAt: true },
+    }),
+    prisma.installEvent.findMany({
+      where: { createdAt: { gte: since } },
+      select: { createdAt: true },
+    }),
   ]);
   const base = baseUrl(req);
   const liveBuildIds = new Set(slots.map((s) => s.buildId));
 
+  const uploadSeries = toDailySeries(uploadDates.map((u) => u.createdAt));
+  const installSeries = toDailySeries(installDates.map((i) => i.createdAt));
+
+  const presented = builds.map((b) => ({
+    ...b,
+    sizeMb: formatSize(b.sizeBytes),
+    minOs: minOsLabel(b),
+    installUrl: installPageUrl(base, b.slug),
+    appLabel: APP_LABELS[b.app as AppKey] ?? b.app,
+    failureReason: failureReason(b),
+    channelLabel: CHANNEL_LABELS[b.channel as Channel] ?? b.channel,
+    channelIsManual: b.channelSource === "MANUAL",
+    otherChannel: b.channel === "PRODUCTION" ? "DEVELOPMENT" : "PRODUCTION",
+    otherChannelLabel: b.channel === "PRODUCTION" ? "Development" : "Production",
+    isLive: liveBuildIds.has(b.id),
+  }));
+
+  // Two sections, one per app, so the upload area and the build list line up:
+  // dropping a file on the Worker dropzone only ever competes with other
+  // worker builds for attention.
+  const appSections = APP_DEFINITIONS.map((app) => ({
+    app: app.key,
+    label: app.label,
+    audience: app.audience,
+    uploadUrl: `${config.adminPath}/api/builds/upload`,
+    builds: presented.filter((b) => b.app === app.key),
+    latest: presented.find((b) => b.app === app.key && b.status === "READY") ?? null,
+  }));
+
   res.render("dashboard", {
-    builds: builds.map((b) => ({
-      ...b,
-      sizeMb: (Number(b.sizeBytes) / (1024 * 1024)).toFixed(1),
-      minOs: minOsLabel(b),
-      installUrl: installPageUrl(base, b.slug),
-      channelLabel: CHANNEL_LABELS[b.channel as Channel] ?? b.channel,
-      isLive: liveBuildIds.has(b.id),
-    })),
-    channels: CHANNELS.map((c) => ({ value: c, label: CHANNEL_LABELS[c] })),
+    appSections,
+    builds: presented,
+    stats: {
+      uploads: {
+        total: uploadDates.length,
+        chart: barChart({ data: uploadSeries, label: "Uploads per day" }),
+      },
+      installs: {
+        total: installDates.length,
+        chart: barChart({ data: installSeries, label: "Installations per day" }),
+      },
+    },
     email: req.session!.email,
     adminPath: config.adminPath,
     installPath: config.installPath,
@@ -94,9 +151,10 @@ buildsRouter.get("/history", requireAuth, async (_req, res) => {
   res.render("history", {
     history: history.map((h) => ({
       ...h,
-      sizeMb: (Number(h.sizeBytes) / (1024 * 1024)).toFixed(1),
+      sizeMb: formatSize(h.sizeBytes),
       minOs: minOsLabel({ platform: h.platform, minOsVersion: h.minOsVersion, minOsOverride: null }),
       channelLabel: CHANNEL_LABELS[h.channel as Channel] ?? h.channel,
+      appLabel: APP_LABELS[h.app as AppKey] ?? h.app,
     })),
     adminPath: config.adminPath,
   });
@@ -109,8 +167,12 @@ buildsRouter.post("/api/builds/upload", requireAuth, uploadLimiter, (req, res) =
   let handled = false;
   let notes = "";
   let minOsOverride = "";
-  let channel: Channel = "PRODUCTION";
-  let channelProvided = false;
+  /** Which upload section this came from — required, since there is no default app. */
+  let app: AppKey | null = null;
+  let appInvalid = false;
+  /** Only set when the operator deliberately overrode the detector. */
+  let channelOverride: Channel | null = null;
+  let channelInvalid = false;
   let sizeLimitHit = false;
 
   const respond = (status: number, body: object) => {
@@ -123,12 +185,15 @@ buildsRouter.post("/api/builds/upload", requireAuth, uploadLimiter, (req, res) =
     // Bounded so a client cannot stream an unbounded field into memory.
     if (name === "notes") notes = value.slice(0, 2000);
     if (name === "minOsOverride") minOsOverride = value.slice(0, 32);
-    if (name === "channel") {
-      channelProvided = true;
-      // Anything unrecognised is rejected below rather than silently defaulting
-      // to PRODUCTION — a typo must not publish a test build to every worker.
-      if (isChannel(value)) channel = value;
-      else channel = "" as Channel;
+    // Optional. Left out, the channel is worked out from the binary during
+    // parsing (lib/detectChannel.ts); sent, it is an explicit operator override.
+    if (name === "channel" && value) {
+      if (isChannel(value)) channelOverride = value;
+      else channelInvalid = true;
+    }
+    if (name === "app") {
+      if (isAppKey(value)) app = value;
+      else appInvalid = true;
     }
   });
 
@@ -175,16 +240,26 @@ buildsRouter.post("/api/builds/upload", requireAuth, uploadLimiter, (req, res) =
           return respond(400, { error: "Not a valid zip archive (.ipa/.apk are zip files)." });
         }
 
-        if (!channelProvided || !isChannel(channel)) {
+        if (channelInvalid) {
           await fs.promises.rm(tmpPath, { force: true });
-          return respond(400, { error: "Choose whether this is a development or production build." });
+          return respond(400, { error: "Unknown channel." });
+        }
+        if (appInvalid || !app) {
+          await fs.promises.rm(tmpPath, { force: true });
+          return respond(400, { error: "Choose the Worker app or Checker app section to upload into." });
         }
 
         const created = await prisma.build.create({
           data: {
             slug,
             platform,
-            channel,
+            app,
+            // Starts as DEVELOPMENT and is reassigned once the binary has been
+            // read, so a build is never visible as a production candidate during
+            // the seconds it spends parsing.
+            channel: channelOverride ?? "DEVELOPMENT",
+            channelSource: channelOverride ? "MANUAL" : "DETECTED",
+            channelReason: channelOverride ? "Set by hand at upload." : "Detecting…",
             fileName: info.filename.slice(0, 255),
             appName: info.filename,
             bundleId: "",
@@ -232,7 +307,11 @@ buildsRouter.get("/api/builds", requireAuth, dashboardApiLimiter, async (_req, r
       id: b.id,
       slug: b.slug,
       platform: b.platform,
+      app: b.app,
+      appReason: b.appReason,
       channel: b.channel,
+      channelSource: b.channelSource,
+      channelReason: b.channelReason,
       appName: b.appName,
       fileName: b.fileName,
       version: b.version,
@@ -251,13 +330,36 @@ buildsRouter.patch("/api/builds/:id", requireAuth, dashboardApiLimiter, async (r
   });
   if (!build) return res.status(404).json({ error: "not found" });
 
-  const { notes, minOsOverride } = req.body ?? {};
+  const { notes, minOsOverride, channel } = req.body ?? {};
   const data: Record<string, unknown> = {};
   if (typeof notes === "string") data.notes = notes.slice(0, 2000);
   if (typeof minOsOverride === "string") data.minOsOverride = minOsOverride.slice(0, 32) || null;
 
+  if (channel !== undefined) {
+    if (!isChannel(channel)) return res.status(400).json({ error: "Unknown channel." });
+
+    // Moving a live build to the other channel would leave the public page
+    // pointing at something its own board no longer lists. Take it offline first.
+    const liveSlots = await prisma.releaseSlot.count({ where: { buildId: build.id } });
+    if (liveSlots > 0) {
+      return res.status(409).json({
+        error: "This build is live. Take it offline before changing its channel.",
+      });
+    }
+
+    data.channel = channel;
+    // Recorded as MANUAL so a later re-parse cannot silently undo the correction.
+    data.channelSource = "MANUAL";
+    data.channelReason = `Set to ${CHANNEL_LABELS[channel]} by ${req.session!.email}.`;
+  }
+
   const updated = await prisma.build.update({ where: { id: build.id }, data });
-  res.json({ ok: true, minOs: minOsLabel(updated) });
+  res.json({
+    ok: true,
+    minOs: minOsLabel(updated),
+    channel: updated.channel,
+    channelReason: updated.channelReason,
+  });
 });
 
 buildsRouter.get("/api/builds/:id/qr", requireAuth, dashboardApiLimiter, async (req, res) => {
@@ -293,6 +395,7 @@ buildsRouter.delete("/api/builds/:id", requireAuth, dashboardApiLimiter, async (
       prisma.promotionEvent.create({
         data: {
           channel: slot.channel,
+          app: slot.app,
           platform: slot.platform,
           action: "CLEARED",
           replacedBuildId: build.id,

@@ -276,20 +276,6 @@ a { color: var(--accent); }
 .candidate.is-live { border-color: #22c55e; }
 .candidate-main { min-width: 0; }
 
-.dev-box {
-  display: flex; align-items: center; justify-content: space-between;
-  border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem;
-  background: var(--card); text-decoration: none; color: var(--text);
-}
-.dev-box:hover { border-color: var(--accent); }
-.dev-box-title { font-weight: 600; }
-
-.channel-dialog { max-width: 420px; text-align: left; }
-.channel-dialog h3 { margin: 0 0 0.35rem; }
-.channel-choices { display: flex; gap: 0.6rem; margin: 1rem 0 0.75rem; }
-.channel-choice { flex: 1; padding: 0.85rem; background: var(--accent); color: #fff; font-weight: 600; }
-.channel-choice:last-child { background: var(--border); color: var(--text); }
-
 .toast {
   position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%);
   background: var(--card); border: 1px solid var(--border); color: var(--text);
@@ -318,3 +304,61 @@ a { color: var(--accent); }
 }
 .stacked-form .btn.primary { background: var(--accent); color: #fff; padding: 0.7rem 1.2rem; }
 .auth-card .notice { margin-bottom: 1rem; }
+
+/* ── Dashboard: stats and the latest-build card ─────────────────────────────── */
+.stat-row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.stat-tile { flex: 1; min-width: 150px; }
+.stat-label { color: var(--muted); font-size: 0.85rem; }
+/* The headline number is the answer; the bars are the context for it. */
+.stat-value { font-size: 1.9rem; font-weight: 600; line-height: 1.15; margin: 0.1rem 0 0.5rem; }
+
+/* Intrinsic size, scaled uniformly when the panel is narrower. Stretching the
+   SVG to 100% width turned the bars' 2px corner radii into ellipses. */
+.chart { display: block; width: 280px; max-width: 100%; height: auto; }
+.chart-axis { stroke: var(--muted); stroke-width: 1; opacity: 0.4; }
+/* Zero days keep a faint stub so a gap reads as "nothing happened", not "no data". */
+.chart-zero { fill: var(--border); }
+
+.ready-card {
+  display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;
+  border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; background: var(--card);
+}
+.ready-main { flex: 1; min-width: 260px; }
+.ready-app { font-weight: 600; margin-bottom: 0.5rem; }
+/* The short code is what someone reads aloud or types, so it gets the size. */
+.ready-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.9rem; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 0.5rem;
+}
+.ready-qr img { background: #fff; border-radius: 10px; padding: 8px; display: block; }
+.ready-main .link-row { margin: 0 0 0.5rem; }
+.ready-main .link-text { font-size: 0.8rem; }
+
+.channel-why { margin-top: 0.25rem; font-style: italic; }
+
+@media (max-width: 820px) {
+  .ready-card { gap: 1.25rem; }
+}
+
+/* ── App sections (Worker / Checker) ────────────────────────────────────────── */
+.app-section { margin-bottom: 2.5rem; }
+.app-section-head {
+  display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+}
+.app-section-title { margin: 0; font-size: 1.15rem; }
+
+.app-badge { font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 4px; margin-left: 0.35rem; }
+.app-worker { background: #1e2a4a; color: #93b4ff; }
+.app-checker { background: #3a1e4a; color: #d9a3ff; }
+
+/* Public catalogue: same app-group idea, on the light "native" theme. */
+.catalogue-app-group { margin-bottom: 2.5rem; }
+.catalogue-app-head {
+  max-width: 880px; margin: 0 auto; padding: 0 1rem 0.5rem;
+  display: flex; align-items: baseline; gap: 0.6rem;
+}
+.catalogue-app-head h2 { margin: 0; font-size: 1.2rem; }
+.catalogue-app-head .muted { color: var(--n-label); }
+
+.failure-reason { color: var(--danger); font-style: italic; }

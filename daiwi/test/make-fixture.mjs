@@ -1,10 +1,16 @@
 /**
  * Builds a minimal but genuine .ipa for the end-to-end suite: a zip containing
- * Payload/HotelCRMWorker.app/{Info.plist, AppIcon60x60@2x.png}.
+ * Payload/<App>.app/{Info.plist, AppIcon60x60@2x.png}.
  *
  * Real enough to exercise the actual parser (src/lib/ipa.ts) rather than a stub —
  * an XML Info.plist is a legitimate alternative to the usual binary plist, and
  * the parser sniffs for both.
+ *
+ * Usage: node make-fixture.mjs <out.ipa> [bundleId] [displayName]
+ *
+ * Defaults to the real worker-app bundle id (src/lib/apps.ts / mobile/worker-app/app.json)
+ * so the e2e suite exercises the actual "confirmed by bundle id" path, not just the
+ * unrecognised-id fallback.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -12,8 +18,11 @@ import path from "node:path";
 import zlib from "node:zlib";
 
 const out = process.argv[2] ?? "HotelCRMWorker.ipa";
+const bundleId = process.argv[3] ?? "com.fhmhotelservices.workerapp";
+const displayName = process.argv[4] ?? "Hotel CRM Worker";
+
 const dir = fs.mkdtempSync(path.join(process.env.TMPDIR ?? "/tmp", "ipa-"));
-const app = path.join(dir, "Payload", "HotelCRMWorker.app");
+const app = path.join(dir, "Payload", "App.app");
 fs.mkdirSync(app, { recursive: true });
 
 fs.writeFileSync(
@@ -22,8 +31,8 @@ fs.writeFileSync(
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleIdentifier</key><string>app.hotelcrm.worker</string>
-  <key>CFBundleDisplayName</key><string>Hotel CRM Worker</string>
+  <key>CFBundleIdentifier</key><string>${bundleId}</string>
+  <key>CFBundleDisplayName</key><string>${displayName}</string>
   <key>CFBundleShortVersionString</key><string>1.4.2</string>
   <key>CFBundleVersion</key><string>142</string>
   <key>MinimumOSVersion</key><string>16.0</string>
@@ -67,4 +76,4 @@ fs.writeFileSync(path.join(app, "AppIcon60x60@2x.png"), png);
 fs.rmSync(out, { force: true });
 execFileSync("zip", ["-qr", path.resolve(out), "Payload"], { cwd: dir });
 fs.rmSync(dir, { recursive: true, force: true });
-console.log(`wrote ${out} (${fs.statSync(out).size} bytes)`);
+console.log(`wrote ${out} (${fs.statSync(out).size} bytes, bundleId=${bundleId})`);

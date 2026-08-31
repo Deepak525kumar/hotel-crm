@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/db.js";
+import { formatSize } from "../lib/format.js";
 import { config } from "../lib/config.js";
 import { requireAuth } from "../lib/auth.js";
 import { promotionLimiter } from "../lib/rateLimits.js";
@@ -12,12 +13,13 @@ import {
   isPlatform,
   type Channel,
 } from "../lib/domain.js";
+import { APP_DEFINITIONS, APP_LABELS, isAppKey, type AppKey } from "../lib/apps.js";
 import { minOsLabel } from "./builds.js";
 
 export const promotionRouter = Router();
 
 function present(build: {
-  id: string; slug: string; platform: string; appName: string; fileName: string;
+  id: string; slug: string; platform: string; app: string; appName: string; fileName: string;
   version: string; buildNumber: string; sizeBytes: bigint; createdAt: Date;
   minOsVersion: string | null; minOsOverride: string | null; iconKey: string | null;
 }, base: string) {
@@ -25,11 +27,12 @@ function present(build: {
     id: build.id,
     slug: build.slug,
     platform: build.platform,
+    app: build.app,
     appName: build.appName,
     fileName: build.fileName,
     version: build.version,
     buildNumber: build.buildNumber,
-    sizeMb: (Number(build.sizeBytes) / (1024 * 1024)).toFixed(1),
+    sizeMb: formatSize(build.sizeBytes),
     createdAt: build.createdAt,
     minOs: minOsLabel(build),
     hasIcon: !!build.iconKey,
@@ -38,8 +41,9 @@ function present(build: {
 }
 
 /**
- * The promotion board for one channel: a drop box per platform showing what is
- * live, and the pool of eligible builds underneath it.
+ * The promotion board for one channel: one group per app (Worker, Checker),
+ * each holding an iOS and an Android drop box, with the pool of eligible
+ * builds for that app+platform underneath. Four platform boxes in total.
  */
 async function renderBoard(channel: Channel, req: import("express").Request, res: import("express").Response) {
   const base = baseUrl(req);
@@ -49,26 +53,34 @@ async function renderBoard(channel: Channel, req: import("express").Request, res
     prisma.build.findMany({
       where: { channel, status: "READY", deletedAt: null },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: 200,
     }),
   ]);
 
-  const boards = PLATFORMS.map((platform) => {
-    const slot = slots.find((s) => s.platform === platform);
-    return {
-      platform,
-      label: PLATFORM_DEVICE_LABELS[platform],
-      live: slot?.build && !slot.build.deletedAt ? present(slot.build, base) : null,
-      promotedAt: slot?.promotedAt ?? null,
-      promotedByEmail: slot?.promotedByEmail ?? null,
-      candidates: builds.filter((b) => b.platform === platform).map((b) => present(b, base)),
-    };
-  });
+  const groups = APP_DEFINITIONS.map((app) => ({
+    app: app.key,
+    label: app.label,
+    audience: app.audience,
+    boards: PLATFORMS.map((platform) => {
+      const slot = slots.find((s) => s.app === app.key && s.platform === platform);
+      return {
+        platform,
+        app: app.key,
+        label: PLATFORM_DEVICE_LABELS[platform],
+        live: slot?.build && !slot.build.deletedAt ? present(slot.build, base) : null,
+        promotedAt: slot?.promotedAt ?? null,
+        promotedByEmail: slot?.promotedByEmail ?? null,
+        candidates: builds
+          .filter((b) => b.app === app.key && b.platform === platform)
+          .map((b) => present(b, base)),
+      };
+    }),
+  }));
 
   res.render("promotion", {
     channel,
     channelLabel: CHANNEL_LABELS[channel],
-    boards,
+    groups,
     adminPath: config.adminPath,
     // Development builds are never advertised on the workers' page; that page
     // only ever reflects the PRODUCTION slots.
@@ -80,17 +92,20 @@ promotionRouter.get("/production", requireAuth, (req, res) => renderBoard("PRODU
 promotionRouter.get("/development", requireAuth, (req, res) => renderBoard("DEVELOPMENT", req, res));
 
 /**
- * Promotes a build into a channel/platform slot.
+ * Promotes a build into a channel/app/platform slot.
  *
- * The channel and platform are taken from the *build row*, never from the
- * request body — a client cannot drop an Android build into the iOS box, or a
- * development build into the production one, by editing the payload.
+ * The channel, app and platform are taken from the *build row*, never trusted
+ * from the request body — a client cannot drop a checker build into the worker
+ * box, an Android build into the iOS box, or a development build into
+ * production, by editing the payload. The request's channel/app/platform only
+ * say which box the operator dropped onto; they must match the build's own
+ * identity or the promotion is refused.
  */
 promotionRouter.post("/api/promote", requireAuth, promotionLimiter, async (req, res) => {
-  const { buildId, channel, platform } = req.body ?? {};
+  const { buildId, channel, app, platform } = req.body ?? {};
 
-  if (!isChannel(channel) || !isPlatform(platform)) {
-    return res.status(400).json({ error: "Unknown channel or platform." });
+  if (!isChannel(channel) || !isAppKey(app) || !isPlatform(platform)) {
+    return res.status(400).json({ error: "Unknown channel, app or platform." });
   }
   if (typeof buildId !== "string" || !buildId) {
     return res.status(400).json({ error: "buildId is required." });
@@ -106,6 +121,11 @@ promotionRouter.post("/api/promote", requireAuth, promotionLimiter, async (req, 
       error: `That is an ${build.platform === "IOS" ? "iOS" : "Android"} build — it cannot go in the ${platform === "IOS" ? "iOS" : "Android"} box.`,
     });
   }
+  if (build.app !== app) {
+    return res.status(409).json({
+      error: `That is a ${APP_LABELS[build.app as AppKey] ?? build.app} build — it cannot go in the ${APP_LABELS[app] ?? app} section.`,
+    });
+  }
   if (build.channel !== channel) {
     return res.status(409).json({
       error: `That build was uploaded to the ${CHANNEL_LABELS[build.channel as Channel] ?? build.channel} channel and cannot be promoted here.`,
@@ -113,7 +133,7 @@ promotionRouter.post("/api/promote", requireAuth, promotionLimiter, async (req, 
   }
 
   const existing = await prisma.releaseSlot.findUnique({
-    where: { channel_platform: { channel, platform } },
+    where: { channel_app_platform: { channel, app, platform } },
   });
   if (existing?.buildId === build.id) {
     return res.json({ ok: true, unchanged: true });
@@ -121,13 +141,14 @@ promotionRouter.post("/api/promote", requireAuth, promotionLimiter, async (req, 
 
   await prisma.$transaction([
     prisma.releaseSlot.upsert({
-      where: { channel_platform: { channel, platform } },
-      create: { channel, platform, buildId: build.id, promotedByEmail: req.session!.email },
+      where: { channel_app_platform: { channel, app, platform } },
+      create: { channel, app, platform, buildId: build.id, promotedByEmail: req.session!.email },
       update: { buildId: build.id, promotedAt: new Date(), promotedByEmail: req.session!.email },
     }),
     prisma.promotionEvent.create({
       data: {
         channel,
+        app,
         platform,
         action: "PROMOTED",
         buildId: build.id,
@@ -143,23 +164,24 @@ promotionRouter.post("/api/promote", requireAuth, promotionLimiter, async (req, 
   res.json({ ok: true });
 });
 
-/** Takes a platform's slot out of service — the public page then shows nothing for it. */
-promotionRouter.delete("/api/promote/:channel/:platform", requireAuth, promotionLimiter, async (req, res) => {
-  const { channel, platform } = req.params;
-  if (!isChannel(channel) || !isPlatform(platform)) {
-    return res.status(400).json({ error: "Unknown channel or platform." });
+/** Takes an app/platform's slot out of service — the public page then shows nothing for it. */
+promotionRouter.delete("/api/promote/:channel/:app/:platform", requireAuth, promotionLimiter, async (req, res) => {
+  const { channel, app, platform } = req.params;
+  if (!isChannel(channel) || !isAppKey(app) || !isPlatform(platform)) {
+    return res.status(400).json({ error: "Unknown channel, app or platform." });
   }
 
   const existing = await prisma.releaseSlot.findUnique({
-    where: { channel_platform: { channel, platform } },
+    where: { channel_app_platform: { channel, app, platform } },
   });
   if (!existing) return res.status(404).json({ error: "Nothing is live for that platform." });
 
   await prisma.$transaction([
-    prisma.releaseSlot.delete({ where: { channel_platform: { channel, platform } } }),
+    prisma.releaseSlot.delete({ where: { channel_app_platform: { channel, app, platform } } }),
     prisma.promotionEvent.create({
       data: {
         channel,
+        app,
         platform,
         action: "CLEARED",
         replacedBuildId: existing.buildId,
@@ -174,8 +196,9 @@ promotionRouter.delete("/api/promote/:channel/:platform", requireAuth, promotion
 /** Promotion timeline — when each version started reaching devices, and who sent it. */
 promotionRouter.get("/api/promotions", requireAuth, async (req, res) => {
   const channel = isChannel(req.query.channel) ? req.query.channel : undefined;
+  const app = isAppKey(req.query.app) ? req.query.app : undefined;
   const events = await prisma.promotionEvent.findMany({
-    where: channel ? { channel } : undefined,
+    where: { ...(channel ? { channel } : {}), ...(app ? { app } : {}) },
     orderBy: { createdAt: "desc" },
     take: 100,
   });

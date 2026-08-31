@@ -3,112 +3,113 @@
  * inline script and inline event handlers (see server.ts).
  *
  * Every URL this talks to comes from a data- attribute rendered server-side,
- * so the mount path (ADMIN_PATH) is never hardcoded here.
+ * so the mount path (ADMIN_PATH) is never hardcoded here. There are two
+ * dropzones on the page — one per app — each scoped to its own inputs so an
+ * upload always carries the right `app` field without the two ever interfering.
  */
-const dropzone = document.getElementById("dropzone");
-const fileInput = document.getElementById("fileInput");
-const notesInput = document.getElementById("notesInput");
-const minOsInput = document.getElementById("minOsInput");
-const progressWrap = document.getElementById("progressWrap");
-const progressBar = document.getElementById("progressBar");
-const uploadError = document.getElementById("uploadError");
-const channelDialog = document.getElementById("channelDialog");
-const channelFileName = document.getElementById("channelFileName");
+const toast = document.getElementById("toast");
 
-const uploadUrl = dropzone.dataset.uploadUrl;
-const buildsApi = uploadUrl.replace(/\/upload$/, "");
-
-dropzone.addEventListener("click", (e) => {
-  if (e.target === notesInput || e.target === minOsInput) return;
-  fileInput.click();
-});
-
-["dragover", "dragleave", "drop"].forEach((evt) =>
-  dropzone.addEventListener(evt, (e) => {
-    e.preventDefault();
-    dropzone.classList.toggle("dragover", evt === "dragover");
-  })
-);
-
-dropzone.addEventListener("drop", (e) => {
-  const file = e.dataTransfer.files[0];
-  if (file) chooseChannelThenUpload(file);
-});
-
-fileInput.addEventListener("change", () => {
-  if (fileInput.files[0]) chooseChannelThenUpload(fileInput.files[0]);
-  // Cleared so picking the same file twice in a row still fires `change`.
-  fileInput.value = "";
-});
-
-/**
- * Every upload is filed under a channel, and the operator is asked before a
- * single byte is sent. There is deliberately no default: a test build silently
- * landing in production is exactly the mistake this dialog exists to prevent.
- */
-function chooseChannelThenUpload(file) {
-  uploadError.textContent = "";
-
-  if (!/\.(ipa|apk)$/i.test(file.name)) {
-    uploadError.textContent = "Only .ipa and .apk files are supported.";
-    return;
-  }
-
-  channelFileName.textContent = file.name;
-  channelDialog.showModal();
-
-  channelDialog.addEventListener(
-    "close",
-    () => {
-      const choice = channelDialog.returnValue;
-      if (!choice || choice === "cancel") return;
-      uploadFile(file, choice);
-    },
-    { once: true }
-  );
+let toastTimer;
+function showToast(message, isError) {
+  toast.textContent = message;
+  toast.classList.toggle("toast-error", !!isError);
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (toast.hidden = true), 3200);
 }
 
-function uploadFile(file, channel) {
-  uploadError.textContent = "";
+// Any dropzone's upload URL identifies the shared /api/builds root — used for
+// polling and for the delete/channel-change calls below, neither of which are
+// app-specific.
+const firstDropzone = document.querySelector(".dropzone");
+const buildsApi = firstDropzone ? firstDropzone.dataset.uploadUrl.replace(/\/upload$/, "") : null;
 
-  const form = new FormData();
-  // Fields before the file: the server reads notes/minOsOverride as they
-  // arrive, and a field appended after a multi-hundred-megabyte file part
-  // would not be parsed until the upload had already finished.
-  form.append("notes", notesInput.value);
-  form.append("minOsOverride", minOsInput.value);
-  form.append("channel", channel);
-  form.append("file", file);
+document.querySelectorAll(".dropzone").forEach((dropzone) => {
+  const app = dropzone.dataset.app;
+  const uploadUrl = dropzone.dataset.uploadUrl;
+  const fileInput = dropzone.querySelector(".file-input");
+  const notesInput = dropzone.querySelector(".notes-input");
+  const minOsInput = dropzone.querySelector(".min-os-input");
+  const progressWrap = dropzone.querySelector(".progress");
+  const progressBar = dropzone.querySelector(".progress-bar");
+  const errorEl = dropzone.querySelector(".error");
 
-  const xhr = new XMLHttpRequest();
-  xhr.open("POST", uploadUrl);
-  progressWrap.hidden = false;
-  progressBar.style.width = "0%";
+  dropzone.addEventListener("click", (e) => {
+    if (e.target === notesInput || e.target === minOsInput) return;
+    fileInput.click();
+  });
 
-  xhr.upload.onprogress = (e) => {
-    if (e.lengthComputable) progressBar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
-  };
+  ["dragover", "dragleave", "drop"].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.toggle("dragover", evt === "dragover");
+    })
+  );
 
-  xhr.onload = () => {
-    progressWrap.hidden = true;
-    if (xhr.status >= 200 && xhr.status < 300) {
-      window.location.reload();
+  dropzone.addEventListener("drop", (e) => {
+    const file = e.dataTransfer.files[0];
+    if (file) uploadFile(file);
+  });
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) uploadFile(fileInput.files[0]);
+    // Cleared so picking the same file twice in a row still fires `change`.
+    fileInput.value = "";
+  });
+
+  /**
+   * The app is fixed by which dropzone this is — never asked for — and the
+   * channel is read off the binary while it parses (detectChannel.ts). The
+   * server still checks the bundle id against this section once it can, and
+   * refuses the upload outright if it turns out to be the other app.
+   */
+  function uploadFile(file) {
+    errorEl.textContent = "";
+
+    if (!/\.(ipa|apk)$/i.test(file.name)) {
+      errorEl.textContent = "Only .ipa and .apk files are supported.";
       return;
     }
-    try {
-      uploadError.textContent = JSON.parse(xhr.responseText).error ?? "Upload failed.";
-    } catch {
-      uploadError.textContent = `Upload failed (${xhr.status}).`;
-    }
-  };
 
-  xhr.onerror = () => {
-    progressWrap.hidden = true;
-    uploadError.textContent = "Upload failed — network error.";
-  };
+    const form = new FormData();
+    // Fields before the file: the server reads them as they arrive, and a
+    // field appended after a multi-hundred-megabyte file part would not be
+    // parsed until the upload had already finished.
+    form.append("app", app);
+    form.append("notes", notesInput.value);
+    form.append("minOsOverride", minOsInput.value);
+    form.append("file", file);
 
-  xhr.send(form);
-}
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", uploadUrl);
+    progressWrap.hidden = false;
+    progressBar.style.width = "0%";
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) progressBar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
+    };
+
+    xhr.onload = () => {
+      progressWrap.hidden = true;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        window.location.reload();
+        return;
+      }
+      try {
+        errorEl.textContent = JSON.parse(xhr.responseText).error ?? "Upload failed.";
+      } catch {
+        errorEl.textContent = `Upload failed (${xhr.status}).`;
+      }
+    };
+
+    xhr.onerror = () => {
+      progressWrap.hidden = true;
+      errorEl.textContent = "Upload failed — network error.";
+    };
+
+    xhr.send(form);
+  }
+});
 
 document.querySelectorAll(".copy-btn").forEach((btn) =>
   btn.addEventListener("click", async () => {
@@ -132,19 +133,34 @@ document.querySelectorAll(".qr-btn").forEach((btn) =>
 );
 document.getElementById("qrClose")?.addEventListener("click", () => qrDialog.close());
 
+// Corrects the detector. Recorded as a manual choice, so a re-parse cannot undo it.
+document.querySelectorAll(".channel-btn").forEach((btn) =>
+  btn.addEventListener("click", async () => {
+    const res = await fetch(`${buildsApi}/${btn.dataset.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: btn.dataset.channel }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return showToast(body.error || "Could not change the channel.", true);
+    showToast(`Moved to ${btn.dataset.label}.`);
+    window.location.reload();
+  })
+);
+
 document.querySelectorAll(".delete-btn").forEach((btn) =>
   btn.addEventListener("click", async () => {
     if (!confirm("Delete this release? The binary is removed and the link stops working. The history record is kept.")) return;
     const res = await fetch(`${buildsApi}/${btn.dataset.id}`, { method: "DELETE" });
-    if (res.ok) btn.closest(".build-card").remove();
-    else alert("Delete failed.");
+    if (res.ok) window.location.reload();
+    else showToast("Delete failed.", true);
   })
 );
 
 // Poll for status transitions (PARSING -> READY/FAILED) without a full reload.
 // Parsing an IPA takes a few seconds; the page reloads once it settles.
 const pending = document.querySelectorAll('.build-card[data-status="PARSING"], .build-card[data-status="UPLOADING"]');
-if (pending.length) {
+if (pending.length && buildsApi) {
   let attempts = 0;
   const poll = setInterval(async () => {
     // Give up after five minutes rather than polling a dead tab forever.

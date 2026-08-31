@@ -12,6 +12,7 @@ import { useAuthStore } from "@/stores/auth";
 // fragile -- it is what let these assertions bake in raw keys originally.
 import "@/lib/i18n";
 import type { AuthUser, CalendarAbsence, CalendarEntryDto } from "@/lib/types";
+import { todayKeyInCalendarTimezone } from "@/lib/calendar";
 
 /**
  * The two calendar affordances added 2026-08-16, asserted through the
@@ -60,14 +61,24 @@ const mockShiftWorkers = useShiftWorkerOptions as jest.Mock;
 const mockUsersByIds = useUsersByIds as jest.Mock;
 const mockGroupHotels = useHotelOptionsInGroup as jest.Mock;
 
-/** Today, in the same local-date form the grid keys days by. */
-function todayKey(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-const DAY = todayKey();
+/**
+ * Today, in the SAME timezone the grid itself uses to key days --
+ * Europe/Berlin, not the test runner's local time (see lib/calendar.ts).
+ *
+ * The grid's own bug of this exact shape ("today" computed from the
+ * browser's local clock instead of the calendar timezone) was a real
+ * production incident (lib/calendar.ts, reported 2026-08-29): a manager in
+ * IST between midnight and ~03:30 local sees a day Frankfurt hasn't reached
+ * yet. This test file used to make the identical mistake, so any CI run that
+ * happened to land in the ~2-hour window where Europe/Berlin (UTC+2 in
+ * August) has already rolled over but the runner's UTC clock has not would
+ * compute a `DAY` one day ahead of what the component renders as "today",
+ * and every assertion keyed off `screen.getAllByRole("button", { name:
+ * /Wanda Worker/ })` would fail to find the chip -- not because the
+ * component was wrong, but because the fixture no longer described a day the
+ * component considered visible/current the same way.
+ */
+const DAY = todayKeyInCalendarTimezone();
 
 function entry(over: Partial<CalendarEntryDto> = {}): CalendarEntryDto {
   return {

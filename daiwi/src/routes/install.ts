@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction, type RequestHan
 import QRCode from "qrcode";
 import { pipeline } from "node:stream/promises";
 import { prisma } from "../lib/db.js";
+import { formatSize } from "../lib/format.js";
 import { config } from "../lib/config.js";
 import { baseUrl, installPageUrl } from "../lib/env.js";
 import {
@@ -14,6 +15,7 @@ import {
 import { storage } from "../lib/storage.js";
 import { minOsLabel } from "./builds.js";
 import { PLATFORMS, PLATFORM_DEVICE_LABELS } from "../lib/domain.js";
+import { APP_DEFINITIONS } from "../lib/apps.js";
 import {
   publicPageLimiter,
   slugMissLimiter,
@@ -48,7 +50,7 @@ function presentBuild(build: Awaited<ReturnType<typeof loadActiveBuild>> & objec
   return {
     ...build,
     minOs: minOsLabel(build),
-    sizeMb: (Number(build.sizeBytes) / (1024 * 1024)).toFixed(1),
+    sizeMb: formatSize(build.sizeBytes),
     pageUrl: installPageUrl(base, build.slug),
   };
 }
@@ -70,30 +72,39 @@ installRouter.get("/", asyncRoute(async (req, res) => {
     include: { build: true },
   });
 
-  const sections = await Promise.all(
-    PLATFORMS.map(async (platform) => {
-      const slot = slots.find((s) => s.platform === platform);
-      // A slot pointing at a soft-deleted or not-ready build shows as empty
-      // rather than as a dead download link.
-      const build =
-        slot?.build && !slot.build.deletedAt && slot.build.status === "READY" ? slot.build : null;
+  // One group per app (Worker, Checker), each with its own iOS/Android
+  // sections — so a worker scanning the page never has to tell which download
+  // is meant for them apart from a badge.
+  const appGroups = await Promise.all(
+    APP_DEFINITIONS.map(async (app) => {
+      const sections = await Promise.all(
+        PLATFORMS.map(async (platform) => {
+          const slot = slots.find((s) => s.app === app.key && s.platform === platform);
+          // A slot pointing at a soft-deleted or not-ready build shows as empty
+          // rather than as a dead download link.
+          const build =
+            slot?.build && !slot.build.deletedAt && slot.build.status === "READY" ? slot.build : null;
 
-      const section = {
-        key: platform.toLowerCase(),
-        platform,
-        label: PLATFORM_DEVICE_LABELS[platform],
-      };
-      if (!build) return { ...section, build: null, qrDataUrl: null };
+          const section = {
+            key: platform.toLowerCase(),
+            platform,
+            label: PLATFORM_DEVICE_LABELS[platform],
+          };
+          if (!build) return { ...section, build: null, qrDataUrl: null };
 
-      return {
-        ...section,
-        build: presentBuild(build, base),
-        qrDataUrl: await QRCode.toDataURL(installPageUrl(base, build.slug), { margin: 1, width: 220 }),
-      };
+          return {
+            ...section,
+            build: presentBuild(build, base),
+            qrDataUrl: await QRCode.toDataURL(installPageUrl(base, build.slug), { margin: 1, width: 220 }),
+          };
+        })
+      );
+
+      return { app: app.key, label: app.label, audience: app.audience, sections };
     })
   );
 
-  res.render("catalogue", { sections, installPath: config.installPath });
+  res.render("catalogue", { appGroups, installPath: config.installPath });
 }));
 
 installRouter.get("/:slug", asyncRoute(async (req, res) => {
@@ -173,6 +184,13 @@ installRouter.get("/:slug/download", downloadLimiter, asyncRoute(async (req, res
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.setHeader("Content-Length", String(size));
   res.setHeader("X-Content-Type-Options", "nosniff");
+
+  // Counted before the bytes move, and deliberately anonymous: build, platform,
+  // channel and a timestamp, nothing that identifies the person or the device.
+  // The dashboard answers "how many installs this month", never "who".
+  await prisma.installEvent.create({
+    data: { buildId: build.id, app: build.app, platform: build.platform, channel: build.channel },
+  });
 
   const body = await storage.getStream(build.storageKey);
   // pipeline() destroys the S3 stream if the client disconnects mid-download,

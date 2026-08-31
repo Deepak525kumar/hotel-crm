@@ -1,11 +1,15 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
-import { minOsLabel, androidVersionForApiLevel } from "../src/routes/builds.js";
+import { minOsLabel, androidVersionForApiLevel, failureReason } from "../src/routes/builds.js";
 import { isChannel, isPlatform, CHANNELS, PLATFORMS } from "../src/lib/domain.js";
 import { passwordProblem, hashResetToken, newResetToken, MIN_PASSWORD_LENGTH } from "../src/lib/passwords.js";
 import { buildManifest, itmsServicesUrl, inspectUserAgent } from "../src/lib/manifest.js";
 import { newKey } from "../src/lib/storage.js";
+import { detectIosChannel, detectAndroidChannel } from "../src/lib/detectChannel.js";
+import { barChart, toDailySeries } from "../src/lib/sparkline.js";
+import { formatSize } from "../src/lib/format.js";
+import { appForBundleId, isAppKey, APPS } from "../src/lib/apps.js";
 
 describe("minimum OS labelling", () => {
   test("iOS reports the declared version", () => {
@@ -198,5 +202,236 @@ describe("storage keys", () => {
 
   test("keys stay under the prefix they were asked for", () => {
     assert.ok(newKey("icons/xyz", "icon.png").startsWith("icons/xyz/"));
+  });
+});
+
+describe("channel detection — iOS", () => {
+  test("a development-signed build is development", () => {
+    // get-task-allow is the debugger entitlement; Apple will not sign a
+    // distribution build with it, so it settles the question on its own.
+    const d = detectIosChannel({ hasProfile: true, profileType: "development", getTaskAllow: true });
+    assert.equal(d.channel, "DEVELOPMENT");
+    assert.match(d.reason, /get-task-allow/);
+  });
+
+  test("get-task-allow outranks a profile that claims to be a release", () => {
+    const d = detectIosChannel({ hasProfile: true, profileType: "ad-hoc", getTaskAllow: true });
+    assert.equal(d.channel, "DEVELOPMENT");
+  });
+
+  test("an ad-hoc release build is production — this is what workers install", () => {
+    const d = detectIosChannel({ hasProfile: true, profileType: "ad-hoc", getTaskAllow: false });
+    assert.equal(d.channel, "PRODUCTION");
+  });
+
+  test("an enterprise in-house build is production", () => {
+    assert.equal(
+      detectIosChannel({ hasProfile: true, profileType: "enterprise", getTaskAllow: false }).channel,
+      "PRODUCTION"
+    );
+  });
+
+  test("the development APNs environment marks a build as development", () => {
+    const d = detectIosChannel({
+      hasProfile: true,
+      profileType: "ad-hoc",
+      getTaskAllow: false,
+      apsEnvironment: "development",
+    });
+    assert.equal(d.channel, "DEVELOPMENT");
+  });
+
+  test("an unsigned IPA falls back to development, not production", () => {
+    // The fallback direction is the whole point: an unreadable build must not
+    // land in the promotable list.
+    const d = detectIosChannel({ hasProfile: false });
+    assert.equal(d.channel, "DEVELOPMENT");
+    assert.match(d.reason, /unsigned|unreadable/i);
+  });
+
+  test("an unclassifiable profile falls back to development", () => {
+    assert.equal(
+      detectIosChannel({ hasProfile: true, profileType: "unknown", getTaskAllow: false }).channel,
+      "DEVELOPMENT"
+    );
+  });
+});
+
+describe("channel detection — Android", () => {
+  const release = {
+    manifestRead: true,
+    debuggable: false,
+    debugSigned: false,
+    hasDevClient: false,
+    packageName: "com.fhmhotelservices.workerapp",
+    versionName: "1.4.2",
+  };
+
+  test("a plain release build is production", () => {
+    assert.equal(detectAndroidChannel(release).channel, "PRODUCTION");
+  });
+
+  test("android:debuggable makes it development", () => {
+    const d = detectAndroidChannel({ ...release, debuggable: true });
+    assert.equal(d.channel, "DEVELOPMENT");
+    assert.match(d.reason, /debuggable/);
+  });
+
+  test("the debug keystore makes it development", () => {
+    assert.equal(detectAndroidChannel({ ...release, debugSigned: true }).channel, "DEVELOPMENT");
+  });
+
+  test("a bundled Expo dev client makes it development", () => {
+    const d = detectAndroidChannel({ ...release, hasDevClient: true });
+    assert.equal(d.channel, "DEVELOPMENT");
+    assert.match(d.reason, /dev client/i);
+  });
+
+  test("a .debug application id makes it development", () => {
+    assert.equal(
+      detectAndroidChannel({ ...release, packageName: "com.fhmhotelservices.workerapp.debug" }).channel,
+      "DEVELOPMENT"
+    );
+  });
+
+  test("a -dev version name makes it development", () => {
+    assert.equal(detectAndroidChannel({ ...release, versionName: "1.4.2-dev" }).channel, "DEVELOPMENT");
+  });
+
+  test("an unreadable manifest falls back to development", () => {
+    assert.equal(detectAndroidChannel({ manifestRead: false }).channel, "DEVELOPMENT");
+  });
+
+  test("a normal release version number is not mistaken for a dev marker", () => {
+    // "-rc" is deliberately absent from the marker list: release candidates are
+    // what actually ships to workers here.
+    assert.equal(detectAndroidChannel({ ...release, versionName: "2.0.0" }).channel, "PRODUCTION");
+  });
+});
+
+describe("daily series", () => {
+  test("zero-fills every day in the window", () => {
+    const series = toDailySeries([new Date()], 30);
+    assert.equal(series.length, 30);
+    assert.equal(series.reduce((n, d) => n + d.count, 0), 1);
+  });
+
+  test("counts several events on the same day together", () => {
+    const now = new Date();
+    const series = toDailySeries([now, now, now], 7);
+    assert.equal(series[series.length - 1].count, 3);
+  });
+
+  test("an empty month renders as all zeroes rather than throwing", () => {
+    const series = toDailySeries([], 30);
+    assert.equal(series.length, 30);
+    assert.ok(series.every((d) => d.count === 0));
+  });
+});
+
+describe("bar chart rendering", () => {
+  test("emits one titled mark per day", () => {
+    const svg = barChart({ data: toDailySeries([new Date()], 7), label: "Uploads" });
+    assert.equal((svg.match(/<title>/g) ?? []).length, 7);
+  });
+
+  test("carries an accessible summary", () => {
+    const svg = barChart({ data: toDailySeries([], 7), label: "Installations" });
+    assert.match(svg, /role="img"/);
+    assert.match(svg, /aria-label="Installations: 0 over 7 days/);
+  });
+
+  test("an all-zero series draws no full-height bars", () => {
+    // Without a floor on the divisor, max=0 would make every bar full height.
+    const svg = barChart({ data: toDailySeries([], 7), label: "Uploads" });
+    assert.equal((svg.match(/<path/g) ?? []).length, 0);
+  });
+
+  test("escapes a label rather than letting it break out of the attribute", () => {
+    const svg = barChart({ data: toDailySeries([], 3), label: '"><script>bad()</script>' });
+    assert.ok(!svg.includes("<script>"), svg.slice(0, 200));
+  });
+});
+
+describe("size formatting", () => {
+  test("a small build reads in KB rather than as 0.0 MB", () => {
+    // "0.0 MB" is a rounding artifact, not a size.
+    assert.equal(formatSize(1181), "1 KB");
+    assert.equal(formatSize(50 * 1024), "50 KB");
+  });
+
+  test("a real build reads in MB", () => {
+    assert.equal(formatSize(45 * 1024 * 1024), "45.0 MB");
+  });
+
+  test("bytes below a kilobyte are shown as bytes", () => {
+    assert.equal(formatSize(512), "512 B");
+  });
+
+  test("accepts the bigint the database returns", () => {
+    assert.equal(formatSize(BigInt(45 * 1024 * 1024)), "45.0 MB");
+  });
+});
+
+describe("app identity", () => {
+  test("only WORKER and CHECKER are accepted", () => {
+    for (const a of APPS) assert.ok(isAppKey(a));
+    for (const bad of ["", "worker", "Worker", null, undefined, 1, {}, ["WORKER"]]) {
+      assert.equal(isAppKey(bad), false, JSON.stringify(bad));
+    }
+  });
+
+  test("the worker app's exact bundle id resolves to WORKER", () => {
+    assert.equal(appForBundleId("com.fhmhotelservices.workerapp"), "WORKER");
+  });
+
+  test("the checker app's exact bundle id resolves to CHECKER", () => {
+    assert.equal(appForBundleId("com.fhmhotelservices.checkerapp"), "CHECKER");
+  });
+
+  test("matching is case-insensitive", () => {
+    assert.equal(appForBundleId("COM.FHMHOTELSERVICES.WORKERAPP"), "WORKER");
+  });
+
+  test("a channel-suffixed variant still resolves — the suffix is the channel, not the app", () => {
+    assert.equal(appForBundleId("com.fhmhotelservices.workerapp.debug"), "WORKER");
+    assert.equal(appForBundleId("com.fhmhotelservices.checkerapp.dev"), "CHECKER");
+  });
+
+  test("a lookalike id sharing the prefix is NOT treated as a match", () => {
+    // "workerappX" is a different app id than "workerapp"; only a dot boundary counts.
+    assert.equal(appForBundleId("com.fhmhotelservices.workerappx"), null);
+  });
+
+  test("an unrelated bundle id resolves to nothing, not a guess", () => {
+    assert.equal(appForBundleId("com.example.someotherapp"), null);
+  });
+
+  test("empty or missing input resolves to nothing", () => {
+    assert.equal(appForBundleId(""), null);
+    // @ts-expect-error — exercising the runtime guard against a bad caller
+    assert.equal(appForBundleId(undefined), null);
+  });
+});
+
+describe("failure reason", () => {
+  test("a FAILED build surfaces the parser's error message", () => {
+    const reason = failureReason({
+      status: "FAILED",
+      metadataJson: JSON.stringify({ error: "This is the Checker app — upload it there instead." }),
+    });
+    assert.equal(reason, "This is the Checker app — upload it there instead.");
+  });
+
+  test("a READY build has no failure reason", () => {
+    assert.equal(failureReason({ status: "READY", metadataJson: "{}" }), null);
+  });
+
+  test("malformed metadata degrades to null rather than throwing", () => {
+    assert.equal(failureReason({ status: "FAILED", metadataJson: "not json" }), null);
+  });
+
+  test("metadata with no error field degrades to null", () => {
+    assert.equal(failureReason({ status: "FAILED", metadataJson: "{}" }), null);
   });
 });

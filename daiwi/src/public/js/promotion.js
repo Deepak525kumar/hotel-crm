@@ -7,8 +7,11 @@
  * all three paths call the same promote().
  */
 // Absolute, from the server-rendered mount path: a relative "api/promote" would
-// resolve differently the moment the page URL gained a trailing slash.
-const API_BASE = document.getElementById("slotGrid").dataset.api;
+// resolve differently the moment the page URL gained a trailing slash. Read
+// from whichever slot-grid rendered on the page — both app groups' grids
+// carry the same api base, since it is a function of the mount path, not the app.
+const anyGrid = document.querySelector(".slot-grid");
+const API_BASE = anyGrid ? anyGrid.dataset.api : "";
 
 const toast = document.getElementById("toast");
 let toastTimer;
@@ -21,12 +24,12 @@ function showToast(message, isError) {
   toastTimer = setTimeout(() => (toast.hidden = true), 3200);
 }
 
-async function promote(buildId, channel, platform) {
+async function promote(buildId, channel, app, platform) {
   try {
     const res = await fetch(`${API_BASE}/promote`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ buildId, channel, platform }),
+      body: JSON.stringify({ buildId, channel, app, platform }),
     });
     const body = await res.json().catch(() => ({}));
 
@@ -47,11 +50,11 @@ async function promote(buildId, channel, platform) {
   }
 }
 
-async function clearSlot(channel, platform) {
+async function clearSlot(channel, app, platform) {
   if (!confirm("Take this build offline? The public install page will show nothing for this platform until you promote another.")) return;
 
   try {
-    const res = await fetch(`${API_BASE}/promote/${channel}/${platform}`, { method: "DELETE" });
+    const res = await fetch(`${API_BASE}/promote/${channel}/${app}/${platform}`, { method: "DELETE" });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       showToast(body.error || `Could not take offline (${res.status}).`, true);
@@ -73,6 +76,7 @@ document.querySelectorAll(".candidate").forEach((card) => {
       JSON.stringify({
         buildId: card.dataset.buildId,
         platform: card.dataset.platform,
+        app: card.dataset.app,
         channel: card.dataset.channel,
       })
     );
@@ -86,7 +90,7 @@ document.querySelectorAll(".candidate").forEach((card) => {
   card.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault();
-    promote(card.dataset.buildId, card.dataset.channel, card.dataset.platform);
+    promote(card.dataset.buildId, card.dataset.channel, card.dataset.app, card.dataset.platform);
   });
 });
 
@@ -94,6 +98,7 @@ document.querySelectorAll(".candidate").forEach((card) => {
 
 document.querySelectorAll(".slot-box").forEach((box) => {
   const boxPlatform = box.dataset.platform;
+  const boxApp = box.dataset.app;
   const boxChannel = box.dataset.channel;
 
   function payloadFrom(e) {
@@ -125,7 +130,14 @@ document.querySelectorAll(".slot-box").forEach((box) => {
     if (!payload?.buildId) return;
 
     // Checked here too so the wrong-box case reads instantly rather than after a
-    // round trip. The server enforces the same rule from the build row.
+    // round trip. The server enforces the same rules from the build row.
+    if (payload.app !== boxApp) {
+      showToast(
+        `That is a ${payload.app === "WORKER" ? "Worker app" : "Checker app"} build — drop it in the ${boxApp === "WORKER" ? "Worker app" : "Checker app"} section.`,
+        true
+      );
+      return;
+    }
     if (payload.platform !== boxPlatform) {
       showToast(
         `That is an ${payload.platform === "IOS" ? "iOS" : "Android"} build — drop it in the ${payload.platform === "IOS" ? "iOS" : "Android"} box.`,
@@ -134,16 +146,16 @@ document.querySelectorAll(".slot-box").forEach((box) => {
       return;
     }
 
-    promote(payload.buildId, boxChannel, boxPlatform);
+    promote(payload.buildId, boxChannel, boxApp, boxPlatform);
   });
 });
 
 document.querySelectorAll(".promote-btn").forEach((btn) =>
-  btn.addEventListener("click", () => promote(btn.dataset.buildId, btn.dataset.channel, btn.dataset.platform))
+  btn.addEventListener("click", () => promote(btn.dataset.buildId, btn.dataset.channel, btn.dataset.app, btn.dataset.platform))
 );
 
 document.querySelectorAll(".clear-btn").forEach((btn) =>
-  btn.addEventListener("click", () => clearSlot(btn.dataset.channel, btn.dataset.platform))
+  btn.addEventListener("click", () => clearSlot(btn.dataset.channel, btn.dataset.app, btn.dataset.platform))
 );
 
 document.querySelectorAll(".copy-btn").forEach((btn) =>

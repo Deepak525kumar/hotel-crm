@@ -16,6 +16,9 @@ export interface ProvisioningProfile {
   provisionedDevices: string[];
   /** development builds set get-task-allow, which requires Developer Mode on iOS 16+ */
   getTaskAllow: boolean;
+  /** APNs entitlement: "development" or "production". A second, independent tell
+   *  for whether this is a debug build — see lib/detectChannel.ts. */
+  apsEnvironment?: string;
   type: ProfileType;
   daysUntilExpiry: number | null;
   isExpired: boolean;
@@ -55,6 +58,9 @@ export function parseMobileProvision(buf: Buffer): ProvisioningProfile {
     ? (raw["ProvisionedDevices"] as string[])
     : [];
   const getTaskAllow = entitlements["get-task-allow"] === true;
+  const apsEnvironment = entitlements["aps-environment"]
+    ? String(entitlements["aps-environment"])
+    : undefined;
 
   const expirationDate =
     raw["ExpirationDate"] instanceof Date ? (raw["ExpirationDate"] as Date) : undefined;
@@ -79,6 +85,7 @@ export function parseMobileProvision(buf: Buffer): ProvisioningProfile {
     provisionsAllDevices,
     provisionedDevices,
     getTaskAllow,
+    apsEnvironment,
     type: classify({ provisionsAllDevices, provisionedDevices, getTaskAllow }),
     daysUntilExpiry,
     isExpired: daysUntilExpiry !== null && daysUntilExpiry < 0,
