@@ -203,6 +203,34 @@ describe("storage keys", () => {
   test("keys stay under the prefix they were asked for", () => {
     assert.ok(newKey("icons/xyz", "icon.png").startsWith("icons/xyz/"));
   });
+
+  // Regression: app-info-parser decides file type by splitting the PATH
+  // STRING on "." — not by magic bytes, not by content — and throws before it
+  // ever opens the file. An extensionless temp path (what the upload handler
+  // used to write to disk) made it reject every real .apk with "Unsupported
+  // file type", while every .ipa upload passed, because .ipa is parsed by our
+  // own lib/ipa.ts, which only uses the path to open a file handle and never
+  // inspects the name. That asymmetry is exactly why this shipped unnoticed:
+  // every test fixture written during development was an .ipa.
+  //
+  // This asserts the library's own contract directly — no zip content, no
+  // AndroidManifest.xml, so no giant binary fixture needs to live in this
+  // repo. It fails against the pre-fix temp path shape and passes once the
+  // written path carries a real .apk/.ipa extension (routes/builds.ts).
+  test("app-info-parser needs a real extension on the path it's given, not just real content", async () => {
+    // @ts-ignore -- ships no types
+    const AppInfoParser = (await import("app-info-parser")).default;
+
+    assert.throws(
+      () => new AppInfoParser("/tmp/storage/tmp/slug-11111111-2222-3333-4444-555555555555"),
+      /Unsupported file type/,
+      "an extensionless path must not reach this far silently"
+    );
+    assert.doesNotThrow(
+      () => new AppInfoParser("/tmp/storage/tmp/slug-11111111-2222-3333-4444-555555555555.apk"),
+      "the constructor should accept a path once it carries a real extension"
+    );
+  });
 });
 
 describe("channel detection — iOS", () => {

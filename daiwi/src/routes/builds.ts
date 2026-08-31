@@ -209,7 +209,14 @@ buildsRouter.post("/api/builds/upload", requireAuth, uploadLimiter, (req, res) =
     // Both the storage key and the temp path are server-generated; the client's
     // filename only ever appears after being stripped to [A-Za-z0-9._-].
     const storageKey = newKey(`builds/${slug}`, info.filename);
-    const tmpPath = path.join(TMP_DIR, `${slug}-${crypto.randomUUID()}`);
+    // The extension matters, not just cosmetically: app-info-parser (used for
+    // .apk) determines file type by splitting the PATH it's given on ".", not
+    // by magic bytes or MIME type. An extensionless temp path made it treat
+    // every real Android upload as "Unsupported file type" — .ipa never hit
+    // this because that path is parsed by lib/ipa.ts, which reads the path
+    // only to open it and never inspects the name.
+    const tmpExt = platform === "IOS" ? ".ipa" : ".apk";
+    const tmpPath = path.join(TMP_DIR, `${slug}-${crypto.randomUUID()}${tmpExt}`);
     const out = fs.createWriteStream(tmpPath);
 
     stream.on("limit", () => {
