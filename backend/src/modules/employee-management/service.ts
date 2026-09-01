@@ -535,9 +535,31 @@ export class EmployeeManagementService extends BaseService {
       reason?: string | null;
       actorUserId: string | null;
       data?: Prisma.EmploymentRecordUpdateInput;
+      /**
+       * Removing a never-approved APPLICATION, which is not an employment
+       * transition at all (delete() only -- see its own comment).
+       *
+       * ALLOWED_TRANSITIONS deliberately has no PENDING -> DELETED edge, and
+       * that stays true: it is what stops deactivateForContractLapse() (which
+       * also targets DELETED) from quietly disposing of a pending applicant
+       * when their contract lapses, and two tests pin it. But delete() itself
+       * carries an explicit "if the record is PENDING, a manager may delete
+       * it" branch, which that same missing edge made unreachable -- so
+       * nobody, admin included, could remove a mistyped applicant.
+       *
+       * Narrow opt-out rather than a wider table so exactly one caller gains
+       * the ability, and the general rule keeps protecting every other one.
+       */
+      allowPendingApplicationRemoval?: boolean;
     }
   ): Promise<EmploymentRecord> {
-    assertTransition(record.status, toStatus);
+    const isPendingApplicationRemoval =
+      opts.allowPendingApplicationRemoval === true &&
+      record.status === EmploymentStatus.PENDING &&
+      toStatus === EmploymentStatus.DELETED;
+    if (!isPendingApplicationRemoval) {
+      assertTransition(record.status, toStatus);
+    }
 
     // A new engagement cycle starts on either return path -> PENDING: a full
     // rehire (DELETED -> PENDING, via restore()) or a re-onboarding after a
@@ -1420,6 +1442,11 @@ export class EmployeeManagementService extends BaseService {
         actorUserId: actor.userId,
         reason,
         data: { deleted_reason: reason, deleted_at: now },
+        // The authorization block at the top of this method already decided a
+        // PENDING record may be removed here (and by whom). Without this the
+        // missing PENDING -> DELETED edge threw first, so that decision never
+        // took effect -- see applyTransition's own comment.
+        allowPendingApplicationRemoval: true,
       });
 
       // Manager ghosting fix (2026-08-13 audit): deactivate() vacated managed
