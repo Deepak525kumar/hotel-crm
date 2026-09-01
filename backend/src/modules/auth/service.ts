@@ -622,8 +622,21 @@ export class AuthService extends BaseService {
     // must see the CURRENT assignment in the UI, not the stale one baked
     // into a token issued up to an access-token lifetime ago.
     const scope = await this.resolveScope(user.id, user.role);
-    const { employment_record, created_by, ...rest } = user;
-    
+    // profile_photo_key is destructured OUT and replaced by the boolean
+    // below, the same as every other response site (login, signup,
+    // updateProfile, users/service.ts). It was being spread straight through
+    // by `...rest` here, which had two consequences: the raw S3 key left the
+    // process on the single most-called endpoint in the platform, and
+    // `has_profile_photo` -- the field the web and both apps actually read to
+    // decide whether to fetch the photo -- was absent from it.
+    //
+    // That second one is why a worker's photo "disappeared" in the apps:
+    // login returns the flag, so the avatar appeared right after signing in,
+    // but every app launch restores the session through /auth/me (see each
+    // app's auth-store initialize()), which did not -- so the flag came back
+    // undefined and UserAvatar fell back to initials from then on.
+    const { employment_record, created_by, profile_photo_key, ...rest } = user;
+
     let managerName: string | null = null;
     if (employment_record?.primary_hotel?.manager) {
       managerName = `${employment_record.primary_hotel.manager.first_name} ${employment_record.primary_hotel.manager.last_name}`.trim();
@@ -638,6 +651,7 @@ export class AuthService extends BaseService {
       role: user.role.toLowerCase(),
       permissions: ROLE_PERMISSIONS[user.role] ?? [],
       employment_status: employment_record?.status ?? null,
+      has_profile_photo: profile_photo_key != null,
       creator_name: creatorName,
       manager_name: managerName,
       ...AuthService.flattenScope(scope),

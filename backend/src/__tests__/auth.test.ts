@@ -790,6 +790,54 @@ describe('AuthService', () => {
       expect(result.employment_status).toBeNull();
     });
 
+    // Reported live: "workers cannot see their profile photos in the apps".
+    // login() carried has_profile_photo, so the avatar appeared immediately
+    // after signing in -- but every app launch restores the session through
+    // THIS endpoint (each app's auth-store initialize()), and it returned the
+    // raw profile_photo_key spread straight through `...rest` and no flag at
+    // all. So the photo showed once and was replaced by initials on the next
+    // launch. The key must also never leave the process: it is an internal
+    // storage detail, and this is the most-called endpoint in the platform.
+    it('reports has_profile_photo and never returns the raw storage key', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user_1',
+        email: 'user@test.com',
+        first_name: 'John',
+        last_name: 'Doe',
+        phone: null,
+        profile_photo_key: 'profile-photos/user_1/uuid/photo.jpg',
+        role: 'WORKER',
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      const result = await service.getCurrentUser('user_1');
+
+      expect(result.has_profile_photo).toBe(true);
+      expect(result).not.toHaveProperty('profile_photo_key');
+      expect(JSON.stringify(result)).not.toContain('profile-photos/');
+    });
+
+    it('reports has_profile_photo false when the account has no photo', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user_1',
+        email: 'user@test.com',
+        first_name: 'John',
+        last_name: 'Doe',
+        phone: null,
+        profile_photo_key: null,
+        role: 'WORKER',
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      const result = await service.getCurrentUser('user_1');
+
+      expect(result.has_profile_photo).toBe(false);
+    });
+
     // 2026-08-13 fix (reported live): this endpoint is /auth/me, which My
     // Profile and SessionBootstrap read the signed-in user from. It never
     // selected the EmploymentRecord, so a still-onboarding user's own
