@@ -38,20 +38,36 @@ export function useAsyncAction() {
     ): Promise<T | undefined> => {
       setError(null);
       setPendingKey(opts?.key ?? "default");
+      let result: T;
       try {
-        const result = await action();
-        await opts?.onSuccess?.(result);
-        return result;
+        result = await action();
       } catch (err) {
         setError(
           err instanceof ApiError
             ? err.message
             : (opts?.errorMessage ?? DEFAULT_ERROR),
         );
+        setPendingKey(null);
         return undefined;
+      }
+
+      // onSuccess runs OUTSIDE the error path on purpose (reported live for
+      // absence withdrawal: the absence was withdrawn and an error appeared
+      // anyway). Callers pass a cache revalidation here -- `mutate(...)` --
+      // and it used to sit inside the same try as the action, so a failed
+      // refetch was reported with the ACTION's error message, telling the
+      // user the thing they just did had failed when it had succeeded. The
+      // action is what `error` speaks for; a stale cache resolves itself on
+      // the next revalidation and is not worth contradicting a completed
+      // write over.
+      try {
+        await opts?.onSuccess?.(result);
+      } catch {
+        // Intentionally silent -- see above.
       } finally {
         setPendingKey(null);
       }
+      return result;
     },
     [],
   );

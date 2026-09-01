@@ -89,6 +89,18 @@ export default function RoomsScreen() {
     );
   }, [assignments]);
 
+  // The shift that WOULD unlock logging if the worker checked in: today's,
+  // not yet started. Deliberately separate from todayShift (which requires
+  // IN_PROGRESS/COMPLETED, matching what the server will accept) so the
+  // empty state can point at something concrete instead of only explaining.
+  const pendingShift = useMemo<WorkerAssignment | undefined>(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return (assignments ?? []).find(
+      (a: WorkerAssignment) =>
+        a.day === today && !a.rework_of_assignment_id && a.status === 'CONFIRMED'
+    );
+  }, [assignments]);
+
   const { data: suggestionData } = useSWR(
     todayShift?.hotel?.id ? `/rooms/suggestions/${todayShift.hotel.id}` : null,
     () => api.rooms.suggestions(todayShift!.hotel!.id)
@@ -284,13 +296,26 @@ export default function RoomsScreen() {
                   </Card>
                 </>
               ) : (
-                <Card>
+                // Reported as "no option to log a room". There IS a rule
+                // behind it -- the server refuses a log against a shift that
+                // is not IN_PROGRESS/COMPLETED (rooms/service.ts), so the
+                // input is withheld rather than offered and then rejected --
+                // but a bare sentence reads as the screen being broken. It
+                // now says which shift is waiting and takes the worker
+                // straight to the check-in that unlocks logging.
+                <Card style={styles.checkInCard}>
                   <ThemedText type="small" themeColor="textSecondary">
                     {t(
                       'rooms.checkInFirst',
                       'Check in to today’s shift to start logging the rooms you finish.'
                     )}
                   </ThemedText>
+                  {pendingShift ? (
+                    <Button
+                      label={t('rooms.goToCheckIn', 'Go to check-in')}
+                      onPress={() => router.push(`/shift/${pendingShift.id}` as never)}
+                    />
+                  ) : null}
                 </Card>
               )}
 
@@ -333,6 +358,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   listCard: { gap: 0, paddingVertical: 0 },
+  checkInCard: { gap: Spacing.three, alignItems: 'flex-start' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   input: {
     flex: 1,

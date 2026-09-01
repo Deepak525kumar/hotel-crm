@@ -69,24 +69,39 @@ export function StaffingWriteGate({
 }
 
 /**
- * User account deactivation (`DELETE /users/:id`) — Admin-only backend-side
- * (users/routes.ts:39, `requireRole('admin')`), narrower than the worker
- * detail page's own view gate (which now also admits Manager for the
- * Documents section, GD-16). Split out so widening view access doesn't
- * silently also expose an action the backend would 403.
+ * User account deactivation (`DELETE /users/:id`).
+ *
+ * Mirrors the backend's two-part rule rather than the route gate alone: the
+ * route admits admin/manager/regional_manager (users/routes.ts), and
+ * `userService.deleteUser` then narrows every non-admin to targets whose
+ * EmploymentRecord is still PENDING (scope enforced below that by
+ * employeeManagementService.delete). So a manager may clear up an
+ * application they just created, but never an active colleague.
+ *
+ * `targetEmploymentStatus` is required for that reason: without it this gate
+ * cannot tell the two cases apart and would have to fall back to admin-only,
+ * which is what it did before -- leaving a manager unable to delete the very
+ * pending account the backend was happy to let them delete.
  */
 export function UserDeactivateGate({
+  targetEmploymentStatus,
   fallback = null,
   children,
 }: {
+  /** The target's EmploymentStatus, or null when they hold no record (an admin). */
+  targetEmploymentStatus?: string | null;
   fallback?: ReactNode;
   children: ReactNode;
 }) {
-  return (
-    <RoleGate allow={["admin"]} fallback={fallback}>
-      {children}
-    </RoleGate>
-  );
+  const role = useAuthStore((s) => s.user?.role);
+
+  if (role === "admin") return <>{children}</>;
+
+  const isPending = targetEmploymentStatus === "PENDING";
+  const canDeletePending =
+    isPending && (role === "manager" || role === "regional_manager");
+
+  return canDeletePending ? <>{children}</> : <>{fallback}</>;
 }
 
 /**

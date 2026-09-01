@@ -51,7 +51,13 @@ export default function BroadcastDetailPage() {
   // one is rendered.
   const role = useAuthStore((s) => s.user?.role);
   const canSeeAggregateEligibility = role === "admin" || role === "manager" || role === "regional_manager";
-  const canAccept = role === "worker";
+  // `checker` included 2026-09-01 (web/app parity audit). A JobRequest carries
+  // a target_role and the backend resolves which side a caller sees from the
+  // CALLER's role, with no role gate on the accept route at all -- the checker
+  // app has accepted checker-targeted broadcasts through these same endpoints
+  // since target_role shipped. Web-side this said `worker` only, so a checker
+  // could open the page and had no button.
+  const canAccept = role === "worker" || role === "checker";
 
   const { data: request, isLoading, error, mutate } = useWorkRequest(id);
   const { data: hotel } = useHotel(request?.hotel_id);

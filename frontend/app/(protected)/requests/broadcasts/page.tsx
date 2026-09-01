@@ -65,7 +65,13 @@ export default function BroadcastsPage() {
   const { broadcasts, isLoading, error, hasNext } = useBroadcasts({
     page,
     per_page: PER_PAGE,
-    ...(role === "worker" ? { status: ["OPEN", "PARTIALLY_FILLED"] } : {}),
+    // Staff-side callers (worker AND checker -- the two roles a broadcast can
+    // target) see only what they can still act on. Checker was missing here,
+    // so a checker reaching this list saw closed and filled requests mixed in
+    // with the open ones, unlike the checker app's Jobs tab.
+    ...(role === "worker" || role === "checker"
+      ? { status: ["OPEN", "PARTIALLY_FILLED"] }
+      : {}),
   });
 
   return (

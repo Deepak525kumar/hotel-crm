@@ -1219,6 +1219,7 @@
       "needsRework": "Reprise nécessaire",
       "reworkSubmitted": "Reprise soumise"
     },
-    "suggestions": "Suggestions:"
+    "suggestions": "Suggestions:",
+    "goToCheckIn": "Aller au pointage d'arrivée"
   }
 }

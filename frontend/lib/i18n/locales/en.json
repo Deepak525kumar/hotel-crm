@@ -1219,6 +1219,7 @@
       "passed": "Passed",
       "needsRework": "Needs rework",
       "reworkSubmitted": "Rework submitted"
-    }
+    },
+    "goToCheckIn": "Go to check-in"
   }
 }
