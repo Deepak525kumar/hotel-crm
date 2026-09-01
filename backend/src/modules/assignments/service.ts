@@ -1545,6 +1545,66 @@ export class AssignmentService extends BaseService {
    * Calendar-placed assignments (no JobRequest) are marked NO_SHOW if their
    * calendar day is strictly before today in UTC.
    */
+  async sweepShiftReminders(): Promise<number> {
+    const now = new Date();
+    // 70 minutes from now
+    const cutoff = new Date(now.getTime() + 70 * 60 * 1000);
+    
+    // Look back 1 day and forward 2 days to account for timezones
+    const minDay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const maxDay = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+    const candidates = await this.prisma.workerAssignment.findMany({
+      where: {
+        status: AssignmentStatus.CONFIRMED,
+        shift_reminder_sent_at: null,
+        day: {
+          gte: minDay,
+          lte: maxDay,
+        },
+      },
+    });
+
+    let notifiedCount = 0;
+    for (const assignment of candidates) {
+      if (assignment.work_request_id || assignment.job_request_id) {
+        const shiftStart = await resolveScheduledStart(this.prisma, assignment);
+        
+        // If the shift is starting in less than 70 minutes and is still in the future
+        if (shiftStart && shiftStart <= cutoff && shiftStart > now) {
+          await this.prisma.$transaction(async (tx) => {
+            // Use updateMany for atomic check-and-set to prevent race conditions
+            // if multiple background worker instances are running
+            const result = await tx.workerAssignment.updateMany({
+              where: { 
+                id: assignment.id, 
+                status: AssignmentStatus.CONFIRMED, 
+                shift_reminder_sent_at: null 
+              },
+              data: { shift_reminder_sent_at: new Date() },
+            });
+
+            if (result.count === 1) {
+              await notificationService.enqueue({
+                recipientId: assignment.worker_id,
+                type: 'SHIFT_REMINDER',
+                title: 'Upcoming Shift',
+                message: `Reminder: Your shift is starting in about 1 hour.`,
+                data: { assignment_id: assignment.id },
+                transports: [OutboxTransport.PUSH],
+                sourceModule: OutboxSourceModule.ASSIGNMENTS,
+                producerService: 'AssignmentService',
+              }, tx);
+              
+              notifiedCount++;
+            }
+          });
+        }
+      }
+    }
+    return notifiedCount;
+  }
+
   async sweepNoShows(gracePeriodMs: number, batchSize: number): Promise<number> {
     const cutoff = new Date(Date.now() - gracePeriodMs);
 

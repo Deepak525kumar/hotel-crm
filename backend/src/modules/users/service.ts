@@ -670,7 +670,7 @@ export class UserService extends BaseService {
         // enqueue would change the sign-in address and notify nobody -- the
         // exact silent takeover this fan-out exists to make visible.
         await this.enqueueEmailChangeNotifications(
-          { id: user.id, first_name: user.first_name, last_name: user.last_name },
+          { id: user.id, first_name: user.first_name, last_name: user.last_name, role: user.role },
           previousEmail,
           nextEmail,
           supervisorIds,
@@ -744,7 +744,7 @@ export class UserService extends BaseService {
 
   /** Enqueued within the caller's transaction -- see the call site. */
   private async enqueueEmailChangeNotifications(
-    user: { id: string; first_name: string; last_name: string },
+    user: { id: string; first_name: string; last_name: string; role: string },
     previousEmail: string,
     nextEmail: string,
     supervisorIds: string[],
@@ -752,6 +752,9 @@ export class UserService extends BaseService {
   ): Promise<void> {
     const name = `${user.first_name} ${user.last_name}`.trim();
     const title = 'Account email changed';
+    
+    const isMobileUser = user.role === 'WORKER' || user.role === 'CHECKER';
+    const newEmailTransports = isMobileUser ? [OutboxTransport.EMAIL, OutboxTransport.PUSH] : [OutboxTransport.EMAIL];
 
     // The user, in-app and by email at the NEW address (the default
     // resolution, since the record now holds it).
@@ -762,7 +765,7 @@ export class UserService extends BaseService {
         title,
         message: `Your sign-in email was changed to ${nextEmail}. You have been signed out on all devices and will need to sign in again.`,
         data: { previous_email: previousEmail, new_email: nextEmail },
-        transports: [OutboxTransport.EMAIL, OutboxTransport.PUSH],
+        transports: newEmailTransports,
         sourceModule: OutboxSourceModule.USERS,
         producerService: 'UserService',
       },
@@ -780,7 +783,7 @@ export class UserService extends BaseService {
         type: NotificationType.USER_EMAIL_CHANGED,
         title,
         message: `The sign-in email for this account was changed to ${nextEmail}. If you did not expect this, contact an administrator immediately.`,
-        transports: [OutboxTransport.EMAIL],
+        transports: newEmailTransports,
         emailTo: previousEmail,
         sourceModule: OutboxSourceModule.USERS,
         producerService: 'UserService',

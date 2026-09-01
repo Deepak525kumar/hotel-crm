@@ -20,6 +20,7 @@ import { RetentionSweepJob } from './modules/retention/sweep-job.js';
 import { JobRequestAutoCloseJob } from './modules/job-requests/auto-close-job.js';
 import { HrContractExpiryReminderJob } from './modules/hr/expiry-reminder-job.js';
 import { AssignmentNoShowJob } from './modules/assignments/no-show-job.js';
+import { ShiftReminderJob } from './modules/assignments/shift-reminder-job.js';
 
 /**
  * Platform Worker process entrypoint (ADR-029 §3). A second Node entrypoint over
@@ -150,6 +151,11 @@ async function main() {
         new AssignmentNoShowJob({
           intervalMs: env.ASSIGNMENT_NO_SHOW_INTERVAL_MS,
           gracePeriodMs: env.ASSIGNMENT_NO_SHOW_GRACE_PERIOD_MS,
+        })
+      )
+      .register(
+        new ShiftReminderJob({
+          intervalMs: 5 * 60 * 1000,
         })
       );
 

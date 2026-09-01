@@ -1014,6 +1014,7 @@ model WorkerAssignment {
   assigned_by_id         String
   assigned_by            User                 @relation("assignment_manager", fields: [assigned_by_id], references: [id], onDelete: Restrict)
   status                 AssignmentStatus     @default(CONFIRMED)
+  shift_reminder_sent_at DateTime?
   confirmed_at           DateTime             @default(now())
   started_at             DateTime?
   completed_at           DateTime?

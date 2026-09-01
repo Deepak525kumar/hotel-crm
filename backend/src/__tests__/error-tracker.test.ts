@@ -51,9 +51,10 @@ describe('Error-tracking seam (S0-3 observability baseline)', () => {
 
     expect(sink).toHaveBeenCalledTimes(1);
     expect(mockLogger.error).not.toHaveBeenCalled();
-    const event = sink.mock.calls[0][0] as { message: string; context: Record<string, unknown> };
-    expect(event.message).toBe('routed');
-    expect(event.context.source).toBe('test');
+    const errArg = sink.mock.calls[0][0] as Error;
+    const ctxArg = sink.mock.calls[0][1] as Record<string, unknown>;
+    expect(errArg.message).toBe('routed');
+    expect(ctxArg.source).toBe('test');
   });
 
   it('never throws even when the sink throws', () => {
