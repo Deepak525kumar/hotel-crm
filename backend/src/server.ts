@@ -1,26 +1,15 @@
+import './instrument.js';
 import { loadEnv, getEnv } from './config/env.js';
 import { createApp } from './app.js';
 import { connectDb, disconnectDb } from './lib/db.js';
 import { logger } from './lib/logger.js';
-import * as Sentry from '@sentry/node';
-import { setErrorSink, captureException } from './lib/error-tracker.js';
+import { captureException } from './lib/error-tracker.js';
 
 async function main() {
   try {
     // Load environment
     loadEnv();
     const env = getEnv();
-
-    if (env.SENTRY_DSN) {
-      Sentry.init({ dsn: env.SENTRY_DSN, environment: env.NODE_ENV });
-      setErrorSink((event) => {
-        Sentry.withScope((scope) => {
-          scope.setExtras(event.context);
-          Sentry.captureException(new Error(event.message));
-        });
-      });
-      logger.info('Sentry initialized');
-    }
 
     // Verify database connectivity BEFORE the server starts listening so the
     // process fails fast (and the orchestrator restarts it) instead of

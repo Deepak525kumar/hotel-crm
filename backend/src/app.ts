@@ -5,6 +5,7 @@ import { requestLoggerMiddleware } from './middleware/requestLogger.js';
 // import { authMiddleware } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { logger } from './lib/logger.js';
+import * as Sentry from '@sentry/node';
 import v1Router from './routes/v1/index.js';
 
 export function createApp(): Express {
@@ -64,6 +65,10 @@ export function createApp(): Express {
 
   // 404 handler
   app.use(notFoundHandler);
+
+  // Sentry error handler MUST be before any other error middleware
+  // and after all controllers/routes
+  Sentry.setupExpressErrorHandler(app);
 
   // Error handler (must be last)
   app.use(errorHandler);

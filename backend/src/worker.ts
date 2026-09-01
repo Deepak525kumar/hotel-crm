@@ -1,8 +1,8 @@
+import './instrument.js';
 import { loadEnv, getEnv } from './config/env.js';
 import { connectDb, disconnectDb, getPrisma } from './lib/db.js';
 import { logger } from './lib/logger.js';
-import * as Sentry from '@sentry/node';
-import { setErrorSink, captureException } from './lib/error-tracker.js';
+import { captureException } from './lib/error-tracker.js';
 import { Scheduler } from './lib/scheduler.js';
 import { ReworkEscalationJob } from './modules/quality/rework-escalation-job.js';
 import { InspectionDigestJob } from './modules/quality/inspection-digest-job.js';
@@ -68,17 +68,6 @@ async function main() {
   try {
     loadEnv();
     const env = getEnv();
-
-    if (env.SENTRY_DSN) {
-      Sentry.init({ dsn: env.SENTRY_DSN, environment: env.NODE_ENV });
-      setErrorSink((event) => {
-        Sentry.withScope((scope) => {
-          scope.setExtras(event.context);
-          Sentry.captureException(new Error(event.message));
-        });
-      });
-      logger.info('Sentry initialized in worker');
-    }
 
     await connectDb();
     const prisma = getPrisma();

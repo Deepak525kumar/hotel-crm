@@ -19,12 +19,7 @@ export interface ErrorContext {
   [key: string]: unknown;
 }
 
-export type ErrorSink = (event: {
-  name: string;
-  message: string;
-  stack?: string;
-  context: ErrorContext;
-}) => void;
+export type ErrorSink = (error: Error, context: ErrorContext) => void;
 
 let sink: ErrorSink | null = null;
 
@@ -45,15 +40,9 @@ export function setErrorSink(customSink: ErrorSink | null): void {
 export function captureException(error: unknown, context: ErrorContext = {}): void {
   try {
     const err = error instanceof Error ? error : new Error(String(error));
-    const event = {
-      name: err.name,
-      message: err.message,
-      stack: err.stack,
-      context,
-    };
 
     if (sink) {
-      sink(event);
+      sink(err, context);
       return;
     }
 
@@ -69,9 +58,9 @@ export function captureException(error: unknown, context: ErrorContext = {}): vo
 
     logger.error('Captured exception', {
       channel: 'error_tracking',
-      name: event.name,
-      message: event.message,
-      stack: event.stack,
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
       sentry_configured: sentryConfigured,
       ...context,
     });
