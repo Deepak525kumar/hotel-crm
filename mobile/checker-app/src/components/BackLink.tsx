@@ -24,8 +24,16 @@ export function BackLink() {
   const locale = useLocaleStore((s) => s.locale);
   const arrow = isRtlLocale(locale) ? '→' : '←';
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
+
   return (
-    <Pressable onPress={() => router.back()} style={styles.back}>
+    <Pressable onPress={handleBack} style={styles.back}>
       <ThemedText type="small" themeColor="textSecondary">
         {arrow} {t('common.back')}
       </ThemedText>
