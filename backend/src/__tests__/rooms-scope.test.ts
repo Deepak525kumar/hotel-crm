@@ -89,6 +89,11 @@ function assignment(over: Record<string, unknown> = {}) {
     day: new Date('2026-09-01T00:00:00.000Z'),
     status: 'IN_PROGRESS',
     rework_of_assignment_id: null,
+    // The shift's own clock. logRoom's window is measured off these, so a
+    // fixture without started_at is a shift nobody checked into -- which is
+    // now refused, and is its own test below.
+    started_at: new Date('2026-09-01T09:00:00.000Z'),
+    completed_at: null,
     ...over,
   };
 }
@@ -403,7 +408,10 @@ describe('RoomService — "today" is anchored to the platform calendar timezone'
 
     expect(result.day).toBe(expected);
     const where = (mockRoomLog.findMany.mock.calls[0][0] as { where: Record<string, any> }).where;
-    expect(where.day).toEqual(new Date(`${expected}T00:00:00.000Z`));
+    // The read spans the day before as well (a shift outlives the calendar
+    // day it started on -- see dayRangeFrom), so the anchoring this test
+    // exists for is the RANGE'S UPPER BOUND.
+    expect(where.day.lte).toEqual(new Date(`${expected}T00:00:00.000Z`));
   });
 
   it('honours an explicit day verbatim', async () => {
@@ -413,7 +421,8 @@ describe('RoomService — "today" is anchored to the platform calendar timezone'
 
     expect(result.day).toBe('2026-01-15');
     const where = (mockRoomLog.findMany.mock.calls[0][0] as { where: Record<string, any> }).where;
-    expect(where.day).toEqual(new Date('2026-01-15T00:00:00.000Z'));
+    expect(where.day.lte).toEqual(new Date('2026-01-15T00:00:00.000Z'));
+    expect(where.day.gte).toEqual(new Date('2026-01-14T00:00:00.000Z'));
   });
 });
 
@@ -496,41 +505,30 @@ describe('RoomService — derived room state', () => {
 });
 
 /**
- * Owner decision (2026-09-02): a room may only be logged DURING its shift,
- * plus two hours afterwards for anything forgotten in the last rush.
+ * WHEN a room may be logged (owner decision, 2026-09-02): during the shift,
+ * plus two hours after it ends. Never before the worker has started.
  *
- * The status check alone allowed both ends of that to be wrong -- a worker
- * who checks in early is IN_PROGRESS before their shift starts, and a
- * COMPLETED shift stayed loggable indefinitely, so rooms could be attributed
- * to a shift days after a checker had already closed it out.
- *
- * Hotel timezone is UTC in these tests purely so the expected instants are
- * readable; resolveScheduledStart's zone handling is covered by its own
- * module's tests.
+ * Measured off the shift's OWN started_at/completed_at, not the linked
+ * JobRequest's scheduled times. The first version of this rule used the
+ * scheduled clock and was inert in production: the assignments workers
+ * actually log against carry no linked request at all, so the window was
+ * skipped entirely and a shift nobody had checked into still accepted rooms.
+ * These tests therefore use the columns every real shift has.
  */
 describe('RoomService — a room may only be logged inside its shift window', () => {
-  // 09:00-17:00 UTC on the shift day. Grace therefore runs to 19:00.
-  const SHIFT = {
-    shift_date: new Date('2026-09-01T00:00:00.000Z'),
-    shift_start_time: '09:00',
-    shift_end_time: '17:00',
-  };
-
-  function arrangeTimedShift(now: string) {
-    jest.useFakeTimers().setSystemTime(new Date(now));
-    mockWorkerAssignment.findUnique.mockResolvedValue(
-      assignment({ job_request_id: 'jr1', work_request_id: null })
-    );
-    mockJobRequest.findUnique.mockResolvedValue(SHIFT);
-    mockHotel.findUnique.mockResolvedValue({ timezone: 'UTC' });
-  }
-
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  it('refuses a room logged before the shift has started', async () => {
-    arrangeTimedShift('2026-09-01T08:00:00.000Z');
+  function at(now: string, over: Record<string, unknown> = {}) {
+    jest.useFakeTimers().setSystemTime(new Date(now));
+    mockWorkerAssignment.findUnique.mockResolvedValue(assignment(over));
+  }
+
+  // The reported bug: a COMPLETED shift the worker never checked into passed
+  // the status gate and accepted rooms indefinitely.
+  it('refuses a shift the worker never checked into, even when it is COMPLETED', async () => {
+    at('2026-09-01T12:00:00.000Z', { status: 'COMPLETED', started_at: null, completed_at: null });
 
     await expect(service.logRoom('asn1', '412', WORKER)).rejects.toMatchObject({
       name: 'ValidationError',
@@ -539,15 +537,18 @@ describe('RoomService — a room may only be logged inside its shift window', ()
   });
 
   it('accepts a room logged during the shift', async () => {
-    arrangeTimedShift('2026-09-01T12:00:00.000Z');
+    at('2026-09-01T12:00:00.000Z');
 
     await service.logRoom('asn1', '412', WORKER);
 
     expect(mockRoomLog.create).toHaveBeenCalledTimes(1);
   });
 
-  it('accepts a room logged inside the two-hour grace after the shift', async () => {
-    arrangeTimedShift('2026-09-01T18:30:00.000Z');
+  it('accepts a room logged inside the two-hour grace after checkout', async () => {
+    at('2026-09-01T18:30:00.000Z', {
+      status: 'COMPLETED',
+      completed_at: new Date('2026-09-01T17:00:00.000Z'),
+    });
 
     await service.logRoom('asn1', '412', WORKER);
 
@@ -555,7 +556,10 @@ describe('RoomService — a room may only be logged inside its shift window', ()
   });
 
   it('refuses a room logged after the grace has run out', async () => {
-    arrangeTimedShift('2026-09-01T19:30:00.000Z');
+    at('2026-09-01T19:30:00.000Z', {
+      status: 'COMPLETED',
+      completed_at: new Date('2026-09-01T17:00:00.000Z'),
+    });
 
     await expect(service.logRoom('asn1', '412', WORKER)).rejects.toMatchObject({
       name: 'ValidationError',
@@ -563,16 +567,12 @@ describe('RoomService — a room may only be logged inside its shift window', ()
     expect(mockRoomLog.create).not.toHaveBeenCalled();
   });
 
-  // A calendar-placed assignment has a day but no start/end time at all
-  // (resolveScheduledStart returns null -- the data-model gap tracked in
-  // #365). There is no clock to bound it against, so it keeps the
-  // status-only rule rather than being refused for a gap that is not the
-  // worker's doing.
-  it('falls back to the status rule when the shift has no resolvable time', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-09-05T23:00:00.000Z'));
-    mockWorkerAssignment.findUnique.mockResolvedValue(
-      assignment({ job_request_id: null, work_request_id: null })
-    );
+  // A shift left IN_PROGRESS because nobody checked out must not stay open
+  // for logging forever -- but there is no end instant to measure from, so
+  // this is deliberately still allowed. Recorded so the choice is visible
+  // rather than assumed.
+  it('still accepts a room on a shift that was never checked out', async () => {
+    at('2026-09-03T12:00:00.000Z', { status: 'IN_PROGRESS', completed_at: null });
 
     await service.logRoom('asn1', '412', WORKER);
 
