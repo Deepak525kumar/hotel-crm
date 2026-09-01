@@ -101,9 +101,16 @@ export default function RoomsScreen() {
     );
   }, [assignments]);
 
+  // Read once, here, rather than asserted non-null inside the fetcher. The
+  // fetcher used `todayShift!.hotel!.id`, and `hotel` is genuinely nullable
+  // on the DTO: this screen polls every 5s, so a revalidation could run the
+  // fetcher from a render where todayShift had a hotel against a todayShift
+  // that no longer does, and `hotel!.id` is then a hard
+  // "Cannot read property 'id' of null" rather than a skipped fetch.
+  const suggestionHotelId = todayShift?.hotel?.id ?? null;
   const { data: suggestionData } = useSWR(
-    todayShift?.hotel?.id ? `/rooms/suggestions/${todayShift.hotel.id}` : null,
-    () => api.rooms.suggestions(todayShift!.hotel!.id)
+    suggestionHotelId ? `/rooms/suggestions/${suggestionHotelId}` : null,
+    () => api.rooms.suggestions(suggestionHotelId as string)
   );
 
   // Only suggestions that match what has been typed and are not already logged
@@ -212,44 +219,19 @@ export default function RoomsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <FlatList
-          contentContainerStyle={styles.content}
-          data={data?.rooms ?? []}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => renderRoom(item)}
-          refreshing={isLoading}
-          onRefresh={() => void mutate()}
-          ListHeaderComponent={
-            <>
-              <View style={styles.headerRow}>
-                <ThemedText type="title">{t('rooms.title', 'My rooms')}</ThemedText>
-                <NotificationBell />
-              </View>
+        {/* PINNED. The tab exists to log rooms one after another, and the
+            input used to live inside ListHeaderComponent -- so it scrolled
+            away behind the day's own list exactly as that list got long
+            enough to matter, and the worker had to scroll back up for every
+            room. Header and input sit outside the FlatList now; only the
+            record below them scrolls. */}
+        <View style={styles.pinned}>
+          <View style={styles.headerRow}>
+            <ThemedText type="title">{t('rooms.title', 'My rooms')}</ThemedText>
+            <NotificationBell />
+          </View>
 
-              {/* Rooms sent back, from any day. Kept above today's list and
-                  outside the day filter on purpose: a rework raised yesterday
-                  is dated today by the server and has a 20-minute clock on
-                  it, so it must never be a scroll away. */}
-              {(data?.needs_rework ?? []).length > 0 ? (
-                <>
-                  <SectionHeader title={t('rooms.needsYourAttention', 'Needs your attention')} />
-                  {/* Given a warning edge so it reads as urgent at a glance
-                      rather than as a third neutral list: these rooms carry a
-                      20-minute rework clock, and previously they sat in a card
-                      identical to "Logged today" directly below. */}
-                  <Card
-                    style={{
-                      ...styles.listCard,
-                      ...styles.attentionCard,
-                      borderLeftColor: theme.warning,
-                    }}
-                  >
-                    {(data?.needs_rework ?? []).map((room) => renderRoom(room, { showHotel: true }))}
-                  </Card>
-                </>
-              ) : null}
-
-              {todayShift ? (
+          {todayShift ? (
                 <>
                   <SectionHeader
                     title={t('rooms.addTitle', 'Log a finished room')}
@@ -331,6 +313,36 @@ export default function RoomsScreen() {
                   ) : null}
                 </Card>
               )}
+        </View>
+
+        <FlatList
+          contentContainerStyle={styles.content}
+          data={data?.rooms ?? []}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => renderRoom(item)}
+          refreshing={isLoading}
+          onRefresh={() => void mutate()}
+          ListHeaderComponent={
+            <>
+              {/* Rooms sent back, from any day, and outside the day filter on
+                  purpose: a rework raised yesterday is dated today by the
+                  server and carries a 20-minute clock. It leads the scrolling
+                  section so it is the first thing under the input, with a
+                  warning edge so it does not read as a third neutral list. */}
+              {(data?.needs_rework ?? []).length > 0 ? (
+                <>
+                  <SectionHeader title={t('rooms.needsYourAttention', 'Needs your attention')} />
+                  <Card
+                    style={{
+                      ...styles.listCard,
+                      ...styles.attentionCard,
+                      borderLeftColor: theme.warning,
+                    }}
+                  >
+                    {(data?.needs_rework ?? []).map((room) => renderRoom(room, { showHotel: true }))}
+                  </Card>
+                </>
+              ) : null}
 
               {/* Was the bare count ("3") as a subtitle, which read as an
                   unlabelled number next to the heading. */}
@@ -370,7 +382,9 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   content: {
     paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.three,
+    // No top padding: the pinned block above already ends with its own
+    // bottom padding, and keeping both put a visible gap between the input
+    // and the first thing it produces.
     paddingBottom: Spacing.six,
     gap: Spacing.two,
   },
@@ -383,6 +397,14 @@ const styles = StyleSheet.create({
   listCard: { gap: 0, paddingVertical: 0 },
   checkInCard: { gap: Spacing.three, alignItems: 'flex-start' },
   attentionCard: { borderLeftWidth: 3 },
+  // Matches `content`'s horizontal padding so the pinned block and the list
+  // below it share one left edge.
+  pinned: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.two,
+    gap: Spacing.two,
+  },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   input: {
     flex: 1,

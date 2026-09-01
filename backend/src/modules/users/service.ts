@@ -1411,7 +1411,21 @@ export class UserService extends BaseService {
     return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
   }
 
-  async deleteUser(userId: string, actorId: string, actorRole: string, ip?: string) {
+  async deleteUser(
+    userId: string,
+    actorId: string,
+    actorRole: string,
+    ip?: string,
+    // Threaded through 2026-09-01. Without it the delegation below built an
+    // AuthContext with NO scope, and employeeManagementService.delete ->
+    // isRecordInScope() denies by default on a missing scope claim -- so a
+    // manager/regional_manager deleting a PENDING account was refused
+    // ("Access denied to this employee") by the very check meant to permit
+    // them, and the PENDING branch above it could never be reached in
+    // practice. Optional so existing internal callers keep compiling; the
+    // controller always passes it.
+    actorScope?: UserScope | null,
+  ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
     if (userId === actorId) throw new ForbiddenError('Cannot delete your own account');
@@ -1442,7 +1456,7 @@ export class UserService extends BaseService {
 
     if (employmentRecord && !employmentRecord.deleted_at) {
       await employeeManagementService.delete(
-        { userId: actorId, email: '', role: actorRole, permissions: [] },
+        { userId: actorId, email: '', role: actorRole, permissions: [], scope: actorScope ?? null },
         employmentRecord.employee_id,
         'Account deleted by administrator',
       );

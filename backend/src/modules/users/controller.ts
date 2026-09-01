@@ -210,7 +210,13 @@ export class UserController {
   async deleteUser(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError();
-      await userService.deleteUser(req.params['user_id']!, req.auth.userId, req.auth.role, req.ip);
+      await userService.deleteUser(
+        req.params['user_id']!,
+        req.auth.userId,
+        req.auth.role,
+        req.ip,
+        req.auth.scope ?? null,
+      );
       res.status(204).send();
     } catch (error) {
       next(error);
