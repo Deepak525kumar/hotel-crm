@@ -211,7 +211,8 @@
     "attendanceDetail": "Anwesenheitsdetails",
     "qualityCheck": "Qualitätsprüfung",
     "rateWorker": "Mitarbeiter bewerten",
-    "schedule": "Dienstplan"
+    "schedule": "Dienstplan",
+    "rooms": "Zimmer"
   },
   "roles": {
     "admin": "Administrator",
@@ -1181,5 +1182,39 @@
   "marketplace": {
     "description": "Schichten, auf die Sie sich bewerben können.",
     "noneOpen": "Derzeit keine offenen Stellen."
+  },
+  "rooms": {
+    "title": "Meine Zimmer",
+    "addTitle": "Fertiges Zimmer erfassen",
+    "placeholder": "Zimmernummer",
+    "add": "Hinzufügen",
+    "remove": "Entfernen",
+    "removeTitle": "Zimmer entfernen?",
+    "removeBody": "{{room}} aus deiner Liste entfernen?",
+    "todayTitle": "Heute erfasst",
+    "emptyToday": "Heute noch keine Zimmer erfasst.",
+    "needsYourAttention": "Erfordert deine Aufmerksamkeit",
+    "goToRework": "Zur Nacharbeit",
+    "checkInFirst": "Checke in die heutige Schicht ein, um fertige Zimmer zu erfassen.",
+    "couldNotLog": "Zimmer konnte nicht erfasst werden",
+    "couldNotRemove": "Zimmer konnte nicht entfernt werden",
+    "editTitle": "Zimmernummer ändern",
+    "couldNotUpdate": "Zimmer konnte nicht geändert werden",
+    "hotelTodayTitle": "Heute erfasste Zimmer",
+    "roomsLogged": "Erfasste Zimmer",
+    "check": {
+      "title": "Zimmer auswählen",
+      "reworkedTitle": "Nacharbeit prüfen",
+      "checkedTitle": "Bereits kontrolliert",
+      "notListed": "Zimmer nicht in der Liste",
+      "empty": "Noch keine Zimmer erfasst",
+      "emptyBody": "Hier hat heute noch niemand ein Zimmer erfasst. Wähle „Zimmer nicht in der Liste“, um es trotzdem zu kontrollieren."
+    },
+    "state": {
+      "awaitingCheck": "Wartet auf Kontrolle",
+      "passed": "Bestanden",
+      "needsRework": "Nacharbeit nötig",
+      "reworkSubmitted": "Nacharbeit eingereicht"
+    }
   }
 }

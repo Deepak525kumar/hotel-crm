@@ -32,6 +32,44 @@ export interface AuthResponse {
   expires_in: number;
 }
 
+/**
+ * The quality state of a room the worker logged. Derived server-side from the
+ * room's inspection -- never stored -- so this app and the checker's app can
+ * never disagree about a room. Mirrors backend `modules/rooms/types.ts`.
+ */
+export type RoomState =
+  /** Logged, not yet inspected. */
+  | 'AWAITING_CHECK'
+  /** Inspected and accepted. */
+  | 'PASSED'
+  /** Sent back by the checker; the worker has to fix it and upload evidence. */
+  | 'NEEDS_REWORK'
+  /** Fix submitted, room auto-passed; the checker may still reopen it. */
+  | 'REWORK_SUBMITTED';
+
+export interface RoomLog {
+  id: string;
+  assignment_id: string;
+  hotel_id: string;
+  hotel_name: string | null;
+  worker_id: string;
+  worker_name: string | null;
+  day: string;
+  room_number: string;
+  state: RoomState;
+  logged_at: string;
+  verification_id: string | null;
+  score: number | null;
+  /**
+   * The rework shift to open when this room needs fixing -- rework is a
+   * separate assignment, not a state on the original one. Null unless the
+   * state is NEEDS_REWORK.
+   */
+  rework_assignment_id: string | null;
+  /** False once a checker has inspected the room: the log is then frozen. */
+  editable: boolean;
+}
+
 export interface ApiResponse<T> {
   status: 'success' | 'error';
   data?: T;

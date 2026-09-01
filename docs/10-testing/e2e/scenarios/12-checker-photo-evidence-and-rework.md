@@ -121,13 +121,55 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST -H "Authorization: Bearer $WT" 
 
 **PASS:** `400`. Then repeat **with** `-F "photos=@..."`.
 
-**PASS:** `200`; and in the database `QualityVerification.rework_completed_at` is set, the rework assignment is
-`COMPLETED`, `photo_urls` has grown from 1 to 2 (the completion photo is *appended* via
-`{ push: [...] }`, it does not replace the checker's evidence), and the Checker has a
-`REWORK_COMPLETED` notification.
+**PASS:** `200`, and in the database:
 
-Repeat the successful call once more. **PASS:** `409`, and `photo_urls` is **still 2** — a
-duplicate completion must not append a third photo.
+```bash
+docker exec hotel-crm-postgres-1 psql -U hotelcrm -d hotelcrm_dev -t -c \
+  "SELECT status, rework_required, rework_completed_at, score
+     FROM \"QualityVerification\" WHERE id='$VERIFICATION_ID';"
+docker exec hotel-crm-postgres-1 psql -U hotelcrm -d hotelcrm_dev -t -c \
+  "SELECT round_number, completed_at, array_length(photo_urls,1)
+     FROM \"ReworkRound\" WHERE verification_id='$VERIFICATION_ID' ORDER BY round_number;"
+```
+
+- `rework_completed_at` is set, and the rework assignment is `COMPLETED`;
+- **`status` is now `PASSED` and `rework_required` is `false`** — the room
+  AUTO-PASSES on submission (owner decision, 2026-09-01). Before that change
+  nothing in the codebase could move a verification out of `NEEDS_REWORK`, so a
+  fixed room stayed failed forever and dragged the worker's rating (analytics
+  filters on `status: PASSED`);
+- **`score` is UNCHANGED** (still 45). The room passed operationally; the
+  original number stays as the honest record that it took two attempts. A
+  score that moved would mean somebody fabricated it;
+- the worker's evidence is on the **`ReworkRound`**, not on the verification —
+  `QualityVerification.photo_urls` still holds only the checker's photographs.
+  (Corrected 2026-09-01: this step used to claim `photo_urls` "grows from 1 to
+  2" on the verification, which stopped being true on 2026-08-30 when the two
+  sets of photographs were deliberately separated — a checker could not tell
+  their own pictures from the worker's proof of the fix.)
+- the Checker has a `REWORK_COMPLETED` notification, pushed, and its message
+  says the room passed and can be sent back again. With auto-pass this push is
+  the **only** moment a human is invited to look at the fix, so a message that
+  merely said "marked it done" would be a real gap.
+
+Repeat the successful call once more. **PASS:** `200` again — not `409`.
+Resubmission is deliberately allowed so a worker can add more evidence; the
+round's `photo_urls` grows, `completed_at` does **not** move (it records when
+the room was done, and re-stamping it would restart the 20-minute story), and
+the checker's second notification says "added more evidence" rather than
+repeating "completed". (Corrected 2026-09-01: this step previously asserted a
+`409` and a frozen photo count.)
+
+## Step 6b — The checker can reopen a room after the auto-pass
+
+Re-run Step 4's `POST /quality/rework` against the same `$VERIFICATION_ID`.
+
+**PASS:** `201` — a second `ReworkRound` (`round_number = 2`) is created, the
+verification returns to `NEEDS_REWORK`, and `rework_completed_at` is reset to
+`null`. This is what makes auto-pass safe: acceptance is automatic, but it is
+not final. Note the guard is per-ROUND, not per-verification: `assignRework`
+refuses (`409`) only while a round is still **open**, so reopening works after
+a completion but a double-assign while one is outstanding is still a conflict.
 
 ## Step 7 — Cross-worker completion is refused
 

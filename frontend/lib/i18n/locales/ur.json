@@ -212,7 +212,8 @@
     "attendanceDetail": "حاضری کی تفصیل",
     "qualityCheck": "معیار کی جانچ",
     "rateWorker": "ورکر کی درجہ بندی",
-    "schedule": "شیڈول"
+    "schedule": "شیڈول",
+    "rooms": "کمرے"
   },
   "roles": {
     "admin": "ایڈمن",
@@ -1182,5 +1183,39 @@
   "marketplace": {
     "description": "شفٹس جن کے لیے آپ درخواست دے سکتے ہیں۔",
     "noneOpen": "فی الحال کوئی کھلی ملازمت نہیں۔"
+  },
+  "rooms": {
+    "title": "میرے کمرے",
+    "addTitle": "مکمل کمرہ درج کریں",
+    "placeholder": "کمرہ نمبر",
+    "add": "شامل کریں",
+    "remove": "ہٹائیں",
+    "removeTitle": "کمرہ ہٹائیں؟",
+    "removeBody": "کیا {{room}} کو اپنی فہرست سے ہٹانا ہے؟",
+    "todayTitle": "آج درج کیے گئے",
+    "emptyToday": "آج ابھی کوئی کمرہ درج نہیں ہوا۔",
+    "needsYourAttention": "آپ کی توجہ درکار ہے",
+    "goToRework": "دوبارہ کام پر جائیں",
+    "checkInFirst": "مکمل کمرے درج کرنے کے لیے آج کی شفٹ میں چیک اِن کریں۔",
+    "couldNotLog": "یہ کمرہ درج نہیں ہو سکا",
+    "couldNotRemove": "یہ کمرہ ہٹایا نہیں جا سکا",
+    "editTitle": "کمرہ نمبر تبدیل کریں",
+    "couldNotUpdate": "یہ کمرہ تبدیل نہیں ہو سکا",
+    "hotelTodayTitle": "آج درج کیے گئے کمرے",
+    "roomsLogged": "درج کیے گئے کمرے",
+    "check": {
+      "title": "کمرہ منتخب کریں",
+      "reworkedTitle": "جانچنے کے لیے دوبارہ کام",
+      "checkedTitle": "پہلے جانچے گئے",
+      "notListed": "کمرہ فہرست میں نہیں",
+      "empty": "ابھی کوئی کمرہ درج نہیں",
+      "emptyBody": "آج یہاں کسی نے کوئی کمرہ درج نہیں کیا۔ پھر بھی جانچنے کے لیے ”کمرہ فہرست میں نہیں“ منتخب کریں۔"
+    },
+    "state": {
+      "awaitingCheck": "جانچ کا انتظار",
+      "passed": "منظور",
+      "needsRework": "دوبارہ کام درکار",
+      "reworkSubmitted": "دوبارہ کام جمع کرایا"
+    }
   }
 }

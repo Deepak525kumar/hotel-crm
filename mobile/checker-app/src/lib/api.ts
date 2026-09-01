@@ -32,6 +32,7 @@ import type {
   QualityVerification,
   Rating,
   RecordConsentDecisionInput,
+  RoomsForCheck,
   User,
   WorkerDocument,
 } from '@/types/api';
@@ -523,11 +524,43 @@ export const api = {
     // silent failure in worker-app).
     myStats: () => request<WorkerStats>('/analytics/my-stats'),
   },
+  rooms: {
+    /**
+     * The rooms this checker may inspect on `day` (defaults to today
+     * server-side) — the entry point of the room-first inspection flow
+     * (owner-approved, 2026-09-01).
+     *
+     * The flow it replaced was worker-first: pick a worker, then TYPE the room
+     * number. Nothing tied that number to anything the worker had recorded, so
+     * a typo produced an inspection of a room nobody cleaned and the worker's
+     * own record of the shift stayed unlinked. Here the room is the choice and
+     * the worker comes with it.
+     *
+     * `hotel_id` narrows the list for a checker rostered at more than one hotel
+     * on the same day; it cannot widen it. Scope is resolved on the server from
+     * the checker's own roster (empty on a day off), and this client does no
+     * filtering of its own — a client-side filter over a wider list would be a
+     * disclosure, not a gate. Same reasoning as
+     * `quality.inspectableWorkers` below.
+     */
+    forCheck: (params?: { day?: string; hotel_id?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.day) qs.set('day', params.day);
+      if (params?.hotel_id) qs.set('hotel_id', params.hotel_id);
+      const q = qs.toString();
+      return request<RoomsForCheck>(`/rooms/for-check${q ? `?${q}` : ''}`);
+    },
+  },
+
   quality: {
     /**
      * ADR-072 §2.5: the workers this checker may inspect on `day` (defaults to
      * today server-side). Scope is resolved on the server from the checker's
      * own shifts — the client sends no hotel, and could not be trusted to.
+     *
+     * No longer the primary entry point — `rooms.forCheck` is. Kept because a
+     * worker can forget to log a room, and a skipped room must still be
+     * inspectable; that path submits a typed room number and no `room_log_id`.
      */
     inspectableWorkers: (day?: string) =>
       request<{ day: string; workers: InspectableWorker[] }>(
@@ -565,6 +598,19 @@ export const api = {
         criteria_scores?: Record<string, number>;
         outcome: InspectionOutcome;
         rework_notes?: string;
+        /**
+         * The worker's own room record this inspection belongs to. MUST be sent
+         * whenever the checker arrived from the room picker (`rooms.forCheck`):
+         * it is the only thing that links the inspection back to the room the
+         * worker logged, and the server cross-checks it against
+         * assignment_id/worker_id/room_number and rejects a mismatch rather
+         * than trusting any one of the four.
+         *
+         * Optional because the fallback path exists on purpose — a room the
+         * worker never logged has no record to link to (see
+         * `quality.inspectableWorkers`).
+         */
+        room_log_id?: string;
       },
       photos: { uri: string; name: string; type: string }[] = []
     ) => {
@@ -574,6 +620,7 @@ export const api = {
       form.append('room_number', data.room_number);
       form.append('score', String(data.score));
       form.append('outcome', data.outcome);
+      if (data.room_log_id) form.append('room_log_id', data.room_log_id);
       if (data.comment) form.append('comment', data.comment);
       if (data.rework_notes) form.append('rework_notes', data.rework_notes);
       if (data.criteria_scores) {

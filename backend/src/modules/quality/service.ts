@@ -18,6 +18,11 @@ import {
 import { attendanceScore, blendQualityAndAttendance } from './overall-rating.js';
 import { notificationService } from '../notifications/service.js';
 import { logger } from '../../lib/logger.js';
+// Room-first inspection flow (2026-09-01). One-directional: rooms knows
+// nothing about quality, quality reads a room log to resolve whose work a
+// check covers. No cycle.
+import { roomService } from '../rooms/service.js';
+import { roomKey } from '../rooms/types.js';
 // Shared with the assignments search: every free-text search needs this, and a
 // second copy of the rule is a second chance to get it wrong.
 import { escapeLikeTerm } from '../../lib/like-escape.js';
@@ -891,7 +896,34 @@ export class QualityService extends BaseService {
       if (isNewest) {
         await tx.qualityVerification.updateMany({
           where: { id: verification.id },
-          data: { rework_completed_at: existing.completed_at ?? completedAt },
+          data: {
+            rework_completed_at: existing.completed_at ?? completedAt,
+            // AUTO-PASS on submission (owner decision, 2026-09-01).
+            //
+            // Before this, nothing in the codebase could move a verification
+            // out of NEEDS_REWORK: assignRework set it, completeRework
+            // recorded the evidence, and no method anywhere set it back. A
+            // room sent back therefore stayed NEEDS_REWORK permanently, and
+            // since analytics filters on `status: PASSED`, a worker who fixed
+            // the room perfectly still carried the failure in their rating
+            // forever. The new room tab renders that state to the worker every
+            // day, which is what made the dead end intolerable.
+            //
+            // The checker is not bypassed: they are pushed the completion
+            // (below) with the worker's photos, and may reopen the room --
+            // assignRework refuses only while a round is still OPEN, and this
+            // round is now closed, so a new round is permitted immediately.
+            //
+            // `score` is deliberately NOT touched (owner decision): the
+            // original number stays as an honest record of the first attempt.
+            // The room is operationally passed; the worker's rating still
+            // reflects that it took two attempts.
+            status: VerificationStatus.PASSED,
+            // The room is accepted, so it is no longer awaiting rework. Left
+            // true, every "needs rework" query -- the worker's own tab
+            // included -- would keep returning a room nobody has to touch.
+            rework_required: false,
+          },
         });
       }
 
@@ -913,9 +945,15 @@ export class QualityService extends BaseService {
           // Named for what happened: a first completion and a later addition
           // are different events, and telling the checker "rework completed"
           // twice for one round reads as though it was done twice.
+          //
+          // The first-completion wording says the room has PASSED and that
+          // reopening is available (2026-09-01). With auto-pass, this push is
+          // the ONLY moment a human is invited to look at the fix -- a message
+          // that just said "marked it done" would leave the checker unaware
+          // the room had already been accepted on their behalf.
           message: existing.completed_at
             ? `The worker added more evidence for round ${round.round_number}.`
-            : `The worker uploaded evidence for round ${round.round_number} and marked it done.`,
+            : `Room ${verification.room_number} was reworked and has passed. Review the photos and send it back again if it is not right.`,
           data: {
             verification_id: verification.id,
             rework_assignment_id: assignmentId,
@@ -1054,6 +1092,7 @@ export class QualityService extends BaseService {
   ) {
     const { assignment_id, worker_id, score, comment, criteria_scores, outcome, room_number } = data;
     const reworkNotes = (data.rework_notes ?? comment ?? '').trim();
+    const roomLogId = data.room_log_id;
 
     const assignment = await this.prisma.workerAssignment.findUnique({
       where: { id: assignment_id },
@@ -1076,6 +1115,31 @@ export class QualityService extends BaseService {
     // Found by probing the service directly: it accepted '' and '   '.
     if (!room_number || room_number.trim() === '') {
       throw new ValidationError('A room number is required');
+    }
+
+    // Room-first flow (2026-09-01): when the checker picked a logged room, the
+    // log is the authority on WHOSE work this is. Cross-checked rather than
+    // trusted from either direction -- a client that sends room A's log id
+    // with room B's assignment/worker/room_number is rejected, because
+    // attributing an inspection (and any rework that follows) to the wrong
+    // worker is the one error nobody downstream can detect.
+    if (roomLogId) {
+      const log = await roomService.resolveForInspection(roomLogId);
+      if (log.assignment_id !== assignment_id || log.worker_id !== worker_id) {
+        throw new ValidationError('The selected room does not belong to that shift');
+      }
+      if (roomKey(log.room_number) !== roomKey(room_number)) {
+        throw new ValidationError('The selected room does not match the room number submitted');
+      }
+      // Not a hard failure: the picker shows already-checked rooms on purpose
+      // so a checker can re-inspect one deliberately. A re-check creates a NEW
+      // verification, and the log is re-pointed at it below.
+      if (log.verification_id) {
+        logger.info('room_log_reinspected', {
+          room_log_id: roomLogId,
+          previous_verification_id: log.verification_id,
+        });
+      }
     }
 
     // CRR §15: the photo accompanies the rating. After authorization, so an
@@ -1151,6 +1215,19 @@ export class QualityService extends BaseService {
               : {}),
           },
         });
+
+      // Point the worker's room log at this check, in the same transaction as
+      // the check itself (2026-09-01). This is what makes the room's state
+      // derivable from one authority: the log stores no status of its own, so
+      // if this link were written separately and that write were lost, the
+      // room would read "awaiting check" forever while an inspection sat
+      // against it. A re-check re-points the log at the newest verification.
+      if (roomLogId) {
+        await tx.roomLog.update({
+          where: { id: roomLogId },
+          data: { verification_id: verification.id },
+        });
+      }
 
       // GD-04 single-writer rule: every path that writes a Rating must refresh
       // the aggregate inside the same transaction, or WorkerOverallRating goes

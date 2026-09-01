@@ -211,7 +211,8 @@
     "attendanceDetail": "Détail de présence",
     "qualityCheck": "Contrôle qualité",
     "rateWorker": "Évaluer l'employé",
-    "schedule": "Planning"
+    "schedule": "Planning",
+    "rooms": "Chambres"
   },
   "roles": {
     "admin": "Administrateur",
@@ -1181,5 +1182,38 @@
   "marketplace": {
     "description": "Créneaux auxquels vous pouvez postuler.",
     "noneOpen": "Aucune offre ouverte pour le moment."
+  },
+  "rooms": {
+    "title": "Mes chambres",
+    "addTitle": "Enregistrer une chambre terminée",
+    "placeholder": "Numéro de chambre",
+    "add": "Ajouter",
+    "remove": "Retirer",
+    "removeTitle": "Retirer la chambre ?",
+    "removeBody": "Retirer {{room}} de votre liste ?",
+    "todayTitle": "Enregistrées aujourd’hui",
+    "emptyToday": "Aucune chambre enregistrée aujourd’hui.",
+    "needsYourAttention": "Nécessite votre attention",
+    "goToRework": "Aller à la reprise",
+    "checkInFirst": "Pointez votre arrivée pour enregistrer les chambres terminées.",
+    "couldNotLog": "Impossible d’enregistrer cette chambre",
+    "couldNotRemove": "Impossible de retirer cette chambre",
+    "state": {
+      "awaitingCheck": "En attente de contrôle",
+      "passed": "Validée",
+      "needsRework": "Reprise nécessaire",
+      "reworkSubmitted": "Reprise soumise"
+    },
+    "check": {
+      "title": "Sélectionner une chambre",
+      "subtitle": "Chambres enregistrées aujourd’hui dans vos hôtels",
+      "reworkedTitle": "Reprises — vérifier les photos",
+      "checkedTitle": "Déjà contrôlées",
+      "empty": "Aucune chambre à contrôler",
+      "emptyBody": "Aucune chambre terminée n’a encore été enregistrée aujourd’hui dans les hôtels où vous travaillez.",
+      "notListed": "La chambre n’est pas dans la liste ?",
+      "scoreShort": "Score {{score}}",
+      "loggedByHint": "Issue du registre de l’employé — l’employé est renseigné automatiquement."
+    }
   }
 }

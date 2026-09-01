@@ -211,7 +211,8 @@
     "attendanceDetail": "Attendance Detail",
     "qualityCheck": "Quality Check",
     "rateWorker": "Rate Worker",
-    "schedule": "Schedule"
+    "schedule": "Schedule",
+    "rooms": "Rooms"
   },
   "roles": {
     "admin": "Admin",
@@ -1181,5 +1182,38 @@
   "marketplace": {
     "description": "Shifts you can apply for.",
     "noneOpen": "No open jobs right now."
+  },
+  "rooms": {
+    "title": "My rooms",
+    "addTitle": "Log a finished room",
+    "placeholder": "Room number",
+    "add": "Add",
+    "remove": "Remove",
+    "removeTitle": "Remove room?",
+    "removeBody": "Remove {{room}} from your log?",
+    "todayTitle": "Logged today",
+    "emptyToday": "No rooms logged yet today.",
+    "needsYourAttention": "Needs your attention",
+    "goToRework": "Go to rework",
+    "checkInFirst": "Check in to today’s shift to start logging the rooms you finish.",
+    "couldNotLog": "Could not log this room",
+    "couldNotRemove": "Could not remove this room",
+    "state": {
+      "awaitingCheck": "Awaiting check",
+      "passed": "Passed",
+      "needsRework": "Needs rework",
+      "reworkSubmitted": "Rework submitted"
+    },
+    "check": {
+      "title": "Select a room",
+      "subtitle": "Rooms logged today at the hotels you are working",
+      "reworkedTitle": "Reworked — review photos",
+      "checkedTitle": "Already checked",
+      "empty": "No rooms to check",
+      "emptyBody": "Nobody has logged a finished room yet at the hotels you are working today.",
+      "notListed": "Room not on the list?",
+      "scoreShort": "Score {{score}}",
+      "loggedByHint": "From the worker’s room log — the worker is filled in for you."
+    }
   }
 }

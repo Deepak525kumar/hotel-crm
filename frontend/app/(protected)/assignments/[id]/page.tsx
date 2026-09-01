@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { UserRef } from "@/components/users/UserRef";
 import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
@@ -8,6 +8,7 @@ import { useHotel, useUserOptions } from "@/hooks/useHotels";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useRoomsForCheck } from "@/hooks/useRooms";
 import { useAuthStore } from "@/stores/auth";
 import { ApiError, assignmentsApi, attendanceApi, qualityApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
@@ -26,6 +27,7 @@ import {
   Input,
   Modal,
   PageHeader,
+  Select,
   Skeleton,
   Textarea,
   TextLink,
@@ -35,7 +37,7 @@ import type {
   ReworkRoundPhotos,
   InspectionChecklistItem,
   QualityVerification,
-  RoomsCompletedEntry,
+  RoomLog,
 } from "@/lib/types";
 import { INSPECTION_CHECKLIST_ITEMS } from "@/lib/types";
 import { useTranslation } from "react-i18next";
@@ -63,17 +65,21 @@ export default function AssignmentDetailPage() {
   const [reassignOpen, setReassignOpen] = useState(false);
   const action = useAsyncAction();
 
-  // No GET endpoint exists for rooms-completed entries (ADR-028) — the
-  // logged entry is only ever known from this page's own POST response, not
-  // re-fetchable on reload. Session-local only, intentionally.
-  const [roomsCompletedOpen, setRoomsCompletedOpen] = useState(false);
-  const [loggedRoomsCompleted, setLoggedRoomsCompleted] = useState<RoomsCompletedEntry | null>(
-    null,
-  );
+  // The manager's manual "rooms completed" card and its modal were removed
+  // 2026-09-01 with the room log (owner decision). The count is now derived
+  // from the workers' OWN per-room records — each worker logs the rooms they
+  // finish (/rooms) — so a manager typing a total after the shift was a second
+  // source of truth for the same fact, with nothing reconciling the two, and
+  // it was the number the room-first inspection flow replaced.
+  //
+  // `assignmentsApi.logRoomsCompleted`/`updateRoomsCompleted` are deliberately
+  // left in lib/api.ts (dormant): the backend endpoints are unchanged,
+  // historical entries are still readable through `assignment.rooms_completed`,
+  // and the calendar page's placement-details panel still calls both. Per-hotel
+  // room activity now lives on the hotel page's "Rooms logged today" card.
 
-  // Same shape as rooms-completed above: no GET endpoint exists for either
-  // (quality/routes.ts has no read route beyond the leaderboard), so both
-  // are session-local only, not re-fetchable on reload.
+  // The verification recorded in this session is held locally: the page never
+  // re-reads it, so it is not restored on reload. Intentional, unchanged.
   const [verificationOpen, setVerificationOpen] = useState(false);
   const [reworkOpen, setReworkOpen] = useState(false);
   const [loggedVerification, setLoggedVerification] = useState<QualityVerification | null>(null);
@@ -401,32 +407,9 @@ export default function AssignmentDetailPage() {
         </Card>
       )}
 
-      {/* rooms-completed route now includes regional_manager (ADR-030 §3
-          C-24, staffing:write) alongside admin/manager. */}
-      {assignment.status === "COMPLETED" && (
-        <RoleGate allow={["admin", "manager", "regional_manager"]}>
-          <Card>
-            <CardContent className="flex items-center justify-between gap-4">
-              <div className="text-sm text-gray-600 dark:text-gray-300">
-                {(loggedRoomsCompleted ?? assignment.rooms_completed)
-                  ? `Logged ${(loggedRoomsCompleted ?? assignment.rooms_completed)!.rooms_completed} rooms completed.`
-                  : "Log the rooms completed count for this assignment."}
-              </div>
-              {(loggedRoomsCompleted ?? assignment.rooms_completed) ? (
-                <Badge tone="success">{t("status.logged")}</Badge>
-              ) : (
-                <Button
-                  variant="outline"
-                  onClick={() => setRoomsCompletedOpen(true)}
-                  className="shrink-0"
-                >
-                  {t("assignments.logRoomsCompletedTitle")}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </RoleGate>
-      )}
+      {/* The manager's "rooms completed" entry card stood here until
+          2026-09-01. See the comment beside this page's state declarations for
+          why it is gone and where the number comes from now. */}
 
       {/*
         quality:write (backend/src/config/constants.ts ROLE_PERMISSIONS) is
@@ -553,15 +536,10 @@ export default function AssignmentDetailPage() {
         onReassigned={(updated) => mutate(updated, { revalidate: false })}
       />
 
-      <LogRoomsCompletedModal
-        assignmentId={id}
-        open={roomsCompletedOpen}
-        onClose={() => setRoomsCompletedOpen(false)}
-        onLogged={setLoggedRoomsCompleted}
-      />
-
       <CreateVerificationModal
         assignmentId={id}
+        hotelId={assignment.hotel_id}
+        workerId={assignment.worker_id}
         open={verificationOpen}
         onClose={() => setVerificationOpen(false)}
         onCreated={setLoggedVerification}
@@ -695,96 +673,9 @@ function ReassignModal({
   );
 }
 
-function LogRoomsCompletedModal({
-  assignmentId,
-  open,
-  onClose,
-  onLogged,
-}: {
-  assignmentId: string;
-  open: boolean;
-  onClose: () => void;
-  onLogged: (entry: RoomsCompletedEntry) => void;
-}) {
-  const { t } = useTranslation();
-  const [roomsCompleted, setRoomsCompleted] = useState("");
-  const [notes, setNotes] = useState("");
-  const [fieldError, setFieldError] = useState<string | null>(null);
-  const log = useAsyncAction();
-
-  const reset = () => {
-    setRoomsCompleted("");
-    setNotes("");
-    setFieldError(null);
-  };
-
-  const handleClose = () => {
-    if (log.pending) return;
-    reset();
-    onClose();
-  };
-
-  const onSubmit = () => {
-    setFieldError(null);
-    const parsed = Number(roomsCompleted);
-    if (roomsCompleted === "" || !Number.isInteger(parsed) || parsed < 0) {
-      setFieldError(t("assignments.roomsWholeNumber"));
-      return;
-    }
-
-    log.run(
-      () =>
-        assignmentsApi.logRoomsCompleted(assignmentId, {
-          rooms_completed: parsed,
-          notes: notes.trim() || undefined,
-        }),
-      {
-        onSuccess: (entry) => {
-          onLogged(entry);
-          reset();
-          onClose();
-        },
-      },
-    );
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title={t("assignments.logRoomsCompletedTitle")}
-      footer={
-        <>
-          <Button variant="outline" onClick={handleClose} disabled={log.pending}>
-            {t("common.cancel")}
-          </Button>
-          <Button onClick={onSubmit} loading={log.pending}>
-            {t("assignments.log")}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Input
-          label={t("assignments.roomsCompleted")}
-          type="number"
-          min={0}
-          step={1}
-          value={roomsCompleted}
-          onChange={(e) => setRoomsCompleted(e.target.value)}
-        />
-        <Textarea
-          label={t("fields.notesOptional")}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          maxLength={1000}
-          rows={3}
-        />
-        <FormError>{fieldError ?? log.error}</FormError>
-      </div>
-    </Modal>
-  );
-}
+// LogRoomsCompletedModal lived here until 2026-09-01. It typed a single
+// post-shift total; the room log replaced it with the workers' own per-room
+// records, which is also what the inspection below is now driven from.
 
 /**
  * CRR §14: the checker assigns rework to the worker who did the room.
@@ -997,13 +888,57 @@ function AssignReworkModal({
   );
 }
 
+/**
+ * Sentinel for "room not on the list". A `<select>` value must be a string, and
+ * a sentinel keeps the fallback reachable from the same control the rooms are
+ * in -- a checker who cannot find the room should not have to work out that
+ * some other affordance exists.
+ */
+const MANUAL_ROOM = "__manual__";
+
+/**
+ * A room option's visible text. Room number first because that is what the
+ * checker is standing in front of; the worker follows because the room is what
+ * identifies them here, and two workers can be on one floor.
+ *
+ * Deliberately untranslated data only -- an `<option>` cannot carry markup, so
+ * anything more structured than this would have to be faked with punctuation.
+ */
+function roomOptionLabel(room: RoomLog): string {
+  return [room.room_number, room.worker_name].filter(Boolean).join(" · ");
+}
+
+/**
+ * The inspection write, room-first since 2026-09-01 (owner decision).
+ *
+ * The room number used to be free text typed from memory: it was tied to
+ * nothing, so a typo produced a check against a room nobody had cleaned, and
+ * the worker's own record of that room stayed unlinked forever. Now the
+ * checker picks one of the rooms the WORKER logged, and the room supplies the
+ * assignment, the worker and the room number -- which is why the request below
+ * uses the selected room's ids rather than this page's assignment.
+ *
+ * Posts to `/quality/inspections` (qualityApi.recordInspection), NOT
+ * `/quality/verifications`: only the former accepts `room_log_id`, and it is
+ * that id which links the check back to the worker's room. The other endpoint's
+ * schema is not `.strict()`, so the id would have been silently dropped and the
+ * room would still read "awaiting check" with an inspection sitting against it.
+ * `outcome: "complete"` keeps this page's existing two-step flow intact -- the
+ * status stays score-derived, and rework is still assigned afterwards from the
+ * card above (Assign rework), rather than turning this modal into a decision
+ * screen it has never been.
+ */
 function CreateVerificationModal({
   assignmentId,
+  hotelId,
+  workerId,
   open,
   onClose,
   onCreated,
 }: {
   assignmentId: string;
+  hotelId: string;
+  workerId: string;
   open: boolean;
   onClose: () => void;
   onCreated: (verification: QualityVerification) => void;
@@ -1011,8 +946,10 @@ function CreateVerificationModal({
   const { t } = useTranslation();
   const [score, setScore] = useState("");
   const [notes, setNotes] = useState("");
-  // Required since 2026-08-29: a shift carries one check per room, so a check
-  // that does not say which room cannot be acted on or found.
+  // The picked room log id, or MANUAL_ROOM for the typed-room fallback.
+  const [selection, setSelection] = useState("");
+  // Only used on the fallback path: a room the worker never logged has no
+  // record to link to, and a skipped room must stay inspectable.
   const [roomNumber, setRoomNumber] = useState("");
   // TREQ-005: one entry per confirmed checklist item, driven off the shared
   // constant rather than hand-declared hooks -- adding or removing an item is
@@ -1026,9 +963,34 @@ function CreateVerificationModal({
   const [fieldError, setFieldError] = useState<string | null>(null);
   const create = useAsyncAction();
 
+  // Fetched only while the modal is open, and narrowed to THIS hotel. The
+  // hotel_id can only narrow what the caller may already see (an out-of-scope
+  // hotel answers 403, not an empty list), and scope itself is resolved
+  // server-side from the caller -- a checker sees only hotels they are rostered
+  // at today. Nothing here is filtered client-side.
+  const { data: picker, isLoading: pickerLoading, error: pickerError } = useRoomsForCheck(
+    open ? hotelId : null,
+  );
+
+  const rooms = useMemo(
+    () => [
+      ...(picker?.awaiting_check ?? []),
+      ...(picker?.reworked ?? []),
+      ...(picker?.already_checked ?? []),
+    ],
+    [picker],
+  );
+  const selectedRoom = rooms.find((r) => r.id === selection);
+  // With nothing to pick, the fallback IS the form rather than an extra choice
+  // to make first -- including when the picker itself failed to load, so a 403
+  // or a network error never leaves a checker unable to record anything.
+  const pickerUnavailable = Boolean(pickerError) || (!pickerLoading && rooms.length === 0);
+  const manualRoom = selection === MANUAL_ROOM || pickerUnavailable;
+
   const reset = () => {
     setScore("");
     setNotes("");
+    setSelection("");
     setRoomNumber("");
     setCriteria({});
     setPhotos([]);
@@ -1069,7 +1031,8 @@ function CreateVerificationModal({
     setFieldError(null);
     // Checked before the score and before any upload: a missing room is the
     // cheapest failure to surface.
-    if (roomNumber.trim() === "") {
+    const submittedRoom = selectedRoom ? selectedRoom.room_number : roomNumber.trim();
+    if (submittedRoom === "") {
       setFieldError(t("quality.roomRequired"));
       return;
     }
@@ -1093,21 +1056,37 @@ function CreateVerificationModal({
       criteriaScores[item as InspectionChecklistItem] = value;
     }
 
+    // The server refuses a photoless inspection (CRR §15: the evidence is what
+    // justifies the whole rating/rework/dispute loop). Caught here so the
+    // refusal does not arrive after an upload attempt on hotel wifi.
+    if (photos.length === 0) {
+      setFieldError(t("quality.photoRequired"));
+      return;
+    }
+
     create.run(
       () =>
-        qualityApi.createVerification(
+        qualityApi.recordInspection(
           {
-            assignment_id: assignmentId,
-            room_number: roomNumber.trim(),
+            // The ROOM is the authority on whose work this is: a room logged
+            // by another worker at this hotel carries its own assignment and
+            // worker, and sending this page's instead would attribute the
+            // check -- and any rework -- to the wrong person. The server
+            // cross-checks all four fields and rejects a mismatch.
+            assignment_id: selectedRoom ? selectedRoom.assignment_id : assignmentId,
+            worker_id: selectedRoom ? selectedRoom.worker_id : workerId,
+            room_number: submittedRoom,
             score: parsed,
-            notes: notes.trim() || undefined,
+            comment: notes.trim() || undefined,
             criteria_scores: criteriaScores,
+            outcome: "complete",
+            ...(selectedRoom ? { room_log_id: selectedRoom.id } : {}),
           },
           photos,
         ),
       {
-        onSuccess: (verification) => {
-          onCreated(verification);
+        onSuccess: (result) => {
+          onCreated(result.verification);
           reset();
           onClose();
         },
@@ -1132,13 +1111,94 @@ function CreateVerificationModal({
       }
     >
       <div className="space-y-4">
-        <Input
-          label={t("quality.roomTitle")}
-          value={roomNumber}
-          onChange={(e) => setRoomNumber(e.target.value)}
-          placeholder={t("quality.roomPlaceholder")}
-          maxLength={64}
-        />
+        {pickerLoading ? (
+          <Skeleton className="h-10 w-full" />
+        ) : (
+          !pickerUnavailable && (
+            <>
+              {/* Grouped by what can be done with each room, and empty groups
+                  are omitted rather than rendered as bare labels: on a normal
+                  shift two of the three are empty. Already-checked rooms are
+                  listed rather than hidden so a room can be re-checked
+                  deliberately -- the server treats that as a new check and
+                  re-points the room at it. */}
+              <Select
+                label={t("quality.roomLabel")}
+                placeholder={t("rooms.check.title")}
+                value={selection}
+                onChange={(e) => setSelection(e.target.value)}
+              >
+                {picker && picker.awaiting_check.length > 0 && (
+                  <optgroup label={t("rooms.state.awaitingCheck")}>
+                    {picker.awaiting_check.map((room) => (
+                      <option key={room.id} value={room.id}>
+                        {roomOptionLabel(room)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {picker && picker.reworked.length > 0 && (
+                  <optgroup label={t("rooms.check.reworkedTitle")}>
+                    {picker.reworked.map((room) => (
+                      <option key={room.id} value={room.id}>
+                        {roomOptionLabel(room)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {picker && picker.already_checked.length > 0 && (
+                  <optgroup label={t("rooms.check.checkedTitle")}>
+                    {picker.already_checked.map((room) => (
+                      <option key={room.id} value={room.id}>
+                        {roomOptionLabel(room)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {/* Kept in the same control, not hidden behind a link: a worker
+                    can forget to log a room, and a skipped room must still be
+                    inspectable. That path sends no room_log_id. */}
+                <option value={MANUAL_ROOM}>{t("rooms.check.notListed")}</option>
+              </Select>
+
+              {/* The worker is DERIVED from the room, and may not be the worker
+                  on this page's assignment -- so it is shown rather than
+                  assumed. */}
+              {selectedRoom && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {t("fields.worker")}:{" "}
+                  {selectedRoom.worker_name ?? t("quality.workerUnavailable")}
+                </p>
+              )}
+            </>
+          )
+        )}
+
+        {manualRoom && (
+          <>
+            {pickerUnavailable && !pickerError && (
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {t("rooms.check.empty")}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {t("rooms.check.emptyBody")}
+                </p>
+              </div>
+            )}
+            {pickerError && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t("common.loadFailed")}</p>
+            )}
+            <Input
+              label={t("quality.roomTitle")}
+              value={roomNumber}
+              onChange={(e) => setRoomNumber(e.target.value)}
+              placeholder={t("quality.roomPlaceholder")}
+              maxLength={64}
+            />
+          </>
+        )}
+
         <Input
           label={t("fields.score0to100")}
           type="number"
@@ -1173,8 +1233,15 @@ function CreateVerificationModal({
         {/* CRR §15: photo evidence accompanies the rating. Optional at the
             transport layer, so a checker without a photo is not blocked. */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium">{t("quality.photos")}</label>
+          {/* Associated with `htmlFor`/`id`: this label sat next to the input
+              with nothing tying the two together, so a screen reader
+              announced an unlabelled file control and clicking the text did
+              not open the picker. */}
+          <label htmlFor="verification-photos" className="block text-sm font-medium">
+            {t("quality.photos")}
+          </label>
           <input
+            id="verification-photos"
             type="file"
             accept={ACCEPTED_PHOTO_TYPES}
             multiple

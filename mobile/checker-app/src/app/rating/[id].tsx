@@ -36,12 +36,28 @@ import { useTheme } from '@/hooks/use-theme';
  * The overall score is DERIVED from the items rather than typed separately.
  * The web asks for both and lets them disagree, which lets the headline number
  * and the evidence behind it tell different stories.
+ *
+ * Reached two ways (2026-09-01). From the room picker, `room_log_id` and
+ * `room_number` arrive as params and the room is FIXED text -- the checker
+ * chose it from the worker's own log, so re-typing it could only introduce a
+ * mismatch. From the worker-first fallback there is no log entry to point at,
+ * so the room stays an input and no `room_log_id` is sent.
  */
 export default function RatingScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
-  const { id, worker_id: workerId } = useLocalSearchParams<{ id: string; worker_id?: string }>();
+  const {
+    id,
+    worker_id: workerId,
+    room_log_id: roomLogId,
+    room_number: roomNumberParam,
+  } = useLocalSearchParams<{
+    id: string;
+    worker_id?: string;
+    room_log_id?: string;
+    room_number?: string;
+  }>();
 
   const [scores, setScores] = useState<Partial<Record<InspectionChecklistItem, number>>>({});
   const [comment, setComment] = useState('');
@@ -51,7 +67,13 @@ export default function RatingScreen() {
 
   // Required (owner decision, 2026-08-29): a shift carries one check per room,
   // so a check that does not say which room cannot be acted on or found.
-  const [roomNumber, setRoomNumber] = useState('');
+  //
+  // Seeded from the picker's param when there is one. `roomLogId` -- not this
+  // value -- is what decides whether the field is editable: a room number
+  // could in principle be prefilled by some other caller, but only a log entry
+  // makes it authoritative.
+  const [roomNumber, setRoomNumber] = useState(roomNumberParam ?? '');
+  const roomFromLog = !!roomLogId;
   const [overallRaw, setOverallRaw] = useState('');
   const overall = overallRaw.trim() === '' ? null : Number(overallRaw);
 
@@ -120,6 +142,11 @@ export default function RatingScreen() {
           comment: comment || undefined,
           criteria_scores,
           outcome,
+          // Only ever the picker's own value. The server cross-checks it
+          // against assignment_id/worker_id/room_number and refuses a
+          // mismatch, so sending a stale or invented one fails the whole
+          // request rather than mislinking a room.
+          room_log_id: roomLogId,
         },
         picker.photos,
       );
@@ -165,17 +192,32 @@ export default function RatingScreen() {
 
           <SectionHeader title={t('quality.roomTitle')} />
           <Card>
-            <TextInput
-              value={roomNumber}
-              onChangeText={setRoomNumber}
-              placeholder={t('quality.roomPlaceholder')}
-              placeholderTextColor={theme.textSecondary}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              maxLength={64}
-              accessibilityLabel={t('quality.roomTitle')}
-              style={[styles.scoreInput, { color: theme.text, borderColor: theme.border }]}
-            />
+            {roomFromLog ? (
+              // Fixed text, not a disabled input: a greyed-out box invites the
+              // checker to try to edit it and reads as broken. There is nothing
+              // to edit here -- the room and its worker came from the worker's
+              // own log, and the server rejects any disagreement between them.
+              <>
+                <ThemedText type="subtitle" accessibilityLabel={`${t('quality.roomTitle')} ${roomNumber}`}>
+                  {roomNumber}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {t('rooms.check.loggedByHint')}
+                </ThemedText>
+              </>
+            ) : (
+              <TextInput
+                value={roomNumber}
+                onChangeText={setRoomNumber}
+                placeholder={t('quality.roomPlaceholder')}
+                placeholderTextColor={theme.textSecondary}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={64}
+                accessibilityLabel={t('quality.roomTitle')}
+                style={[styles.scoreInput, { color: theme.text, borderColor: theme.border }]}
+              />
+            )}
           </Card>
 
           <SectionHeader title={t('quality.checklistTitle')} />

@@ -212,7 +212,8 @@
     "attendanceDetail": "تفاصيل الحضور",
     "qualityCheck": "فحص الجودة",
     "rateWorker": "تقييم العامل",
-    "schedule": "الجدول"
+    "schedule": "الجدول",
+    "rooms": "الغرف"
   },
   "roles": {
     "admin": "مدير النظام",
@@ -1182,5 +1183,38 @@
   "marketplace": {
     "description": "المناوبات التي يمكنك التقدم لها.",
     "noneOpen": "لا توجد وظائف مفتوحة حالياً."
+  },
+  "rooms": {
+    "title": "غرفي",
+    "addTitle": "تسجيل غرفة منتهية",
+    "placeholder": "رقم الغرفة",
+    "add": "إضافة",
+    "remove": "إزالة",
+    "removeTitle": "إزالة الغرفة؟",
+    "removeBody": "إزالة {{room}} من قائمتك؟",
+    "todayTitle": "المسجلة اليوم",
+    "emptyToday": "لا توجد غرف مسجلة اليوم بعد.",
+    "needsYourAttention": "تحتاج إلى انتباهك",
+    "goToRework": "الانتقال إلى إعادة العمل",
+    "checkInFirst": "سجّل حضورك في وردية اليوم لتبدأ بتسجيل الغرف المنتهية.",
+    "couldNotLog": "لم يتم تسجيل هذه الغرفة",
+    "couldNotRemove": "لم يتم إزالة هذه الغرفة",
+    "state": {
+      "awaitingCheck": "بانتظار الفحص",
+      "passed": "مقبولة",
+      "needsRework": "تحتاج إعادة عمل",
+      "reworkSubmitted": "تم إرسال إعادة العمل"
+    },
+    "check": {
+      "title": "اختر غرفة",
+      "subtitle": "الغرف المسجلة اليوم في الفنادق التي تعمل بها",
+      "reworkedTitle": "أُعيد العمل — راجع الصور",
+      "checkedTitle": "تم فحصها",
+      "empty": "لا توجد غرف للفحص",
+      "emptyBody": "لم تُسجَّل أي غرفة منتهية اليوم في الفنادق التي تعمل بها.",
+      "notListed": "الغرفة غير موجودة في القائمة؟",
+      "scoreShort": "النتيجة {{score}}",
+      "loggedByHint": "من سجل غرف العامل — يُدرج العامل تلقائياً."
+    }
   }
 }

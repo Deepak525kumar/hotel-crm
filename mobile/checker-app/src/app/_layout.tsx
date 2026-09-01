@@ -85,6 +85,10 @@ export default function RootLayout() {
               {/* headerShown false like its siblings: the screen draws its own
                   <ScreenHeader>, and expo-router's bar on top of it is the
                   double-title this app just removed from the tab layout. */}
+              {/* The inspection entry point since 2026-09-01. select-worker is
+                  still registered because it is the fallback for a room the
+                  worker never logged, reached from this screen's footer. */}
+              <Stack.Screen name="inspection/select-room" options={{ headerShown: false }} />
               <Stack.Screen name="inspection/select-worker" options={{ headerShown: false }} />
               {/* Where check-in and check-out live. Home, Schedule and Attendance
                   all route here; without it the Start-checking gate could tell a

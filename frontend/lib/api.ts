@@ -59,6 +59,11 @@ import type {
   ListWorkRequestsQuery,
   LoginResponse,
   LogRoomsCompletedInput,
+  MyRooms,
+  RecordInspectionInput,
+  RoomLog,
+  RoomsForCheck,
+  RoomsForHotels,
   MarkAbsenceInput,
   MarkAbsenceForWorkerInput,
   Notification,
@@ -497,6 +502,14 @@ export const assignmentsApi = {
    * entry instead. The logged entry is also readable via
    * `assignmentsApi.get(id).rooms_completed` (AssignmentDto), not just from
    * this call's own response.
+   *
+   * DORMANT since 2026-09-01 on the assignment detail page: that entry card
+   * was retired when the room log shipped (roomsApi below), because the count
+   * is now a consequence of the workers' own per-room records rather than a
+   * second, hand-entered source of truth. Kept — with its PATCH sibling — on
+   * purpose: the backend endpoint is unchanged, historical entries are still
+   * read through `assignment.rooms_completed`, and the calendar page's
+   * placement-details panel still calls both.
    */
   logRoomsCompleted: (id: string, input: LogRoomsCompletedInput) =>
     apiFetch<RoomsCompletedEntry>(`/assignments/${id}/rooms-completed`, {
@@ -570,6 +583,14 @@ export const qualityApi = {
   createVerification: (input: CreateVerificationInput, photos: File[] = []) => {
     const form = new FormData();
     form.append("assignment_id", input.assignment_id);
+    // room_number was declared REQUIRED on the input type but never appended
+    // to the form (found 2026-09-01), so every call this wrapper made was
+    // rejected by the server's own `A room number is required` — tsc had
+    // nothing to say, because the field was present on the argument and
+    // simply dropped here. Nothing in the web calls this method any more
+    // (recordInspection below is the inspection write), but a silently
+    // unsendable field is exactly the trap this comment exists to close.
+    form.append("room_number", input.room_number);
     form.append("score", String(input.score));
     if (input.notes) form.append("notes", input.notes);
     // JSON-stringified into one field: multipart has a flat field model and
@@ -600,6 +621,45 @@ export const qualityApi = {
       rework_rounds: ReworkRoundPhotos[];
     }>(`/quality/verifications/${verificationId}/photos`),
 
+  /**
+   * `POST /quality/inspections` — one inspection, one request, and the ONLY
+   * endpoint that accepts `room_log_id`.
+   *
+   * The web reached the room-first flow (2026-09-01) through this method
+   * rather than createVerification() above because /quality/verifications
+   * cannot link a check to the worker's own room log: its schema is not
+   * `.strict()`, so a `room_log_id` sent there is silently discarded and the
+   * room reads "awaiting check" forever with an inspection sitting against it.
+   *
+   * Always multipart, and the server requires at least one photo (CRR §15) —
+   * callers should validate that before uploading rather than letting a
+   * photoless submit travel over hotel wifi to be refused.
+   */
+  recordInspection: (input: RecordInspectionInput, photos: File[] = []) => {
+    const form = new FormData();
+    form.append("assignment_id", input.assignment_id);
+    form.append("worker_id", input.worker_id);
+    form.append("room_number", input.room_number);
+    form.append("score", String(input.score));
+    form.append("outcome", input.outcome);
+    // Only when the checker came through the room picker. The server
+    // cross-checks it against assignment/worker/room and rejects a mismatch,
+    // so an omitted id is a supported fallback while a wrong one is an error.
+    if (input.room_log_id) form.append("room_log_id", input.room_log_id);
+    if (input.comment) form.append("comment", input.comment);
+    if (input.rework_notes) form.append("rework_notes", input.rework_notes);
+    // Same flat-field-model constraint as createVerification's copy.
+    if (input.criteria_scores && Object.keys(input.criteria_scores).length > 0) {
+      form.append("criteria_scores", JSON.stringify(input.criteria_scores));
+    }
+    for (const photo of photos) form.append("photos", photo);
+    return apiFetch<{
+      verification: QualityVerification;
+      /** Non-null only for `outcome: "rework"`. */
+      rework_assignment: Assignment | null;
+    }>("/quality/inspections", { method: "POST", body: form });
+  },
+
   /** CRR §14: assign rework for a failed inspection to the same worker. */
   assignRework: (input: { verification_id: string; notes: string }) =>
     apiFetch<Assignment>("/quality/rework", { method: "POST", body: input }),
@@ -617,6 +677,81 @@ export const qualityApi = {
    * Mirrors mobile's api.quality.leaderboard() exactly.
    */
   leaderboard: () => apiFetch<QualityLeaderboardEntry[]>("/quality/leaderboard"),
+};
+
+/**
+ * Room-log API matching the backend `/rooms/*` routes (owner decision,
+ * 2026-09-01). The worker records the rooms they finished; the checker picks a
+ * ROOM to inspect and the worker comes with it.
+ *
+ * `day` is optional on every read and is deliberately left unset by default:
+ * "today" is resolved server-side in the platform calendar timezone
+ * (Europe/Berlin, rooms/service.ts toDayDate), so a browser-computed date
+ * would disagree with the server for the first two hours of every day — and
+ * `new Date().toISOString()` would disagree with both.
+ *
+ * Scope is never a client argument here: `mine` takes no worker_id at all, and
+ * `hotel_id` on the picker/live-view endpoints can only NARROW what the caller
+ * may already see (an out-of-scope hotel is a 403, not an empty list, so it
+ * cannot be used to probe other hotels' activity).
+ */
+export const roomsApi = {
+  /**
+   * The worker's own rooms. Two lists: `rooms` for one day, and `needs_rework`
+   * across ALL days — a rework raised yesterday is dated today by the server,
+   * so a day-filtered list alone would hide it.
+   */
+  mine: (day?: string) => apiFetch<MyRooms>(`/rooms/mine${toQuery({ day })}`),
+
+  /**
+   * Logs a finished room against a shift the caller is checked in to. Worker
+   * only, own shift, IN_PROGRESS or COMPLETED. 409 (with a message naming who
+   * logged it) when that room is already logged today at that hotel — the
+   * usual cause is two people cleaning one corridor, which is why the server's
+   * own message is worth surfacing verbatim rather than a generic failure.
+   * 400 on a rework shift: rooms belong to the original shift.
+   */
+  log: (assignmentId: string, roomNumber: string) =>
+    apiFetch<RoomLog>(`/rooms/assignments/${assignmentId}/rooms`, {
+      method: "POST",
+      body: { room_number: roomNumber },
+    }),
+
+  /** Corrects a mis-typed room. 409 once the room has been inspected. */
+  update: (roomLogId: string, roomNumber: string) =>
+    apiFetch<RoomLog>(`/rooms/logs/${roomLogId}`, {
+      method: "PUT",
+      body: { room_number: roomNumber },
+    }),
+
+  /** Removes a mis-tapped room. 409 once the room has been inspected. */
+  remove: (roomLogId: string) =>
+    apiFetch<void>(`/rooms/logs/${roomLogId}`, { method: "DELETE" }),
+
+  /**
+   * Room numbers already used at this hotel, for the input's typeahead. This
+   * is what lets the server keep room matching conservative (trim +
+   * upper-case only, so "0412" stays distinct from "412") without workers
+   * inventing three spellings of one room.
+   */
+  suggestions: (hotelId: string) =>
+    apiFetch<{ rooms: string[] }>(`/rooms/suggestions${toQuery({ hotel_id: hotelId })}`),
+
+  /**
+   * The checker's room picker, grouped by what can be done with each room.
+   * Admits manager/regional_manager/admin too — the web inspection modal uses
+   * the same picker.
+   */
+  forCheck: (query: { day?: string; hotel_id?: string } = {}) =>
+    apiFetch<RoomsForCheck>(`/rooms/for-check${toQuery({ ...query })}`),
+
+  /**
+   * Manager/RM/admin live view: rooms logged at their hotels on `day`, plus a
+   * per-worker count. This is what replaced the manual rooms-completed number
+   * a manager used to type in after the shift.
+   */
+  forHotels: (query: { day?: string; hotel_id?: string } = {}) =>
+    apiFetch<RoomsForHotels>(`/rooms/for-hotels${toQuery({ ...query })}`),
 };
 
 /** Attendance API matching the backend `/attendance/*` routes. */

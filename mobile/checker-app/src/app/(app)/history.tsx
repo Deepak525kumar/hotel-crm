@@ -45,7 +45,7 @@ import type { OwnInspection, VerificationStatus } from '@/types/api';
  * target, because they lead to different places — and because the ABSENCE of
  * the verification row is itself the affordance that offers to record one.
  * That path is what makes rework reachable in practice: the checker's own
- * inspection flow (Home -> Start checking -> select worker) produces a Rating,
+ * inspection flow (Home -> Start checking -> select room) produces a Rating,
  * while rework can only be assigned against a QualityVerification. Without a
  * way to record the second one, rework stays unreachable no matter how many
  * inspections have been logged.

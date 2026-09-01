@@ -131,6 +131,17 @@ export const RecordInspectionSchema = z.object({
   // Defaults to `comment` in the service: the checker app asks the question
   // once, and the answer is what the worker is sent.
   rework_notes: z.string().optional(),
+  // The worker's own RoomLog this check covers (2026-09-01), when the checker
+  // came through the room picker -- which is now the normal path.
+  //
+  // OPTIONAL, and deliberately not a replacement for the three fields above:
+  //  - the picker's "not on the list" fallback inspects a room nobody logged,
+  //    so there is no log id to send;
+  //  - the service CROSS-CHECKS this log against assignment_id / worker_id /
+  //    room_number rather than trusting either side alone, so a client that
+  //    mixes up two rooms is rejected instead of silently attributing one
+  //    worker's inspection to another's room.
+  room_log_id: z.string().min(1).optional(),
 });
 
 export interface RecordInspectionRequest {
@@ -142,6 +153,7 @@ export interface RecordInspectionRequest {
   criteria_scores?: Record<string, number>;
   outcome: 'complete' | 'rework';
   rework_notes?: string;
+  room_log_id?: string;
 }
 
 // ADR-069 / CRR §14: a checker assigns rework to a specific worker. Photo

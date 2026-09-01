@@ -2267,7 +2267,7 @@ export class EmployeeManagementService extends BaseService {
           title,
           message,
           data,
-          transports: [OutboxTransport.PUSH],
+          transports: [OutboxTransport.PUSH, OutboxTransport.EMAIL],
           sourceModule: OutboxSourceModule.EMPLOYEE_MANAGEMENT,
           producerService: 'EmployeeManagementService',
         });

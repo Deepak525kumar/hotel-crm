@@ -28,6 +28,14 @@ const mockRoomsCompletedEntry = {
   aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// Worker-logged rooms (2026-09-01), counted alongside the legacy
+// manager-entered sums above. Defaults to 0 so every existing expectation in
+// this file still reads the legacy figure unchanged; the additive behaviour is
+// pinned in analytics-rooms-completed.test.ts.
+const mockRoomLog = {
+  count: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(0),
+};
+
 const mockAttendance = {
   groupBy: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -47,6 +55,7 @@ const mockPrisma = {
   hotel: mockHotel,
   workerAssignment: mockWorkerAssignment,
   roomsCompletedEntry: mockRoomsCompletedEntry,
+  roomLog: mockRoomLog,
   attendance: mockAttendance,
   qualityVerification: mockQualityVerification,
 };

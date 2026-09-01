@@ -432,6 +432,8 @@ model User {
   // full-day WorkerAssignment — no room-level task layer implied.
   rooms_completed_as_worker                      RoomsCompletedEntry[]              @relation("rooms_completed_worker")
   rooms_completed_entered                        RoomsCompletedEntry[]              @relation("rooms_completed_entered_by")
+  // Rooms this worker logged as cleaned, room by room (2026-09-01).
+  room_logs                                      RoomLog[]                          @relation("room_log_worker")
   // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): manager calendar-placement direct
   // assignment — the worker placed and the manager who placed them.
   calendar_entries_as_worker                     CalendarEntry[]                    @relation("calendar_entry_worker")
@@ -639,6 +641,9 @@ model Hotel {
   blocklist_entries          EmployeeBlocklistEntry[]        @relation("hotel_blocklist")
   // ADR-028: manager-entered "rooms completed" daily counts for this hotel.
   rooms_completed_entries    RoomsCompletedEntry[]
+  // Worker-logged room-by-room records at this hotel (2026-09-01). Also what
+  // the checker's room picker and the hotel's room-number typeahead read.
+  room_logs                  RoomLog[]
   // GD-14/OD-GEO-002 (SPEC-GEO-001): worker geofence checks against this
   // hotel's coordinates (backend-geo-owned, read-only from CRM's side).
   geo_checkins               WorkerGeoCheckin[]
@@ -1053,6 +1058,11 @@ model WorkerAssignment {
   // first of many.
   quality_verifications QualityVerification[]
   rooms_completed_entry RoomsCompletedEntry?
+  // The rooms the worker logged on this shift (2026-09-01). A REWORK
+  // assignment deliberately carries none of its own: rework changes the
+  // ORIGINAL room's state (via its verification), it does not create a
+  // second log, or the same room would appear twice in the checker's picker.
+  room_logs             RoomLog[]
   // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): 1:1 with the CalendarEntry created by
   // placeOnCalendar() in the same transaction — present only for
   // calendar-placed assignments (absent for broadcast-accept rows, PR 9.9).
@@ -1255,6 +1265,11 @@ model QualityVerification {
   // each attempt's evidence has to stay separable from the checker's original
   // photographs and from every other attempt. See ReworkRound.
   rework_rounds       ReworkRound[]
+  // The worker's own room log this inspection covered, when the check came
+  // through the room picker (2026-09-01). Optional on purpose: a checker may
+  // also inspect a room nobody logged, via the picker's "not on the list"
+  // fallback, and every verification predating room logging has none.
+  room_log            RoomLog?
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 
@@ -1426,6 +1441,72 @@ model RoomsCompletedEntry {
   @@index([worker_id])
   @@index([entered_by_id])
   @@index([created_at])
+}
+
+// The worker's own room-by-room record of what they cleaned on a shift
+// (owner decision, 2026-09-01). This is the piece the platform never had: a
+// worker had no way to say WHICH rooms they did -- RoomsCompletedEntry above
+// is a manager-entered COUNT, and QualityVerification.room_number is free
+// text a checker types during an inspection, so nothing connected "the rooms
+// a worker cleaned" to "the room being inspected".
+//
+// Deliberately NOT a canonical Room catalogue (owner decision): there is no
+// per-hotel room table to maintain. A room's identity here is
+// (hotel_id, day, room_key) -- scoped to a hotel so "412" at two hotels can
+// never collide, and scoped to a day because a room is cleaned again
+// tomorrow. The checker's room picker is DERIVED from these rows (the rooms
+// actually logged that day at that hotel), which is what replaced their
+// free-text room field.
+//
+// State is NOT stored here. The row points at the QualityVerification that
+// inspected it (nullable = not yet checked) and every consumer derives
+// "awaiting check / passed / needs rework" from that verification. This
+// module has been bitten repeatedly by mirrored status columns drifting from
+// their source (see QualityVerification's own rework mirror comments), so
+// there is exactly one authority for a room's quality state.
+model RoomLog {
+  id            String   @id @default(cuid())
+  // The shift this room was cleaned on. Carries hotel/worker/day, so every
+  // scope check and attribution question resolves through it.
+  assignment_id String
+  assignment    WorkerAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  // Denormalised from the assignment, matching the Attendance/
+  // QualityVerification/RoomsCompletedEntry precedent -- the uniqueness
+  // constraint below has to be expressible without a join.
+  hotel_id      String
+  hotel         Hotel    @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  worker_id     String
+  worker        User     @relation("room_log_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  // @db.Date, same convention as WorkerAssignment.day: the calendar day the
+  // room was cleaned, not an instant.
+  day           DateTime @db.Date
+  // As the worker typed it -- "412a", "Suite 3", "Penthouse". This is what
+  // every screen displays.
+  room_number   String
+  // The collision key: room_number trimmed and upper-cased. Deliberately NOT
+  // more aggressive than that (owner decision): stripping leading zeros or
+  // dashes would merge "012" and "12" at hotels where those are genuinely
+  // different rooms. The worker-facing input offers a typeahead of room
+  // numbers already used at that hotel, so spellings converge by suggestion
+  // rather than by lossy normalisation.
+  room_key      String
+  // The inspection that covered this room, once one exists. Null = still
+  // awaiting a check. Also the lock: a log may be edited or removed by its
+  // worker only while this is null, so an inspection can never be orphaned
+  // from the room it inspected.
+  verification_id String?         @unique
+  verification    QualityVerification? @relation(fields: [verification_id], references: [id], onDelete: SetNull)
+  logged_at     DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  // The hard block: one log per room per hotel per day, across ALL workers
+  // (owner decision) -- the second worker to claim room 412 is refused and
+  // told who already has it, rather than creating a second entry the checker
+  // would have to disambiguate.
+  @@unique([hotel_id, day, room_key])
+  @@index([assignment_id])
+  @@index([worker_id, day])
+  @@index([hotel_id, day])
 }
 
 // =============================================================================
