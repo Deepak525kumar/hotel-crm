@@ -499,9 +499,14 @@ export default function AssignmentDetailPage() {
       <RoleGate allow={["admin", "checker"]}>
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
+            {/* The room is the subject of the check -- every inspection now
+                targets one specific room the worker logged -- but this line
+                reported only a score and a status, so the one fact that says
+                WHICH room was inspected was captured, stored and then never
+                shown here. */}
             <div className="text-sm text-gray-600 dark:text-gray-300">
               {loggedVerification
-                ? `Verified — score ${loggedVerification.score} (${loggedVerification.status}).`
+                ? `${t("quality.roomLabel")} ${loggedVerification.room_number} — score ${loggedVerification.score} (${loggedVerification.status}).`
                 : "Verify the completed work for this assignment."}
             </div>
             {loggedVerification ? (
