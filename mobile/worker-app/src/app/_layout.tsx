@@ -12,6 +12,7 @@ import { useThemeStore } from '@/stores/theme-store';
 import '@/lib/i18n';
 import { AuthGuard } from '@/components/AuthGuard';
 import { ConsentGate } from '@/components/consent/ConsentGate';
+import { UpdateChecker } from '@/components/UpdateChecker';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -61,11 +62,13 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AuthGuard>
-        <ConsentGate>
-          <Stack screenOptions={{ headerShown: false }} />
-        </ConsentGate>
-      </AuthGuard>
+      <UpdateChecker>
+        <AuthGuard>
+          <ConsentGate>
+            <Stack screenOptions={{ headerShown: false }} />
+          </ConsentGate>
+        </AuthGuard>
+      </UpdateChecker>
     </ThemeProvider>
   );
 }

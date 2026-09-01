@@ -56,6 +56,36 @@ function presentBuild(build: Awaited<ReturnType<typeof loadActiveBuild>> & objec
 }
 
 /**
+ * Unauthenticated API for the mobile apps to check if a new version exists.
+ * e.g. GET /api/latest?app=WORKER&platform=IOS
+ */
+installRouter.get("/api/latest", asyncRoute(async (req, res) => {
+  const { app, platform } = req.query;
+  if (typeof app !== "string" || typeof platform !== "string") {
+    return res.status(400).json({ error: "Missing app or platform query parameters" });
+  }
+
+  const slot = await prisma.releaseSlot.findUnique({
+    where: { channel_app_platform: { channel: "PRODUCTION", app, platform } },
+    include: { build: true },
+  });
+
+  const build = slot?.build && !slot.build.deletedAt && slot.build.status === "READY" ? slot.build : null;
+  if (!build) {
+    return res.json({ available: false });
+  }
+
+  const base = baseUrl(req);
+  res.json({
+    available: true,
+    version: build.version,
+    buildNumber: build.buildNumber,
+    minOs: minOsLabel(build),
+    installUrl: installPageUrl(base, build.slug),
+  });
+}));
+
+/**
  * The catalogue — one stable URL, the link that goes on a poster or into an
  * onboarding email. It never changes.
  *
