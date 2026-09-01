@@ -1218,6 +1218,7 @@
       "passed": "Validée",
       "needsRework": "Reprise nécessaire",
       "reworkSubmitted": "Reprise soumise"
-    }
+    },
+    "suggestions": "Suggestions:"
   }
 }

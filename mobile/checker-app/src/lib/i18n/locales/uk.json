@@ -1218,6 +1218,7 @@
       "passed": "Прийнято",
       "needsRework": "Потрібна переробка",
       "reworkSubmitted": "Переробку надіслано"
-    }
+    },
+    "suggestions": "Suggestions:"
   }
 }

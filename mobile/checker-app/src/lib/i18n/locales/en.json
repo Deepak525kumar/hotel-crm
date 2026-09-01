@@ -1187,6 +1187,7 @@
     "title": "My rooms",
     "addTitle": "Log a finished room",
     "placeholder": "Room number",
+    "suggestions": "Suggestions:",
     "add": "Add",
     "remove": "Remove",
     "removeTitle": "Remove room?",

@@ -1218,6 +1218,7 @@
       "passed": "Bestanden",
       "needsRework": "Nacharbeit nötig",
       "reworkSubmitted": "Nacharbeit eingereicht"
-    }
+    },
+    "suggestions": "Suggestions:"
   }
 }
