@@ -1198,22 +1198,26 @@
     "checkInFirst": "Pointez votre arrivée pour enregistrer les chambres terminées.",
     "couldNotLog": "Impossible d’enregistrer cette chambre",
     "couldNotRemove": "Impossible de retirer cette chambre",
+    "editTitle": "Modifier le numéro de chambre",
+    "couldNotUpdate": "Impossible de modifier cette chambre",
+    "hotelTodayTitle": "Chambres enregistrées aujourd’hui",
+    "roomsLogged": "Chambres enregistrées",
+    "check": {
+      "title": "Sélectionner une chambre",
+      "reworkedTitle": "Reprises — vérifier les photos",
+      "checkedTitle": "Déjà contrôlées",
+      "notListed": "La chambre n’est pas dans la liste ?",
+      "empty": "Aucune chambre à contrôler",
+      "emptyBody": "Aucune chambre terminée n’a encore été enregistrée aujourd’hui dans les hôtels où vous travaillez.",
+      "subtitle": "Chambres enregistrées aujourd’hui dans vos hôtels",
+      "scoreShort": "Score {{score}}",
+      "loggedByHint": "Issue du registre de l’employé — l’employé est renseigné automatiquement."
+    },
     "state": {
       "awaitingCheck": "En attente de contrôle",
       "passed": "Validée",
       "needsRework": "Reprise nécessaire",
       "reworkSubmitted": "Reprise soumise"
-    },
-    "check": {
-      "title": "Sélectionner une chambre",
-      "subtitle": "Chambres enregistrées aujourd’hui dans vos hôtels",
-      "reworkedTitle": "Reprises — vérifier les photos",
-      "checkedTitle": "Déjà contrôlées",
-      "empty": "Aucune chambre à contrôler",
-      "emptyBody": "Aucune chambre terminée n’a encore été enregistrée aujourd’hui dans les hôtels où vous travaillez.",
-      "notListed": "La chambre n’est pas dans la liste ?",
-      "scoreShort": "Score {{score}}",
-      "loggedByHint": "Issue du registre de l’employé — l’employé est renseigné automatiquement."
     }
   }
 }

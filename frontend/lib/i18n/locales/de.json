@@ -1204,11 +1204,14 @@
     "roomsLogged": "Erfasste Zimmer",
     "check": {
       "title": "Zimmer auswählen",
-      "reworkedTitle": "Nacharbeit prüfen",
+      "reworkedTitle": "Nachgearbeitet — Fotos prüfen",
       "checkedTitle": "Bereits kontrolliert",
-      "notListed": "Zimmer nicht in der Liste",
-      "empty": "Noch keine Zimmer erfasst",
-      "emptyBody": "Hier hat heute noch niemand ein Zimmer erfasst. Wähle „Zimmer nicht in der Liste“, um es trotzdem zu kontrollieren."
+      "notListed": "Zimmer nicht in der Liste?",
+      "empty": "Keine Zimmer zu kontrollieren",
+      "emptyBody": "In den Hotels, in denen Sie heute arbeiten, wurde noch kein fertiges Zimmer erfasst.",
+      "subtitle": "Heute erfasste Zimmer in Ihren Hotels",
+      "scoreShort": "Wertung {{score}}",
+      "loggedByHint": "Aus der Zimmerliste des Mitarbeiters — der Mitarbeiter wird automatisch übernommen."
     },
     "state": {
       "awaitingCheck": "Wartet auf Kontrolle",

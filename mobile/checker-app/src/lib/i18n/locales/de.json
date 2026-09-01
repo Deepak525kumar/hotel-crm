@@ -1198,22 +1198,26 @@
     "checkInFirst": "Checke in die heutige Schicht ein, um fertige Zimmer zu erfassen.",
     "couldNotLog": "Zimmer konnte nicht erfasst werden",
     "couldNotRemove": "Zimmer konnte nicht entfernt werden",
+    "editTitle": "Zimmernummer ändern",
+    "couldNotUpdate": "Zimmer konnte nicht geändert werden",
+    "hotelTodayTitle": "Heute erfasste Zimmer",
+    "roomsLogged": "Erfasste Zimmer",
+    "check": {
+      "title": "Zimmer auswählen",
+      "reworkedTitle": "Nachgearbeitet — Fotos prüfen",
+      "checkedTitle": "Bereits kontrolliert",
+      "notListed": "Zimmer nicht in der Liste?",
+      "empty": "Keine Zimmer zu kontrollieren",
+      "emptyBody": "In den Hotels, in denen Sie heute arbeiten, wurde noch kein fertiges Zimmer erfasst.",
+      "subtitle": "Heute erfasste Zimmer in Ihren Hotels",
+      "scoreShort": "Wertung {{score}}",
+      "loggedByHint": "Aus der Zimmerliste des Mitarbeiters — der Mitarbeiter wird automatisch übernommen."
+    },
     "state": {
       "awaitingCheck": "Wartet auf Kontrolle",
       "passed": "Bestanden",
       "needsRework": "Nacharbeit nötig",
       "reworkSubmitted": "Nacharbeit eingereicht"
-    },
-    "check": {
-      "title": "Zimmer auswählen",
-      "subtitle": "Heute erfasste Zimmer in Ihren Hotels",
-      "reworkedTitle": "Nachgearbeitet — Fotos prüfen",
-      "checkedTitle": "Bereits kontrolliert",
-      "empty": "Keine Zimmer zu kontrollieren",
-      "emptyBody": "In den Hotels, in denen Sie heute arbeiten, wurde noch kein fertiges Zimmer erfasst.",
-      "notListed": "Zimmer nicht in der Liste?",
-      "scoreShort": "Wertung {{score}}",
-      "loggedByHint": "Aus der Zimmerliste des Mitarbeiters — der Mitarbeiter wird automatisch übernommen."
     }
   }
 }

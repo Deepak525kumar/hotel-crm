@@ -1203,12 +1203,15 @@
     "hotelTodayTitle": "Rooms logged today",
     "roomsLogged": "Rooms logged",
     "check": {
-      "title": "Pick a room",
-      "reworkedTitle": "Rework to review",
+      "title": "Select a room",
+      "reworkedTitle": "Reworked — review photos",
       "checkedTitle": "Already checked",
-      "notListed": "Room not on the list",
-      "empty": "No rooms logged yet",
-      "emptyBody": "Nobody has logged a room here today. Choose “Room not on the list” to inspect one anyway."
+      "notListed": "Room not on the list?",
+      "empty": "No rooms to check",
+      "emptyBody": "Nobody has logged a finished room yet at the hotels you are working today.",
+      "subtitle": "Rooms logged today at the hotels you are working",
+      "scoreShort": "Score {{score}}",
+      "loggedByHint": "From the worker’s room log — the worker is filled in for you."
     },
     "state": {
       "awaitingCheck": "Awaiting check",

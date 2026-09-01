@@ -242,7 +242,7 @@ describe("inspection room picker", () => {
     render(<AssignmentDetailPage />);
     await openModal();
 
-    expect(screen.getByText("No rooms logged yet")).toBeInTheDocument();
+    expect(screen.getByText("No rooms to check")).toBeInTheDocument();
     expect(screen.getByLabelText("Room number")).toBeInTheDocument();
   });
 
