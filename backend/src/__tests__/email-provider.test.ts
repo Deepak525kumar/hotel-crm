@@ -34,7 +34,8 @@ describe('SendgridProviderClient (Epic 7 PR 7.4, ADR-029 §4)', () => {
     expect(body.personalizations).toEqual([{ to: [{ email: 'worker@example.com' }] }]);
     expect(body.from).toEqual({ email: 'no-reply@hotelcrm.app' });
     expect(body.subject).toBe('Hi');
-    expect(body.content).toEqual([{ type: 'text/plain', value: 'Body text' }]);
+    expect(body.content[0].type).toBe('text/html');
+    expect(body.content[0].value).toContain('Body text');
   });
 
   it('throws on a non-2xx response, without leaking the API key', async () => {
@@ -81,7 +82,7 @@ describe('ResendProviderClient (Epic 7 PR 7.4, ADR-029 §4)', () => {
     expect(body.from).toBe('no-reply@hotelcrm.app');
     expect(body.to).toEqual(['worker@example.com']);
     expect(body.subject).toBe('Hi');
-    expect(body.text).toBe('Body text');
+    expect(body.html).toContain('Body text');
   });
 
   it('throws on a non-2xx response, without leaking the API key', async () => {

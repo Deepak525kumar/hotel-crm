@@ -1,8 +1,8 @@
+import './instrument.js';
 import { loadEnv, getEnv } from './config/env.js';
 import { connectDb, disconnectDb, getPrisma } from './lib/db.js';
 import { logger } from './lib/logger.js';
-import * as Sentry from '@sentry/node';
-import { setErrorSink, captureException } from './lib/error-tracker.js';
+import { captureException } from './lib/error-tracker.js';
 import { Scheduler } from './lib/scheduler.js';
 import { ReworkEscalationJob } from './modules/quality/rework-escalation-job.js';
 import { InspectionDigestJob } from './modules/quality/inspection-digest-job.js';
@@ -20,6 +20,7 @@ import { RetentionSweepJob } from './modules/retention/sweep-job.js';
 import { JobRequestAutoCloseJob } from './modules/job-requests/auto-close-job.js';
 import { HrContractExpiryReminderJob } from './modules/hr/expiry-reminder-job.js';
 import { AssignmentNoShowJob } from './modules/assignments/no-show-job.js';
+import { ShiftReminderJob } from './modules/assignments/shift-reminder-job.js';
 
 /**
  * Platform Worker process entrypoint (ADR-029 §3). A second Node entrypoint over
@@ -68,17 +69,6 @@ async function main() {
   try {
     loadEnv();
     const env = getEnv();
-
-    if (env.SENTRY_DSN) {
-      Sentry.init({ dsn: env.SENTRY_DSN, environment: env.NODE_ENV });
-      setErrorSink((event) => {
-        Sentry.withScope((scope) => {
-          scope.setExtras(event.context);
-          Sentry.captureException(new Error(event.message));
-        });
-      });
-      logger.info('Sentry initialized in worker');
-    }
 
     await connectDb();
     const prisma = getPrisma();
@@ -161,6 +151,11 @@ async function main() {
         new AssignmentNoShowJob({
           intervalMs: env.ASSIGNMENT_NO_SHOW_INTERVAL_MS,
           gracePeriodMs: env.ASSIGNMENT_NO_SHOW_GRACE_PERIOD_MS,
+        })
+      )
+      .register(
+        new ShiftReminderJob({
+          intervalMs: 5 * 60 * 1000,
         })
       );
 

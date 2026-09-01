@@ -15,6 +15,8 @@
  * error's message.
  */
 
+import { wrapHtmlEmail } from './email-template.js';
+
 export interface EmailProviderClient {
   send(input: { to: string; from: string; subject: string; text: string }): Promise<void>;
 }
@@ -41,7 +43,7 @@ export class SendgridProviderClient implements EmailProviderClient {
         personalizations: [{ to: [{ email: input.to }] }],
         from: { email: input.from },
         subject: input.subject,
-        content: [{ type: 'text/plain', value: input.text }],
+        content: [{ type: 'text/html', value: wrapHtmlEmail(input.subject, input.text) }],
       }),
     });
 
@@ -65,7 +67,7 @@ export class ResendProviderClient implements EmailProviderClient {
         from: input.from,
         to: [input.to],
         subject: input.subject,
-        text: input.text,
+        html: wrapHtmlEmail(input.subject, input.text),
       }),
     });
 
