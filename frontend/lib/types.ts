@@ -779,10 +779,20 @@ export interface Assignment {
   id: string;
   work_request_id: string | null;
   job_request_id: string | null;
+  /**
+   * ADR-069: set when this assignment is corrective rework for another one.
+   * Present in the backend `AssignmentDto` since rework shipped but never
+   * declared here, so the web had no way to tell a rework task from an
+   * ordinary shift — which the room log needs, because rooms are logged on
+   * the ORIGINAL shift and `POST /rooms/assignments/:id/rooms` 400s on a
+   * rework one (rooms/service.ts).
+   */
+  rework_of_assignment_id: string | null;
   worker_id: string;
   hotel_id: string;
   assigned_by_id: string;
   status: AssignmentStatus;
+  day: string | null;
   confirmed_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -1047,7 +1057,129 @@ export type RatingCriteriaScores = Partial<Record<InspectionChecklistItem, numbe
   /** @deprecated legacy, read-only */ attitude?: number;
 };
 
+/**
+ * Body of `POST /quality/inspections` — one inspection, one request
+ * (`RecordInspectionSchema`, quality/types.ts).
+ *
+ * Distinct from {@link CreateVerificationInput} (`POST /quality/verifications`)
+ * and NOT interchangeable with it: only this endpoint accepts `room_log_id`,
+ * and only this endpoint links the worker's own room log to the check it
+ * received. Sending `room_log_id` to /verifications would be silently dropped
+ * (that schema is not `.strict()`), leaving the room reading "awaiting check"
+ * forever with an inspection sitting against it.
+ */
+export interface RecordInspectionInput {
+  assignment_id: string;
+  /**
+   * The worker being inspected — the SUBJECT of the check, not a claim about
+   * the caller's own identity. The server re-derives the actor from the
+   * session and rejects this value if it disagrees with the assignment
+   * (`worker_id does not match the assignment worker`).
+   */
+  worker_id: string;
+  room_number: string;
+  score: number;
+  comment?: string;
+  criteria_scores?: Partial<Record<InspectionChecklistItem, number>>;
+  /** The checker's decision, deliberately NOT derived from `score` server-side. */
+  outcome: "complete" | "rework";
+  rework_notes?: string;
+  /**
+   * The worker's own RoomLog this check covers. Omitted only on the
+   * "room not on the list" fallback, where no log exists to link — a room the
+   * worker forgot to log must stay inspectable. The server cross-checks it
+   * against assignment_id/worker_id/room_number and rejects a mismatch rather
+   * than trusting any one of the four.
+   */
+  room_log_id?: string;
+}
 
+/* -------------------------------------------------------------------------- */
+/*  Room logs                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The quality state of a logged room. Mirrors the backend `RoomState`
+ * (rooms/types.ts), where it is DERIVED from the room's verification and
+ * never stored — so this is a read-only field, and there is no client action
+ * that sets it.
+ */
+export type RoomState =
+  | "AWAITING_CHECK"
+  | "PASSED"
+  | "NEEDS_REWORK"
+  | "REWORK_SUBMITTED";
+
+/**
+ * One room a worker logged as finished. Matches the backend `RoomLogDto`
+ * (rooms/types.ts) exactly.
+ *
+ * There is deliberately no room catalogue in this platform: a room's identity
+ * is (hotel_id, day, room_number), so "412" at two hotels never collides and
+ * the same room cleaned tomorrow is a new record.
+ */
+export interface RoomLog {
+  id: string;
+  assignment_id: string;
+  hotel_id: string;
+  hotel_name: string | null;
+  worker_id: string;
+  worker_name: string | null;
+  /** YYYY-MM-DD, taken from the shift — never from the client. */
+  day: string;
+  room_number: string;
+  state: RoomState;
+  logged_at: string;
+  /** Null until a checker inspects this room. */
+  verification_id: string | null;
+  score: number | null;
+  /**
+   * The rework shift the worker must act on, when one is open (ADR-069: rework
+   * is a separate assignment, not a state on this one). Null once the fix has
+   * been submitted, so a completed rework is not linked back for a second
+   * upload.
+   */
+  rework_assignment_id: string | null;
+  /**
+   * True while the log is still the worker's to correct or remove. Goes false
+   * the moment an inspection references it, so a check can never be orphaned
+   * from the room it inspected — edit/remove affordances must respect it
+   * rather than letting the user discover the 409.
+   */
+  editable: boolean;
+}
+
+/** Response of `GET /rooms/mine`. */
+export interface MyRooms {
+  /** The requested day only (defaults to today, resolved server-side). */
+  rooms: RoomLog[];
+  /**
+   * Rooms sent back, across ALL days on purpose: a rework raised yesterday is
+   * dated today by the server, so a day-filtered list alone would hide it.
+   */
+  needs_rework: RoomLog[];
+}
+
+/**
+ * Response of `GET /rooms/for-check` — the checker's room picker, grouped by
+ * what can be done with each room. Scope is resolved server-side from the
+ * caller (a checker sees only hotels they are rostered at that day).
+ */
+export interface RoomsForCheck {
+  day: string;
+  awaiting_check: RoomLog[];
+  /** Auto-passed after the worker submitted a fix; the evidence still wants a look. */
+  reworked: RoomLog[];
+  /** Inspected today. Listed rather than hidden so a room can be re-checked deliberately. */
+  already_checked: RoomLog[];
+}
+
+/** Response of `GET /rooms/for-hotels` — the manager/RM live view. */
+export interface RoomsForHotels {
+  day: string;
+  rooms: RoomLog[];
+  by_worker: { worker_id: string; worker_name: string | null; rooms_logged: number }[];
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Attendance                                                                */

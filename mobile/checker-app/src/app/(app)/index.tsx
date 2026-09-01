@@ -153,7 +153,7 @@ export default function HomeScreen() {
                 <Button
                   label={t('home.startChecking')}
                   disabled={!eligibility.allowed}
-                  onPress={() => router.push('/inspection/select-worker')}
+                  onPress={() => router.push('/inspection/select-room')}
                 />
                 {eligibility.reason === 'NOT_CHECKED_IN' ? (
                   <Button

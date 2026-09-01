@@ -59,9 +59,17 @@ replace them.
 | 12 | `scenarios/12-checker-photo-evidence-and-rework.md` | Checker photo evidence, rework loop, escalation, ADR-069 metric exclusion |
 | 16 | `scenarios/16-push-notification-delivery.md` | Push delivery end to end: token registration, APNs topic/environment, outbox fan-out, invalid-token pruning |
 | 17 | `scenarios/17-email-delivery.md` | Email delivery end to end: handler resolution, sending-domain authentication, recipient/body shapes, bounce blindness |
+| 18 | `scenarios/18-worker-room-log-and-room-first-check.md` | Worker's room log, one-room-per-day collision, room-first inspection picker + per-role scope matrix, rework state round-trip |
 
-**Start with 00. Then 01-07, 09-12, 16 and 17 in order.** 08 is not a test — it is the backlog and the
+**Start with 00. Then 01-07, 09-12, 16, 17 and 18 in order.** 08 is not a test — it is the backlog and the
 "what we still haven't checked" list. Read it at the end of a run and update it.
+
+> **18 changes how an inspection starts.** Until 2026-09-01 a checker picked a
+> worker and typed a room number in free text; they now pick a room from the
+> rooms workers actually logged, and the worker is auto-filled. 12 still owns
+> the evidence/rework assertions — including the rework **auto-pass** added in
+> the same change, which corrected a dead end where nothing could move a room
+> out of `NEEDS_REWORK`.
 
 ### Known coverage gaps (recorded 2026-08-22, extended 2026-08-25, one closed 2026-08-28)
 

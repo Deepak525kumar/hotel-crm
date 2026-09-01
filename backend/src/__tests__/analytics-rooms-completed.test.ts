@@ -34,6 +34,14 @@ const mockPrisma = {
   roomsCompletedEntry: {
     aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  // Worker-logged rooms (2026-09-01). Counted ALONGSIDE the legacy
+  // manager-entered sums above rather than replacing them: the manual entry is
+  // retired from the UI, but every shift before that change has its count only
+  // in RoomsCompletedEntry, and reading room logs alone would collapse all
+  // historical figures to zero.
+  roomLog: {
+    count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
   // getHotelSummary's confirmed-headcount source (2026-08-07): the real
   // figure lives on JobRequestSkillSlot.confirmed_count, not on the
   // never-written JobRequest.workers_confirmed column.
@@ -90,6 +98,10 @@ describe('Analytics rooms_completed wiring (ADR-028, OQ-ANALYTICS-03)', () => {
       _sum: { rooms_completed: 42 },
       _count: 7,
     });
+    // Default: no worker-logged rooms, so the existing expectations below read
+    // the legacy figure unchanged. The additive behaviour is pinned in its own
+    // test at the bottom of this file.
+    mockPrisma.roomLog.count.mockResolvedValue(0);
   });
 
   it('getDashboardStats surfaces rooms_completed.{total,entries} from RoomsCompletedEntry', async () => {
@@ -170,5 +182,49 @@ describe('Analytics rooms_completed wiring (ADR-028, OQ-ANALYTICS-03)', () => {
     expect(mockPrisma.roomsCompletedEntry.aggregate).toHaveBeenCalledWith(
       expect.objectContaining({ where: { hotel_id: 'h1' } })
     );
+  });
+
+  // Worker-logged rooms (2026-09-01). The two sources are mutually exclusive
+  // per assignment -- a shift's rooms are either a manager-entered count
+  // (historical) or the worker's own per-room logs (now) -- so summing them
+  // cannot double-count, and it is what keeps historical trends from
+  // collapsing to zero the day the manual entry was retired.
+  describe('worker-logged rooms are added to the legacy manager-entered counts', () => {
+    it('adds RoomLog rows to the platform total', async () => {
+      mockPrisma.roomLog.count.mockResolvedValue(5);
+
+      const stats = await service.getDashboardStats(undefined);
+
+      expect(stats.rooms_completed).toEqual({ total: 47, entries: 12 });
+    });
+
+    it('scopes the RoomLog count by hotel exactly as the legacy aggregate is scoped', async () => {
+      mockPrisma.roomLog.count.mockResolvedValue(3);
+
+      await service.getDashboardStats('h1');
+
+      expect(mockPrisma.roomLog.count).toHaveBeenCalledWith({ where: { hotel_id: 'h1' } });
+    });
+
+    it('adds RoomLog rows to a hotel summary', async () => {
+      mockPrisma.roomLog.count.mockResolvedValue(4);
+
+      const summary = await service.getHotelSummary('h1');
+
+      expect(summary.rooms_completed).toEqual({ total: 46, entries: 11 });
+      expect(mockPrisma.roomLog.count).toHaveBeenCalledWith({ where: { hotel_id: 'h1' } });
+    });
+
+    it('reports only worker-logged rooms once the legacy table is empty', async () => {
+      mockPrisma.roomsCompletedEntry.aggregate.mockResolvedValue({
+        _sum: { rooms_completed: null },
+        _count: 0,
+      });
+      mockPrisma.roomLog.count.mockResolvedValue(9);
+
+      const stats = await service.getDashboardStats(undefined);
+
+      expect(stats.rooms_completed).toEqual({ total: 9, entries: 9 });
+    });
   });
 });

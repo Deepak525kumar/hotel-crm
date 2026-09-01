@@ -17,6 +17,7 @@ import {
   ClipboardList,
   ListChecks,
   Trophy,
+  DoorOpen,
   type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -80,6 +81,12 @@ export const NAV: NavItem[] = [
   // creation/detail flows don't get conflated.
   { href: "/requests/broadcasts", label: "Broadcasts", labelKey: "nav.broadcasts", icon: Megaphone, roles: ["worker", "manager", "regional_manager", "admin"] },
   { href: "/assignments", label: "Assignments", labelKey: "nav.assignments", icon: ClipboardCheck },
+  // The worker's own room log (owner decision, 2026-09-01) — web parity with
+  // the mobile Rooms tab. `worker` only: logging a room is
+  // `requireRole('worker')` server-side, and every other role's view of room
+  // activity is a different, hotel-scoped surface (the "Rooms logged today"
+  // card on a hotel's page), not this self-scoped one.
+  { href: "/rooms", label: "Rooms", labelKey: "nav.rooms", icon: DoorOpen, roles: ["worker"] },
   // Teams-style day-grid view of placements + absences (FEATURE_JOBDISPATCH_PHASE2
   // gates placement data server-side; absences are additionally manager/RM/admin-only
   // — a worker/checker still sees the page, just with an empty placements/absences

@@ -17,8 +17,11 @@ import { KNOWN_PRE_EXISTING_ORPHANED_TOKENS } from './support/known-debt.js';
 //      cannot rot into inaccuracy.
 describe('ADR-030 D-8 known-debt allowlist (permission-token-hygiene.test.ts exclusions)', () => {
   const EXPECTED_DEBT = [
-    'rooms:read',
-    'rooms:write',
+    // `rooms:read` / `rooms:write` removed 2026-09-01: the `rooms` module now
+    // exists (worker room logging + the checker's room picker) and every one
+    // of its routes checks one of the two tokens, so they are no longer
+    // orphaned. This is property 2 of this suite working as designed -- wiring
+    // a debt token up forces its removal from the list here.
     'tasks:read',
     'tasks:write',
     'staffing:read',

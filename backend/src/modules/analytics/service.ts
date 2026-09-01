@@ -113,6 +113,7 @@ export class AnalyticsService extends BaseService {
       qualityPassed,
       totalQuality,
       roomsCompletedAgg,
+      roomLogCount,
     ] = await Promise.all([
       this.prisma.jobRequest.count({ where: scope }),
       this.prisma.jobRequest.groupBy({
@@ -142,11 +143,21 @@ export class AnalyticsService extends BaseService {
       this.prisma.qualityVerification.count({ where: scope }),
       // ADR-028 (OQ-ANALYTICS-03): basic-analytics "rooms completed per worker",
       // derived from the manager-entered RoomsCompletedEntry.
+      //
+      // Kept as HISTORY, not retired (2026-09-01). Rooms are now logged
+      // room-by-room by the worker (RoomLog, counted below) and the manual
+      // entry is no longer offered in the UI -- but every shift before that
+      // change has its count only here. Reading room logs alone would make
+      // all historical figures collapse to zero, which reads as data loss to
+      // anyone looking at a trend. The two sources are mutually exclusive per
+      // assignment (a shift is logged one way or the other), so adding them
+      // cannot double-count.
       this.prisma.roomsCompletedEntry.aggregate({
         where: scope,
         _sum: { rooms_completed: true },
         _count: true,
       }),
+      this.prisma.roomLog.count({ where: scope }),
     ]);
 
     const reqMap = new Map(
@@ -219,10 +230,12 @@ export class AnalyticsService extends BaseService {
         average_score: ratingAvg !== null ? Math.round((ratingAvg ?? 0) * 100) / 100 : null,
       },
       rooms_completed: {
+        // Legacy manager-entered counts (history) + worker-logged rooms (now).
+        // See the aggregate above for why both.
         total:
-          (roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
-            .rooms_completed ?? 0,
-        entries: (roomsCompletedAgg as { _count: number })._count,
+          ((roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
+            .rooms_completed ?? 0) + (roomLogCount as number),
+        entries: (roomsCompletedAgg as { _count: number })._count + (roomLogCount as number),
       },
     };
   }
@@ -240,6 +253,7 @@ export class AnalyticsService extends BaseService {
       completedAssignments,
       totalAssignments,
       roomsCompletedAgg,
+      workerRoomLogCount,
       overallRating,
       attendanceByStatus,
       totalAttendance,
@@ -268,10 +282,13 @@ export class AnalyticsService extends BaseService {
       this.prisma.workerAssignment.count({
         where: { worker_id: workerId, rework_of_assignment_id: null },
       }),
+      // Legacy manager-entered counts, kept for history -- see the platform
+      // aggregate's note. The worker-logged rooms are counted alongside.
       this.prisma.roomsCompletedEntry.aggregate({
         where: { worker_id: workerId },
         _sum: { rooms_completed: true },
       }),
+      this.prisma.roomLog.count({ where: { worker_id: workerId } }),
       this.prisma.workerOverallRating.findUnique({
         where: { worker_id: workerId },
         select: { average_score: true, total_ratings: true },
@@ -328,8 +345,8 @@ export class AnalyticsService extends BaseService {
     return {
       completed_assignments: completedAssignments,
       rooms_completed:
-        (roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
-          .rooms_completed ?? 0,
+        ((roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
+          .rooms_completed ?? 0) + (workerRoomLogCount as number),
       average_rating: overallRating?.average_score ?? null,
       rating_tier: overallRating
         ? deriveRatingTier(overallRating.average_score, overallRating.total_ratings)
@@ -374,6 +391,7 @@ export class AnalyticsService extends BaseService {
       qualityPassed,
       totalQuality,
       roomsCompletedAgg,
+      hotelRoomLogCount,
       topWorkers,
     ] = await Promise.all([
       this.prisma.jobRequest.aggregate({
@@ -425,11 +443,14 @@ export class AnalyticsService extends BaseService {
       this.prisma.qualityVerification.count({ where: { hotel_id: hotelId } }),
       // ADR-028 (OQ-ANALYTICS-03): basic-analytics "rooms completed per worker"
       // for this hotel, derived from the manager-entered RoomsCompletedEntry.
+      // Kept for history alongside the worker-logged count -- see the platform
+      // aggregate's note.
       this.prisma.roomsCompletedEntry.aggregate({
         where: { hotel_id: hotelId },
         _sum: { rooms_completed: true },
         _count: true,
       }),
+      this.prisma.roomLog.count({ where: { hotel_id: hotelId } }),
       this.getLeaderboard(hotelId),
     ]);
 
@@ -473,9 +494,9 @@ export class AnalyticsService extends BaseService {
       },
       rooms_completed: {
         total:
-          (roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
-            .rooms_completed ?? 0,
-        entries: (roomsCompletedAgg as { _count: number })._count,
+          ((roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
+            .rooms_completed ?? 0) + (hotelRoomLogCount as number),
+        entries: (roomsCompletedAgg as { _count: number })._count + (hotelRoomLogCount as number),
       },
       top_workers: topWorkers.slice(0, 5),
     };

@@ -17,6 +17,7 @@ import notificationRoutes from '../../modules/notifications/routes.js';
 import analyticsRoutes from '../../modules/analytics/routes.js';
 import calendarRoutes from '../../modules/calendar/routes.js';
 import documentRoutes from '../../modules/documents/routes.js';
+import roomRoutes from '../../modules/rooms/routes.js';
 import geoRoutes from '../../modules/geo/routes.js';
 import consentRoutes from '../../modules/consent/routes.js';
 import retentionRoutes from '../../modules/retention/routes.js';
@@ -47,6 +48,10 @@ router.use('/notifications', notificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/calendar', calendarRoutes);
 router.use('/documents', documentRoutes);
+// Worker room logging + the checker's room picker (2026-09-01). Mounted
+// unconditionally: additive, and the worker's room tab is the only way rooms
+// get logged at all.
+router.use('/rooms', roomRoutes);
 router.use('/geo', geoRoutes);
 router.use('/consent', consentRoutes);
 router.use('/retention', retentionRoutes);

@@ -565,6 +565,71 @@ export interface InspectableWorker {
 }
 
 /**
+ * The quality state of a room a worker logged. Derived server-side from the
+ * room's inspection -- never stored -- so the worker's app and this one can
+ * never disagree about a room. Mirrors backend `modules/rooms/types.ts` and
+ * worker-app's copy of this type.
+ */
+export type RoomState =
+  /** Logged by the worker, not yet inspected. */
+  | 'AWAITING_CHECK'
+  /** Inspected and accepted. */
+  | 'PASSED'
+  /** Sent back by the checker; the worker has to fix it and upload evidence. */
+  | 'NEEDS_REWORK'
+  /** Fix submitted, room auto-passed; the checker may still reopen it. */
+  | 'REWORK_SUBMITTED';
+
+/**
+ * One room a worker recorded as finished (owner-approved, 2026-09-01).
+ *
+ * This is what replaced the checker typing a room number from memory: the
+ * inspection now starts from the worker's own entry, so `worker_id` and
+ * `assignment_id` come from the record rather than from a second guess. The
+ * server cross-checks all three when the inspection is submitted.
+ */
+export interface RoomLog {
+  id: string;
+  assignment_id: string;
+  hotel_id: string;
+  hotel_name: string | null;
+  worker_id: string;
+  /** Null when the user record no longer resolves — render a label, never an id fragment. */
+  worker_name: string | null;
+  day: string;
+  room_number: string;
+  state: RoomState;
+  logged_at: string;
+  verification_id: string | null;
+  score: number | null;
+  /**
+   * The rework shift, not a state on the original assignment. Null unless the
+   * state is NEEDS_REWORK.
+   */
+  rework_assignment_id: string | null;
+  /** False once a checker has inspected the room: the worker's log is frozen. */
+  editable: boolean;
+}
+
+/**
+ * The checker's room picker, in three groups (GET /rooms/for-check).
+ *
+ * Three lists rather than one flat array with a filter, because the groups mean
+ * different things to the checker: `awaiting_check` is the work, `reworked` is
+ * a room that auto-passed on the worker's word and still wants a human look at
+ * the photos, and `already_checked` exists only so a re-check is possible.
+ *
+ * Empty in all three on a day off — hotel scope is resolved from the checker's
+ * own roster server-side, and this client neither sends nor filters on it.
+ */
+export interface RoomsForCheck {
+  day: string;
+  awaiting_check: RoomLog[];
+  reworked: RoomLog[];
+  already_checked: RoomLog[];
+}
+
+/**
  * One attempt at fixing a room the checker sent back (2026-08-30).
  *
  * A room can be sent back more than once, and each attempt owns its own

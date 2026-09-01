@@ -54,6 +54,25 @@ export function todayKeyInCalendarTimezone(): string {
 }
 
 /**
+ * The calendar day an INSTANT falls on in the calendar timezone.
+ *
+ * For timestamps (`started_at`, `logged_at`, `check_in_at`), not for the
+ * local-midnight Dates the calendar grid builds -- use {@link toDateKey} for
+ * those, which deliberately reads a Date's own local y/m/d instead.
+ *
+ * Needed because several API shapes carry a real timestamp but no `day`
+ * field (`AssignmentDto` is one), so "is this today?" can only be answered by
+ * projecting the instant into Frankfurt -- the zone every server-side day rule
+ * uses. Comparing against the browser's own date instead is the defect
+ * `todayKeyInCalendarTimezone` above documents.
+ */
+export function dayKeyInCalendarTimezone(instant: string | Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: CALENDAR_TIMEZONE }).format(
+    new Date(instant),
+  );
+}
+
+/**
  * Today in the calendar timezone, as a Date whose LOCAL y/m/d are that day.
  *
  * Deliberately not "the current instant": the grid navigates by local date

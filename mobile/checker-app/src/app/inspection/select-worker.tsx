@@ -14,7 +14,13 @@ import { Spacing } from '@/constants/theme';
 import type { InspectableWorker } from '@/types/api';
 
 /**
- * Step one of Start checking: pick the worker.
+ * The FALLBACK inspection entry point: pick the worker, then type the room.
+ *
+ * No longer step one -- `inspection/select-room.tsx` is, since 2026-09-01, and
+ * reaches this screen from its "Room not on the list?" footer. This path
+ * survives because a worker can forget to log a room they cleaned, and a
+ * skipped room must still be inspectable; it submits a typed room number and
+ * no `room_log_id`, so the inspection is not linked to any room record.
  *
  * The list is whatever `GET /quality/inspectable-workers` returns — workers
  * with a shift today at a hotel this checker is working (ADR-072 §2.5). The

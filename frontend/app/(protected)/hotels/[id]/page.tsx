@@ -6,8 +6,9 @@ import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useHotel, useHotelGroup, useUsersByIds } from "@/hooks/useHotels";
 import { hotelsApi } from "@/lib/api";
-import { HotelWriteGate, BlocklistReadGate } from "@/components/auth/RoleGate";
+import { HotelWriteGate, BlocklistReadGate, RoleGate } from "@/components/auth/RoleGate";
 import { BlocklistCard } from "@/components/employees/BlocklistCard";
+import { RoomsLoggedTodayCard } from "@/components/rooms/RoomsLoggedTodayCard";
 import { formatDateTime } from "@/lib/format";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth";
@@ -229,6 +230,15 @@ export default function HotelDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Roles match `GET /rooms/for-hotels` exactly
+              (requireRole(['manager','regional_manager','admin']) +
+              rooms:read), so no role that reaches this card gets a page of
+              403s — a checker or worker sees their own rooms through /rooms
+              instead, which is a different, self-scoped endpoint. */}
+          <RoleGate allow={["admin", "manager", "regional_manager"]}>
+            <RoomsLoggedTodayCard hotelId={id} />
+          </RoleGate>
 
           <BlocklistReadGate>
             <BlocklistCard hotelId={id} />

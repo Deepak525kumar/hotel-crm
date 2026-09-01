@@ -208,7 +208,13 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
   ]) as string[],
   WORKER: Object.freeze([
     'hotels:read',
+    // `rooms:write` granted 2026-09-01: the worker logs the rooms they cleaned,
+    // room by room (modules/rooms). Self-scoped by identity, not by this token
+    // -- RoomService checks assignment.worker_id === caller on every write, so
+    // the grant admits a worker to their OWN log and nothing else. Until this
+    // feature both room tokens were dead (see __tests__/support/known-debt.ts).
     'rooms:read',
+    'rooms:write',
     'tasks:read',
     'notifications:read',
     // Read-only, and narrower than it looks: the only routes this token gates

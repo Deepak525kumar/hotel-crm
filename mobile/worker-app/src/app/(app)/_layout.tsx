@@ -60,6 +60,23 @@ export default function AppLayout() {
             ),
           }}
         />
+        {/* Rooms (2026-09-01), placed second: logging a finished room is the
+            most frequent thing a worker does in a shift -- dozens of times a
+            day -- so it earns the slot next to Home rather than sitting a tap
+            deep inside the shift screen. */}
+        <Tabs.Screen
+          name="rooms"
+          options={{
+            title: t('nav.rooms', 'Rooms'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'bed.double', android: 'bed', web: 'bed' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
         <Tabs.Screen
           name="shifts"
           options={{

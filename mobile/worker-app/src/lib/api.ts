@@ -21,6 +21,7 @@ import type {
   SkillTag,
   BroadcastEligibility,
   AcceptBroadcastResult,
+  RoomLog,
   WorkerDocument,
   DocumentCategory,
   DocumentCompleteness,
@@ -513,6 +514,53 @@ export const api = {
     // GD-06: resolves the previously-silent 403 — /stats is admin/manager-only.
     myStats: () => request<WorkerStats>('/analytics/my-stats'),
   },
+  /**
+   * The worker's own room log (2026-09-01) -- the rooms they cleaned on a
+   * shift, room by room.
+   *
+   * Every route here is self-scoped server-side: `mine` takes no worker id at
+   * all, and a write is refused unless the assignment belongs to the caller,
+   * so there is no request shape in this client that could touch another
+   * worker's rooms.
+   */
+  rooms: {
+    /**
+     * Two lists: `rooms` for the given day (default today), and `needs_rework`
+     * across ALL days -- a rework raised yesterday is dated today by the
+     * server, and a day-filtered list alone would hide it.
+     */
+    mine: (day?: string) =>
+      request<{ rooms: RoomLog[]; needs_rework: RoomLog[] }>(
+        `/rooms/mine${day ? `?day=${encodeURIComponent(day)}` : ''}`
+      ),
+
+    /** Log a finished room against a shift the caller is checked in to. */
+    log: (assignmentId: string, roomNumber: string) =>
+      request<RoomLog>(`/rooms/assignments/${encodeURIComponent(assignmentId)}/rooms`, {
+        method: 'POST',
+        body: JSON.stringify({ room_number: roomNumber }),
+      }),
+
+    /** Correct a mis-typed room. Refused once the room has been inspected. */
+    update: (roomLogId: string, roomNumber: string) =>
+      request<RoomLog>(`/rooms/logs/${encodeURIComponent(roomLogId)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ room_number: roomNumber }),
+      }),
+
+    /** Remove a mis-tapped room. Refused once the room has been inspected. */
+    remove: (roomLogId: string) =>
+      request<void>(`/rooms/logs/${encodeURIComponent(roomLogId)}`, { method: 'DELETE' }),
+
+    /**
+     * Room numbers already used at this hotel, for the input's typeahead.
+     * This is what lets the server keep room matching conservative (trim +
+     * upper-case only) without workers inventing three spellings of one room.
+     */
+    suggestions: (hotelId: string) =>
+      request<{ rooms: string[] }>(`/rooms/suggestions?hotel_id=${encodeURIComponent(hotelId)}`),
+  },
+
   quality: {
     /**
      * Every check the checker recorded against one shift.

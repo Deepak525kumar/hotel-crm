@@ -17,10 +17,17 @@
 // fixing any one of them (or discovering a new one) requires a deliberate,
 // reviewable edit to this file, not a quiet pass/fail flip.
 //
-//   - rooms:read/write, tasks:read/write, staffing:read/write, audit:read:
+//   - rooms:read/write: NO LONGER ORPHANED as of 2026-09-01. The `rooms`
+//     module now exists (worker room logging + the checker's room picker) and
+//     every one of its routes checks one of these two tokens, so both were
+//     removed from the set below -- the remediation this file's own header
+//     prescribes ("wiring the missing requirePermission gate onto the
+//     relevant route(s)"). `rooms:write` was also granted to WORKER in the
+//     same change, since the worker is the role that writes room logs.
+//   - tasks:read/write, staffing:read/write, audit:read:
 //     no route in the entire repository calls requirePermission with these
-//     tokens; `rooms`/`tasks`/`staffing`/`audit` do not even exist as
-//     modules. Dead tokens.
+//     tokens; `tasks`/`staffing`/`audit` do not even exist as modules. Dead
+//     tokens.
 //   - notifications:read/write: only the admin-only outbox-admin routes
 //     (`requireRole('admin')`) and the unguarded read/mark-read/push-token
 //     routes exist; none checks `requirePermission('notifications:read'/'write')`.
@@ -34,8 +41,8 @@
 //     (employee-management/routes.ts's org-chart route) and so is absent here.
 export const KNOWN_PRE_EXISTING_ORPHANED_TOKENS = new Set([
   'hotels:operate',
-  'rooms:read',
-  'rooms:write',
+  // 'rooms:read' / 'rooms:write' removed 2026-09-01 -- both are now checked by
+  // modules/rooms/routes.ts. See the note above.
   'tasks:read',
   'tasks:write',
   // `staffing:write` is NOT here: it is now checked by the C-23/C-24/C-25/C-26
