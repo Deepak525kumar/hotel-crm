@@ -51,14 +51,7 @@ export interface UserFormValues {
   phone: string;
   role: Role;
   is_active: boolean;
-  // ADR-065 (Universal Onboarding Gate): required for every non-admin role
-  // at creation — the backend auto-creates the linked EmploymentRecord from
-  // these, so there is no separate "Start onboarding" step for anyone.
-  job_title: string;
-  start_date: string;
-  employment_type: EmploymentType | "";
   skills: string[];
-  work_permit_required: boolean;
   hotel_id?: string;
   hotel_group_id?: string;
 }
@@ -80,11 +73,7 @@ function toValues(user: UserDetail | null | undefined, defaultRole: Role): UserF
     // "worker" would pre-fill a value the backend rejects.
     role: user?.role ?? defaultRole,
     is_active: user?.is_active ?? true,
-    job_title: "",
-    start_date: "",
-    employment_type: "",
     skills: [],
-    work_permit_required: false,
     hotel_id: user?.managed_hotels?.[0]?.id ?? "",
     hotel_group_id: user?.managed_hotel_groups?.[0]?.id ?? "",
   };
@@ -180,11 +169,7 @@ export function UserForm({
     });
   };
 
-  // ADR-065: admin accounts have no onboarding/EmploymentRecord concept.
-  // RULE A means `admin` is never actually in `allowedCreateRoles`, but this
-  // stays role-derived (not hardcoded to "always show") so it degrades
-  // correctly if that ever changes.
-  const requiresOnboardingFields = mode === "create" && form.role !== "admin";
+  // Onboarding section removed per request
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,7 +182,7 @@ export function UserForm({
         // Blank phone must not be sent as "" — phone is unique-but-nullable,
         // and "" collides with every other user who also left it blank.
         phone: form.phone.trim() || null,
-        job_title: form.job_title.trim(),
+
         ...(form.role === "worker" ? { skills: form.skills } : {}),
         ...(form.role === "manager" ? { hotel_id: form.hotel_id } : {}),
         ...(form.role === "regional_manager" ? { hotel_group_id: form.hotel_group_id } : {}),
@@ -217,10 +202,7 @@ export function UserForm({
         // create, even if form state somehow held a stale value.
         allowedCreateRoles.includes(form.role) &&
         // Mandatory: see the photo input below.
-        photo !== null &&
-        // ADR-065: required for every non-admin role at creation.
-        (!requiresOnboardingFields ||
-          (form.job_title.trim() && form.start_date && form.employment_type))));
+        photo !== null));
 
   return (
     <Card>
@@ -362,38 +344,9 @@ export function UserForm({
             </div>
           )}
 
-          {requiresOnboardingFields && (
+          {form.role === "worker" && (
             <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-800">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {t("nav.onboarding")}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                An employment record is created automatically — {form.first_name.trim() || "this person"} will
-                see &ldquo;My Onboarding&rdquo; and manage their own documents and contract from their first login.
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Input
-                  label={t("fields.jobTitle")}
-                  required
-                  value={form.job_title}
-                  onChange={(e) => set("job_title", e.target.value)}
-                />
-                <Input
-                  label={t("fields.startDate")}
-                  type="date"
-                  required
-                  value={form.start_date}
-                  onChange={(e) => set("start_date", e.target.value)}
-                />
-              </div>
-              <Checkbox
-                label={t("fields.requiresWorkPermit")}
-                checked={form.work_permit_required}
-                onChange={(e) => set("work_permit_required", e.target.checked)}
-              />
-              
-              {form.role === "worker" && (
-                <div className="space-y-2 sm:col-span-2 pt-2">
+                <div className="space-y-2 pt-2">
                   <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t("fields.skills")}</span>
                   <div className="grid grid-cols-2 gap-2">
                     {SKILL_OPTIONS.map((opt) => (
@@ -411,17 +364,6 @@ export function UserForm({
                     ))}
                   </div>
                 </div>
-              )}
-
-              <Select
-                label={t("fields.employmentType")}
-                value={form.employment_type}
-                onChange={(e) => set("employment_type", e.target.value as EmploymentType)}
-                options={[
-                  { value: "", label: "Select…" },
-                  ...EMPLOYMENT_TYPE_OPTIONS,
-                ]}
-              />
             </div>
           )}
 

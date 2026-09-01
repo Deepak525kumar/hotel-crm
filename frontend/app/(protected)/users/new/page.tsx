@@ -39,17 +39,7 @@ function NewUser() {
       last_name: values.last_name,
       role: values.role,
       ...(values.phone ? { phone: values.phone } : {}),
-      // ADR-065 (Universal Onboarding Gate): required for every non-admin
-      // role — UserForm's own validation (`valid`) already blocks submit
-      // without these, so `values.role === "admin"` is the only case they're
-      // legitimately blank.
-      ...(values.job_title ? { job_title: values.job_title } : {}),
-      ...(values.start_date ? { start_date: values.start_date } : {}),
-      ...(values.employment_type ? { employment_type: values.employment_type } : {}),
-      // Always sent (not conditionally): `false` is a real, meaningful value
-      // here, and omitting it is exactly how the requirement got silently
-      // disabled for everyone.
-      ...(values.role !== "admin" ? { work_permit_required: values.work_permit_required } : {}),
+      // Onboarding fields removed per request
       // Sent as part of creation so the choice is recorded atomically, as the
       // employment record's TARGET assignment.
       //

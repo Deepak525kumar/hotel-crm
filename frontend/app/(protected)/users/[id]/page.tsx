@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useUser } from "@/hooks/useUsers";
 import { useAuth } from "@/hooks/useAuth";
@@ -49,6 +49,7 @@ function UserDetail() {
   const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const router = useRouter();
   const { user: currentUser } = useAuth();
 
   const { data: user, isLoading, error } = useUser(id);
@@ -61,6 +62,8 @@ function UserDetail() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deactivate = useAsyncAction();
   const reactivate = useAsyncAction();
+  const deleteUser = useAsyncAction();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const changeEmail = useAsyncAction();
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailDraft, setEmailDraft] = useState("");
@@ -99,13 +102,23 @@ function UserDetail() {
   // anywhere offered the inverse -- despite the card's own copy promising
   // "The account can be reactivated later."
   const onReactivate = () =>
-    reactivate.run(async () => {
-      await usersApi.update(id, { is_active: true });
-      await Promise.all([
-        globalMutate(["user", id]),
-        globalMutate((key) => Array.isArray(key) && key[0] === "users"),
-      ]);
+    reactivate.run(() => usersApi.update(id, { is_active: true }), {
+      onSuccess: () => globalMutate(["user", id]),
     });
+
+  const onDelete = () =>
+    deleteUser.run(
+      async () => {
+        await usersApi.remove(id);
+        await globalMutate((key) => Array.isArray(key) && key[0] === "users");
+      },
+      {
+        onSuccess: () => {
+          setDeleteConfirmOpen(false);
+          router.push("/users");
+        },
+      }
+    );
 
   // A dedicated endpoint, not a field on update(): PUT /users/:id also admits a
   // hotel-scoped manager, and email is the sign-in identifier. The server
@@ -417,6 +430,30 @@ function UserDetail() {
               </Card>
             )}
           </UserDeactivateGate>
+
+          <RoleGate allow={["admin"]}>
+            <Card className="border-red-100 dark:border-red-900/50">
+              <CardContent className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Delete account
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {isSelf
+                      ? "You cannot delete your own account."
+                      : "Permanently soft-deletes this account and its employment record."}
+                  </p>
+                </div>
+                <Button
+                  variant="danger"
+                  disabled={isSelf}
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  Delete
+                </Button>
+              </CardContent>
+            </Card>
+          </RoleGate>
         </>
       )}
 
@@ -531,6 +568,39 @@ function UserDetail() {
           )}
         </p>
         <FormError className="mt-3">{revokeSessions.error}</FormError>
+      </Modal>
+
+      <Modal
+        open={deleteConfirmOpen}
+        onClose={() => !deleteUser.pending && setDeleteConfirmOpen(false)}
+        title="Delete Account"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={deleteUser.pending}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={onDelete}
+              loading={deleteUser.pending}
+            >
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Are you sure you want to delete{" "}
+          <span className="font-medium">
+            {user?.first_name} {user?.last_name}
+          </span>
+          ? This action will permanently remove their access and employment record.
+        </p>
+        <FormError className="mt-3">{deleteUser.error}</FormError>
       </Modal>
     </div>
   );
