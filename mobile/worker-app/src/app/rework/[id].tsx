@@ -87,7 +87,16 @@ export default function ReworkScreen() {
       // seeing the result is what tells them whether they need to.
       void reload();
       Alert.alert(t('common.submitted'), t('quality.reworkDone', { when: '' }), [
-        { text: t('common.ok'), onPress: () => router.back() },
+        {
+          text: t('common.ok'),
+          onPress: () => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/');
+            }
+          }
+        },
       ]);
     } catch (e) {
       setError(translateApiError(e, t, 'errors.generic'));
