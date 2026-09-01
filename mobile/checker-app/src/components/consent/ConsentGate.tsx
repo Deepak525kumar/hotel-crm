@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -200,49 +200,60 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   // `status` stayed null and `loading` went false, so it fell through to the
   // wall below.
   if (!user) return <>{children}</>;
-  const isBypassed = shouldBypassConsentGate({ isAdmin, status, statusUnknown, enforced });
+  if (shouldBypassConsentGate({ isAdmin, status, statusUnknown, enforced })) return <>{children}</>;
+
+  // A REAL gate, not an overlay: children are not rendered at all until
+  // bypassed above. This is load-bearing, not cosmetic -- <PushRegistration />
+  // (mobile/checker-app/src/components/PushRegistration.tsx) is mounted as a
+  // child of this component specifically so that mount implies consent, and
+  // registers a push token in a useEffect that fires on mount with no retry.
+  // Between 2026-08-25 and 2026-09-01 this component instead always rendered
+  // its children prop underneath an absolute-positioned wall, which kept that
+  // invariant looking true in source (PushRegistration was still nested
+  // inside ConsentGate in the JSX) while breaking it at runtime: children
+  // mounted immediately regardless of consent status, so push registration
+  // fired before consent was granted, took a 403 CONSENT_REQUIRED, and never
+  // retried for that session. Every install of this app registered zero push
+  // tokens, permanently, for six days, with no error surfaced anywhere -- see
+  // worker-app's copy of this file, which was never touched and always
+  // gated correctly.
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.centre, { backgroundColor: theme.background }]}>
+        <ActivityIndicator color={theme.text} />
+      </SafeAreaView>
+    );
+  }
+
   const declined = status?.status === 'declined';
 
   return (
-    <>
-      {children}
-      {!isBypassed && (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.background, zIndex: 9999 }]}>
-          {loading ? (
-            <SafeAreaView style={[styles.centre, { backgroundColor: theme.background }]}>
-              <ActivityIndicator color={theme.text} />
-            </SafeAreaView>
-          ) : (
-            <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-              <ScrollView contentContainerStyle={styles.content}>
-                <ThemedText type="subtitle" style={styles.header}>
-                  {declined ? t('consent.lockedTitle') : t('consent.gateTitle')}
-                </ThemedText>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <ThemedText type="subtitle" style={styles.header}>
+          {declined ? t('consent.lockedTitle') : t('consent.gateTitle')}
+        </ThemedText>
 
-                <ThemedText type="small" themeColor="textSecondary" style={styles.body}>
-                  {declined ? t('consent.lockedBody') : t('consent.gateBody')}
-                </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary" style={styles.body}>
+          {declined ? t('consent.lockedBody') : t('consent.gateBody')}
+        </ThemedText>
 
-                {error ? (
-                  <ThemedView type="backgroundElement" style={styles.card}>
-                    <ThemedText type="small" style={{ color: theme.danger }}>
-                      {error}
-                    </ThemedText>
-                    <Pressable onPress={() => void load()} style={styles.retry}>
-                      <ThemedText type="smallBold">{t('consent.gateRetry')}</ThemedText>
-                    </Pressable>
-                  </ThemedView>
-                ) : null}
+        {error ? (
+          <ThemedView type="backgroundElement" style={styles.card}>
+            <ThemedText type="small" style={{ color: theme.danger }}>
+              {error}
+            </ThemedText>
+            <Pressable onPress={() => void load()} style={styles.retry}>
+              <ThemedText type="smallBold">{t('consent.gateRetry')}</ThemedText>
+            </Pressable>
+          </ThemedView>
+        ) : null}
 
-                {notice ? (
-                  <ConsentNoticeCard notice={notice} deciding={deciding} onDecide={decide} />
-                ) : null}
-              </ScrollView>
-            </SafeAreaView>
-          )}
-        </View>
-      )}
-    </>
+        {notice ? (
+          <ConsentNoticeCard notice={notice} deciding={deciding} onDecide={decide} />
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

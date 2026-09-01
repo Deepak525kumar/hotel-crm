@@ -44,4 +44,41 @@ describe('push registration runs only after the consent gate', () => {
     expect(comp).toContain('registerForPushNotificationsAsync');
     expect(comp).toContain('subscribeToPushNotifications');
   });
+
+  // The three tests above check everything AROUND ConsentGate -- that the
+  // layout wires it correctly -- but never open ConsentGate.tsx itself. That
+  // blind spot is exactly how this shipped: 2026-08-25 rewrote checker-app's
+  // copy of this file to render {children} unconditionally, underneath an
+  // absolute-positioned wall, instead of gating on it. Every check above
+  // still passed -- <PushRegistration /> was still textually nested inside
+  // <ConsentGate> in the JSX, which is all those tests look at -- while at
+  // runtime <PushRegistration />'s effect fired on mount regardless of
+  // consent status, registered against a still-gated endpoint, took a 403,
+  // and (by design, see push-notifications.ts) never retried. Every install
+  // of that app registered zero push tokens for six days before anyone
+  // noticed, because nothing failed loudly enough to page anyone.
+  //
+  // This one opens ConsentGate.tsx and checks the actual invariant: outside
+  // the two early-return bypass guards (admin, no-user), it must never
+  // render `children` at all. A component that both bypasses on a condition
+  // AND falls through to `{children}` unconditionally later is not a gate.
+  it('ConsentGate never renders children outside its bypass guards', () => {
+    const src = readFileSync('src/components/consent/ConsentGate.tsx', 'utf8');
+    const body = src.slice(src.indexOf('export function ConsentGate'));
+
+    // Line-based rather than a single \(...\) regex: the guard condition
+    // itself commonly contains its own parens/braces (e.g.
+    // shouldBypassConsentGate({ isAdmin, status, ... })), which a naive
+    // \([^)]*\) stops matching at the first inner ')' rather than the
+    // guard's own closing paren.
+    const lines = body.split('\n');
+    const guardLines = lines.filter((l) => l.includes('return <>{children}</>;'));
+    expect(guardLines.length).toBeGreaterThanOrEqual(1);
+
+    // Every remaining line must not render children -- in particular not in
+    // the final JSX the function returns when no guard fired, which is the
+    // wall this component exists to show.
+    const remaining = lines.filter((l) => !guardLines.includes(l)).join('\n');
+    expect(remaining).not.toMatch(/\{children\}/);
+  });
 });
