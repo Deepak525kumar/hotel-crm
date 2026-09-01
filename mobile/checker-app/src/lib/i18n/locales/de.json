@@ -1219,6 +1219,8 @@
       "needsRework": "Nacharbeit nötig",
       "reworkSubmitted": "Nacharbeit eingereicht"
     },
-    "suggestions": "Suggestions:"
+    "suggestions": "Suggestions:",
+    "goToCheckIn": "Zum Einchecken",
+    "loggedCount": "{{n}} Zimmer"
   }
 }

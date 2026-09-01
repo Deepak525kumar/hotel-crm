@@ -1219,6 +1219,8 @@
       "needsRework": "Потрібна переробка",
       "reworkSubmitted": "Переробку надіслано"
     },
-    "suggestions": "Suggestions:"
+    "suggestions": "Suggestions:",
+    "goToCheckIn": "Перейти до реєстрації приходу",
+    "loggedCount": "{{n}} кімнат"
   }
 }

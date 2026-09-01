@@ -381,7 +381,7 @@ function UserDetail() {
             </Card>
           </RoleGate>
 
-          <UserDeactivateGate>
+          <UserDeactivateGate targetEmploymentStatus={user.employment_status}>
             {!user.is_active && (
               <Card>
                 <CardContent className="flex items-center justify-between gap-4">

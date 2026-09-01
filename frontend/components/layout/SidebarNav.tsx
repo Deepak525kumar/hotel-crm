@@ -79,7 +79,15 @@ export const NAV: NavItem[] = [
   // apply/approve step) from the marketplace `/requests` flow above — kept
   // as its own nav entry rather than a tab on `/requests` so the two
   // creation/detail flows don't get conflated.
-  { href: "/requests/broadcasts", label: "Broadcasts", labelKey: "nav.broadcasts", icon: Megaphone, roles: ["worker", "manager", "regional_manager", "admin"] },
+  // `checker` added 2026-09-01 (web/app parity audit): a JobRequest carries a
+  // target_role, the backend picks the side from the CALLER's role
+  // (job-requests/service.ts: "a worker must never see a checker-targeted
+  // request and vice versa"), and the accept route carries no role gate at
+  // all. The checker app has shipped a Jobs tab against those same endpoints
+  // since target_role landed -- so a checker-targeted broadcast was
+  // acceptable on a phone and invisible on the web purely because this list
+  // omitted the role.
+  { href: "/requests/broadcasts", label: "Broadcasts", labelKey: "nav.broadcasts", icon: Megaphone, roles: ["worker", "checker", "manager", "regional_manager", "admin"] },
   { href: "/assignments", label: "Assignments", labelKey: "nav.assignments", icon: ClipboardCheck },
   // The worker's own room log (owner decision, 2026-09-01) — web parity with
   // the mobile Rooms tab. `worker` only: logging a room is

@@ -327,11 +327,26 @@ export default function CalendarScreen() {
               setWithdrawingId(item.id);
               try {
                 await api.calendar.deleteAbsence(item.id);
-                await load();
               } catch (error) {
                 setErrorMessage(
                   translateApiError(error, t, 'absences.withdrawFailed')
                 );
+                setWithdrawingId(null);
+                return;
+              }
+              // Reported live: the absence WAS withdrawn and an error still
+              // appeared. The refresh used to sit inside the try above, so a
+              // failure refetching the list -- a transient network blip, or a
+              // race with this screen's own 5s poll -- was reported as
+              // "could not withdraw", contradicting what had already
+              // happened. The delete is the operation the message speaks for;
+              // once it succeeds the worst a failed refresh can do is leave a
+              // stale row until the next poll, which is not an error worth
+              // showing over a completed action.
+              try {
+                await load();
+              } catch {
+                // Intentionally silent -- see above.
               } finally {
                 setWithdrawingId(null);
               }

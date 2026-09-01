@@ -1220,6 +1220,8 @@
       "needsRework": "تحتاج إعادة عمل",
       "reworkSubmitted": "تم إرسال إعادة العمل"
     },
-    "suggestions": "Suggestions:"
+    "suggestions": "Suggestions:",
+    "goToCheckIn": "الذهاب إلى تسجيل الحضور",
+    "loggedCount": "{{n}} غرف"
   }
 }

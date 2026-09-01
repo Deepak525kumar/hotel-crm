@@ -667,6 +667,30 @@ export const qualityApi = {
   assignRework: (input: { verification_id: string; notes: string }) =>
     apiFetch<Assignment>("/quality/rework", { method: "POST", body: input }),
 
+  /**
+   * CRR §14, the other half of assignRework: the WORKER uploads the fix and
+   * marks the rework done. Deliberately not gated on `quality:write` server
+   * side -- the checker inspects, the worker completes -- and self-scoped
+   * there to the rework assignment's own worker, so no worker_id is sent
+   * from here.
+   *
+   * Added 2026-09-01: the worker app has had this since CRR §14 shipped, but
+   * the web had no method and no surface, so a worker who picked up their
+   * rework on a laptop could see "rework pending" and had no way to clear it.
+   *
+   * At least one photo is required (the server rejects an empty upload) --
+   * the evidence IS the completion record, so there is nothing to submit
+   * without it.
+   */
+  completeRework: (assignmentId: string, photos: File[]) => {
+    const form = new FormData();
+    for (const photo of photos) form.append("photos", photo);
+    return apiFetch<unknown>(
+      `/quality/rework/${encodeURIComponent(assignmentId)}/complete`,
+      { method: "POST", body: form },
+    );
+  },
+
   // createRating() and ratingPhotos() were removed 2026-08-29 with the Rating
   // model: one inspection writes ONE record now, so createVerification above
   // is the whole write and verificationPhotos its evidence. The checklist

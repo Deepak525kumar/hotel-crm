@@ -1220,6 +1220,8 @@
       "needsRework": "دوبارہ کام درکار",
       "reworkSubmitted": "دوبارہ کام جمع کرایا"
     },
-    "suggestions": "Suggestions:"
+    "suggestions": "Suggestions:",
+    "goToCheckIn": "چیک اِن پر جائیں",
+    "loggedCount": "{{n}} کمرے"
   }
 }
