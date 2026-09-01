@@ -124,7 +124,7 @@ function CheckCard({ item }: { item: OwnInspection }) {
                 </ThemedText>
               </View>
               <Badge
-                label={t(STATUS_LABEL_KEY[item.status])}
+                label={item.status === 'PASSED' && item.rework_rounds?.length > 0 ? t('quality.reworkCompleted', 'Rework completed') : t(STATUS_LABEL_KEY[item.status])}
                 tone={STATUS_TONE[item.status]}
               />
             </View>
@@ -181,7 +181,8 @@ export default function HistoryScreen() {
 
   const { data, isLoading, isValidating, mutate, error } = useSWR(
     ['/quality/my-inspections', debounced],
-    () => api.quality.myInspections(1, 20, debounced)
+    () => api.quality.myInspections(1, 20, debounced),
+    { refreshInterval: 5000 }
   );
 
   const items = data?.checks ?? [];

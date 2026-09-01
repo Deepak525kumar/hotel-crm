@@ -175,7 +175,10 @@ function buildUrl(path: string): string {
 }
 
 async function parseEnvelope<T>(res: Response): Promise<ApiEnvelope<T>> {
-  const text = await res.text();
+  if (res.status === 204) {
+    return { status: "success", data: undefined as unknown as T };
+  }
+  const text = (await res.text()).trim();
   if (!text) {
     return { status: "success", data: undefined as unknown as T };
   }

@@ -244,7 +244,11 @@ export default function VerificationEvidenceScreen() {
             <View style={styles.row}>
               <Text style={styles.score}>{verification.score}</Text>
               <View style={[styles.badge, { backgroundColor: statusColor }]}>
-                <Text style={styles.badgeText}>{verification.status}</Text>
+                <Text style={styles.badgeText}>
+                  {verification.status === 'PASSED' && verification.rework_rounds?.length > 0
+                    ? t('quality.reworkCompleted', 'Rework completed')
+                    : verification.status}
+                </Text>
               </View>
             </View>
             {/* Which room. With many checks on one shift this is the only

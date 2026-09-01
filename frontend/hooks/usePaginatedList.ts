@@ -1,6 +1,6 @@
 "use client";
 
-import useSWR from "swr";
+import useSWR, { SWRConfiguration } from "swr";
 import type { Key } from "swr";
 
 /**
@@ -16,8 +16,9 @@ export function usePaginatedList<T>(
   key: Key,
   fetcher: () => Promise<T[]>,
   pageSize: number,
+  options?: SWRConfiguration
 ) {
-  const swr = useSWR<T[]>(key, fetcher);
+  const swr = useSWR<T[]>(key, fetcher, options);
   const items = swr.data ?? [];
   return { ...swr, items, hasNext: items.length >= pageSize };
 }

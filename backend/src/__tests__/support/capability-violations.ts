@@ -104,9 +104,21 @@ const VIOLATIONS: readonly CapabilityViolation[] = Object.freeze([
   // Pin should be REMOVED once ADR-030 §3 C-12 is amended to reflect D-5's RM grant.
   {
     key: 'C-12:regional_manager@users:PUT /:user_id/role',
-    reason: 'RULE A 1-level-down: regional_manager may reassign roles within its scope (target role enforced in users/service.ts via canCreateRole; admin/RM targets are rejected)',
-    authority: "ADR-030 D-5 RM parity decision vs ADR-030 §3 C-12 (Admin-only in matrix)",
+    reason: 'ADR-030 D-5 parity: RM may change manager roles, restricted by role-hierarchy logic',
+    authority: 'ADR-030 D-5 Regional Manager V1 Scope vs ADR-030 §3 C-12 Admin-only',
     owner: 'ADR-030 §3 C-12 amendment',
+  },
+  {
+    key: 'C-13:manager@users:DELETE /:user_id',
+    reason: 'Project owner decision: managers may delete PENDING users, restricted by checkAccess in employee-management service',
+    authority: 'Project owner decision vs ADR-030 §3 C-13',
+    owner: 'ADR-030 §3 C-13 amendment',
+  },
+  {
+    key: 'C-13:regional_manager@users:DELETE /:user_id',
+    reason: 'Project owner decision: regional managers may delete PENDING users, restricted by checkAccess in employee-management service',
+    authority: 'Project owner decision vs ADR-030 §3 C-13',
+    owner: 'ADR-030 §3 C-13 amendment',
   },
   // C-15 (Create / bulk-import employee): the ROUTE gate still admits
   // manager/regional_manager, so these two pins stand unchanged in shape —

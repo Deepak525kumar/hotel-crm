@@ -431,7 +431,7 @@ function UserDetail() {
             )}
           </UserDeactivateGate>
 
-          <RoleGate allow={["admin"]}>
+          <RoleGate allow={user.employment_status === "PENDING" ? ["admin", "manager", "regional_manager"] : ["admin"]}>
             <Card className="border-red-100 dark:border-red-900/50">
               <CardContent className="flex items-center justify-between gap-4">
                 <div>

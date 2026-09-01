@@ -1430,8 +1430,15 @@ export class UserService extends BaseService {
     // an admin (no record) still takes the plain account soft-delete below.
     const employmentRecord = await this.prisma.employmentRecord.findUnique({
       where: { user_id: userId },
-      select: { employee_id: true, deleted_at: true },
+      select: { employee_id: true, deleted_at: true, status: true },
     });
+
+    if (actorRole !== 'admin') {
+      if (!employmentRecord || employmentRecord.status !== 'PENDING') {
+        throw new ForbiddenError('Only Admin may delete an active account');
+      }
+      // If it's PENDING, employeeManagementService.delete will enforce scope
+    }
 
     if (employmentRecord && !employmentRecord.deleted_at) {
       await employeeManagementService.delete(

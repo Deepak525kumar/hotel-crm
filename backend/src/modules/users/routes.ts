@@ -111,6 +111,6 @@ router.put('/:user_id/email', requireRole(['admin', 'regional_manager']), requir
 // job, deliberately unchanged). Delegates to authController since
 // token_generation is backend-auth-owned state (ADR-017).
 router.post('/:user_id/revoke-sessions', requireRole('admin'), (req, res, next) => authController.revokeAllSessions(req, res, next));
-router.delete('/:user_id', requireRole('admin'), (req, res, next) => userController.deleteUser(req, res, next));
+router.delete('/:user_id', requireRole(['admin', 'manager', 'regional_manager']), (req, res, next) => userController.deleteUser(req, res, next));
 
 export default router;

@@ -49,14 +49,14 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const { data: stats, isLoading: statsLoading, isValidating: statsValidating, mutate: mutateStats } =
-    useSWR(user ? `/analytics/myStats/${user.id}` : null, () => api.analytics.myStats());
+    useSWR(user ? `/analytics/myStats/${user.id}` : null, () => api.analytics.myStats(), { refreshInterval: 5000 });
 
   const {
     data: assignments,
     isLoading: assignmentsLoading,
     isValidating: assignmentsValidating,
     mutate: mutateAssignments,
-  } = useSWR(user ? `/assignments/list/${user.id}` : null, () => api.assignments.list({ limit: 5 }));
+  } = useSWR(user ? `/assignments/list/${user.id}` : null, () => api.assignments.list({ limit: 5 }), { refreshInterval: 5000 });
 
   // Open jobs are listed here, not just linked to: the dashboard is where a
   // worker without shifts actually looks for work, and this section previously
@@ -64,6 +64,7 @@ export default function HomeScreen() {
   const { data: openJobs, isValidating: jobsValidating, mutate: mutateJobs } = useSWR(
     user ? `/work-requests/open/${user.id}` : null,
     () => api.workRequests.list({ status: 'OPEN', limit: 3 }),
+    { refreshInterval: 5000 }
   );
 
   const upcoming = Array.isArray(assignments)

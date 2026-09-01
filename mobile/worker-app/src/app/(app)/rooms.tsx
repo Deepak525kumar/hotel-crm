@@ -68,7 +68,7 @@ export default function RoomsScreen() {
   const [roomNumber, setRoomNumber] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const { data, isLoading, mutate } = useSWR(user ? '/rooms/mine' : null, () => api.rooms.mine());
+  const { data, isLoading, mutate } = useSWR(user ? '/rooms/mine' : null, () => api.rooms.mine(), { refreshInterval: 5000 });
 
   // The shift to log against: today's, and only once the worker has checked in
   // (the server enforces the same rule -- this just avoids offering an input
@@ -76,7 +76,8 @@ export default function RoomsScreen() {
   // original shift, and logging one here would put the same room in the
   // checker's picker twice.
   const { data: assignments } = useSWR(user ? '/assignments/for-rooms' : null, () =>
-    api.assignments.list({ limit: 20 })
+    api.assignments.list({ limit: 20 }),
+    { refreshInterval: 5000 }
   );
   const todayShift = useMemo<WorkerAssignment | undefined>(() => {
     const today = new Date().toISOString().slice(0, 10);

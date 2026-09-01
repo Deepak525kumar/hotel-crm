@@ -59,21 +59,22 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const { data: stats, isLoading: statsLoading, isValidating: statsValidating, mutate: mutateStats } =
-    useSWR(user ? `/analytics/myStats/${user.id}` : null, () => api.analytics.myStats());
+    useSWR(user ? `/analytics/myStats/${user.id}` : null, () => api.analytics.myStats(), { refreshInterval: 5000 });
 
   const {
     data: assignments,
     isLoading: assignmentsLoading,
     isValidating: assignmentsValidating,
     mutate: mutateAssignments,
-  } = useSWR(user ? `/assignments/list/${user.id}` : null, () => api.assignments.list({ limit: 5 }));
+  } = useSWR(user ? `/assignments/list/${user.id}` : null, () => api.assignments.list({ limit: 5 }), { refreshInterval: 5000 });
 
   const {
     data: attendance,
     isValidating: attendanceValidating,
     mutate: mutateAttendance,
   } = useSWR(user ? `/attendance/mine/${user.id}` : null, () =>
-    api.attendance.listMine(user!.id, { per_page: 20 })
+    api.attendance.listMine(user!.id, { per_page: 20 }),
+    { refreshInterval: 5000 }
   );
 
   // Open jobs, CHECKER-targeted only (enforced server-side, see jobs.tsx's
@@ -84,7 +85,8 @@ export default function HomeScreen() {
     isValidating: jobsValidating,
     mutate: mutateJobs,
   } = useSWR(user ? `/work-requests/open/${user.id}` : null, () =>
-    api.workRequests.list({ status: 'OPEN', limit: 3 })
+    api.workRequests.list({ status: 'OPEN', limit: 3 }),
+    { refreshInterval: 5000 }
   );
 
   const upcoming = Array.isArray(assignments)

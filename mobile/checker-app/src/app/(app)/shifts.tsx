@@ -98,7 +98,8 @@ export default function ScheduleScreen() {
     isValidating: refreshing,
     mutate,
   } = useSWR(user ? `/assignments/list_all/${user.id}` : null, () =>
-    api.assignments.list({ limit: 50 }),
+    api.assignments.list({ limit: 100 }),
+    { refreshInterval: 5000 }
   );
 
   const items = Array.isArray(assignments) ? assignments : [];

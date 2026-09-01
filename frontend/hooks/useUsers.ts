@@ -16,6 +16,7 @@ export function useUsers(query: ListUsersQuery = {}) {
     ["users", { ...query, limit }],
     () => usersApi.list({ ...query, limit }),
     limit,
+    { refreshInterval: process.env.NODE_ENV === 'test' ? 0 : 5000 }
   );
   return { ...swr, users: items, hasNext };
 }
