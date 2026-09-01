@@ -39,7 +39,8 @@ export const UpdateProfileSchema = z.object({
   first_name: z.string().min(2).max(50).optional(),
   last_name: z.string().min(2).max(50).optional(),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').optional(),
-  profile_photo_url: z.string().url('Invalid URL').optional(),
+  // No profile_photo_url field: see auth/service.ts#updateProfile for why
+  // accepting an arbitrary URL string here was removed rather than kept.
   // 2026-08-16: the user's own UI language choice. This route (PUT
   // /auth/profile) is the self-service one — reachable by ANY authenticated
   // user including workers — which is why the language setting lives here

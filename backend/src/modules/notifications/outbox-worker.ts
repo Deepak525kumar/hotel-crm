@@ -132,6 +132,26 @@ export class OutboxWorker {
   }
 }
 
-function defaultSleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms).unref());
+// Exported for outbox-worker.test.ts's regression coverage only -- every
+// production caller still gets it via the constructor's sleepFn default.
+export function defaultSleep(ms: number): Promise<void> {
+  // NEVER .unref() this timer. The Platform Worker's entire process lifetime
+  // is driven by this timer alone between ticks (loop() awaits it, nothing
+  // else holds the event loop open) -- an idle PrismaClient connection does
+  // NOT keep Node alive on its own (verified empirically: a bare `new
+  // PrismaClient(); await $connect()` process with only an unref'd timer
+  // pending exits immediately, before the timer ever fires). A prior version
+  // of this line called .unref() (presumably to stop an idle timer from
+  // blocking `jest --forceExit`-less test teardown) and it took the entire
+  // worker process down: every registered scheduled job (session sweep,
+  // retention sweeps, rework escalation, HR contract expiry reminders, the
+  // shift-reminder sweep, outbox draining itself -- EMAIL and PUSH included)
+  // stopped running on any real cadence. Production symptom before this fix
+  // was reverted live: the worker restarted every ~3 seconds under PM2
+  // (thousands of restarts within hours), and because the Scheduler's
+  // `lastRunAt` state is in-memory and reset on every restart, every job's
+  // "due" check re-evaluated true on every single ~3-second restart --
+  // re-running jobs meant to fire hourly/daily in a tight loop instead (seen
+  // live: the same already-lapsed HR contract re-processed on every cycle).
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

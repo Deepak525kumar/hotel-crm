@@ -1,8 +1,45 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import { userController } from './controller.js';
 import { authController } from '../auth/controller.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import { requireRole, requirePermission } from '../../middleware/permissions.js';
+import { ALLOWED_PHOTO_MIME_TYPES, MAX_PHOTO_SIZE_BYTES } from './photo.js';
+import { ValidationError } from '../../lib/errors.js';
+
+// Mirrors documents/routes.ts's own upload wiring: memory storage only (the
+// buffer goes straight to StorageClient.upload(), never to local disk),
+// fileFilter rejects a disallowed MIME type before the upload completes.
+const uploadPhoto = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_PHOTO_SIZE_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!(ALLOWED_PHOTO_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
+      cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'photo'));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+// Same translation documents/routes.ts's handleUploadErrors() performs: a
+// rejected upload (oversize, wrong MIME type, wrong field name) reaches the
+// client as a 422 ValidationError, not the generic handler's 500 fallback.
+function handleUploadErrors() {
+  return (err: unknown, _req: Request, _res: Response, next: NextFunction) => {
+    if (err instanceof multer.MulterError) {
+      const message =
+        err.code === 'LIMIT_FILE_SIZE'
+          ? `Photo exceeds the maximum size of ${MAX_PHOTO_SIZE_BYTES} bytes`
+          : err.code === 'LIMIT_UNEXPECTED_FILE'
+            ? 'Unsupported photo type or unexpected field'
+            : err.message;
+      next(new ValidationError(message));
+      return;
+    }
+    next(err);
+  };
+}
 
 const router = Router();
 
@@ -40,8 +77,22 @@ router.get('/', requirePermission('users:read'), ...userController.listUsers);
 // Conflicts with ADR-030 D-4's "account creation is Admin-only, permanently"
 // (tracked in SIR-USERS-002). The owner ratified RULE A knowing an amendment
 // is owed; see lib/role-hierarchy.ts's governance note.
-router.post('/', requireRole(['admin', 'manager', 'regional_manager']), requirePermission('users:write'), ...userController.createUser);
+router.post(
+  '/',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('users:write'),
+  uploadPhoto.single('photo'),
+  handleUploadErrors(),
+  ...userController.createUser
+);
 router.get('/:user_id', requirePermission('users:read'), (req, res, next) => userController.getUser(req, res, next));
+// Stable, user-id-keyed URL (never a presigned one) so the browser and
+// expo-image can cache the photo by URL -- see controller.ts's
+// getUserPhoto for why. Same `users:read` gate as the profile route above:
+// visibility is identical by design (if you can view the profile, you can
+// view its photo), enforced inside userService.getUserPhoto by delegating
+// to getUser()'s own scope check rather than a second one here.
+router.get('/:user_id/photo', requirePermission('users:read'), (req, res, next) => userController.getUserPhoto(req, res, next));
 // ADR-030 D-4/D-4a: the profile-only route. 'regional_manager' added per D-5
 // parity with manager — unreachable today (FEATURE_RM_ROLE is off, no live
 // RM user exists), harmless to include now.

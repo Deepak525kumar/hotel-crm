@@ -1,5 +1,24 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+// createUser()'s mandatory-photo upload goes through documents/storage.js's
+// getStorageClient(). Mocked away entirely, the same convention every other
+// suite that exercises a storage-backed write path follows (see e.g.
+// quality.test.ts) -- this suite tests createUser()'s own authz/rollback
+// logic, not S3 wiring. Without this, whether these tests pass depends on
+// whether S3_BUCKET happens to be set in the environment: unset locally,
+// getStorageClient() quietly falls back to a no-op stub and these tests
+// pass; CI sets S3_BUCKET=test-bucket (documents-storage-s3.test.ts needs
+// a bucket name to exist), which routes here into a REAL S3Client attempting
+// a real network call that has no real credentials to succeed with.
+jest.mock('../modules/documents/storage.js', () => ({
+  getStorageClient: async () => ({
+    upload: async () => undefined,
+    download: async () => Buffer.alloc(0),
+    getPresignedUrl: async () => null,
+    delete: async () => undefined,
+  }),
+}));
+
 // Vacancy-history model (2026-08-06): demoting a Regional Manager/Manager who
 // still owns a group/hotel now auto-clears the assignment (rather than
 // blocking), so updateUserRole() also writes hotelGroup/hotel and their
@@ -543,11 +562,17 @@ describe('UserService', () => {
   });
 
   describe('createUser', () => {
+    // Mandatory-photo feature: every createUser() call now takes an
+    // UploadedPhoto as its 4th argument. The buffer content is irrelevant to
+    // these tests -- getStorageClient() is mocked above, whose upload() is
+    // a no-op regardless of this environment's S3_BUCKET setting.
+    const mockPhoto = { buffer: Buffer.from(''), mimetype: 'image/jpeg', originalname: 'photo.jpg' };
+
     it('throws ConflictError when email exists', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'existing' });
 
       await expect(
-        service.createUser({ email: 'exists@test.com', password: 'pw12345678', first_name: 'A', last_name: 'B', role: 'worker', phone: '+1234567890' }, { userId: 'actor', email: 'actor@test.com', role: 'admin', permissions: [] })
+        service.createUser({ email: 'exists@test.com', password: 'pw12345678', first_name: 'A', last_name: 'B', role: 'worker', phone: '+1234567890' }, { userId: 'actor', email: 'actor@test.com', role: 'admin', permissions: [] }, undefined, mockPhoto)
       ).rejects.toMatchObject({ name: 'ConflictError' });
     });
 
@@ -560,7 +585,9 @@ describe('UserService', () => {
       await expect(
         service.createUser(
           { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Mal', last_name: 'Ory', role: 'admin', phone: '+1234567890' },
-          { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+          { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] },
+          undefined,
+          mockPhoto
         )
       // Message changed with RULE A (2026-08-12): the old HOTFIX-AUTH-003
       // guard ("Only admins can assign admin role") was superseded by the
@@ -584,7 +611,9 @@ describe('UserService', () => {
       await expect(
         service.createUser(
           { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Real', last_name: 'Admin', role: 'admin', phone: '+1234567890' },
-          { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] }
+          { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] },
+          undefined,
+          mockPhoto
         )
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
 
@@ -601,7 +630,9 @@ describe('UserService', () => {
 
       const result = await service.createUser(
         { email: 'rm@test.com', password: 'pw12345678', first_name: 'Reg', last_name: 'Man', role: 'regional_manager', phone: '+1234567890' },
-        { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] }
+        { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] },
+        undefined,
+        mockPhoto
       );
 
       expect(result.role).toBe('regional_manager');
@@ -619,7 +650,9 @@ describe('UserService', () => {
 
       const result = await service.createUser(
         { email: 'worker@test.com', password: 'pw12345678', first_name: 'Work', last_name: 'Er', role: 'worker', phone: '+1234567890' },
-        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] },
+        undefined,
+        mockPhoto
       );
 
       expect(result.role).toBe('worker');
@@ -648,7 +681,9 @@ describe('UserService', () => {
 
       await service.createUser(
         { email: 'newworker@test.com', password: 'ChosenPw123!', first_name: 'New', last_name: 'Worker', role: 'worker', phone: '+1234567890' },
-        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] },
+        undefined,
+        mockPhoto
       );
 
       expect(mockNotificationEnqueue).toHaveBeenCalledTimes(1);
@@ -692,7 +727,9 @@ describe('UserService', () => {
 
       const result = await service.createUser(
         { email: 'resilient@test.com', password: 'pw12345678', first_name: 'Res', last_name: 'Ilient', role: 'worker', phone: '+1234567890' },
-        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] },
+        undefined,
+        mockPhoto
       );
 
       expect(result.id).toBe('u_worker3');
@@ -768,6 +805,27 @@ describe('UserService', () => {
       const toSubject = calls.filter((c) => c.recipientId === 'u1' && !c.emailTo);
       expect(toSubject).toHaveLength(1);
       expect(toSubject[0].transports).toContain('EMAIL');
+    });
+
+    // Regression: PUSH has no "old address" -- a device token is registered
+    // per account, not per email, so adding PUSH to the pinned old-address
+    // message does not reach a different audience. It silently became a
+    // second, near-duplicate push to the SAME device as the new-address
+    // message below, for every WORKER/CHECKER email change. `subject` above
+    // is already role WORKER, which is what let this slip past the previous
+    // (loose, `toContain`-only) version of the test above.
+    it('never PUSHes the pinned old-address message, even for a mobile-app role', async () => {
+      arrange();
+      await service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null);
+
+      const calls = mockNotificationEnqueue.mock.calls.map((c: any[]) => c[0]);
+      const pinned = calls.find((c) => c.emailTo === 'old@example.com');
+      expect(pinned?.transports).toEqual(['EMAIL']);
+
+      // The new-address message, by contrast, legitimately reaches the
+      // account holder's own device -- PUSH belongs there.
+      const toSubject = calls.find((c) => c.recipientId === 'u1' && !c.emailTo);
+      expect(toSubject?.transports).toEqual(['EMAIL', 'PUSH']);
     });
 
     it('notifies the hotel manager and the group regional manager', async () => {

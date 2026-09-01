@@ -6,6 +6,7 @@ import { useUsers } from "@/hooks/useUsers";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { RoleBadge } from "@/components/users/RoleBadge";
+import { UserAvatar } from "@/components/users/UserAvatar";
 import {
   ActiveBadge,
   Badge,
@@ -165,8 +166,14 @@ function UsersDirectory() {
                       <TD className="font-medium">
                         <TextLink
                           href={`/users/${u.id}`}
-                          className="block"
+                          className="flex items-center gap-2.5"
                         >
+                          <UserAvatar
+                            userId={u.id}
+                            name={`${u.first_name} ${u.last_name}`}
+                            hasPhoto={u.has_profile_photo}
+                            size="sm"
+                          />
                           {u.first_name} {u.last_name}
                         </TextLink>
                       </TD>

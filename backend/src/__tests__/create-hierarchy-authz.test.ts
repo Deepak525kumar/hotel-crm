@@ -35,6 +35,22 @@ jest.mock('../config/feature-flags.js', () => ({
   isRmRoleEnabled: () => true,
 }));
 
+// createUser()'s mandatory-photo upload goes through documents/storage.js's
+// getStorageClient(). Mocked away entirely (same convention as quality.test.ts
+// and every other suite exercising a storage-backed write path) rather than
+// relying on S3_BUCKET being unset to fall through to the real module's own
+// no-op stub -- CI sets S3_BUCKET=test-bucket for documents-storage-s3.test.ts,
+// which would otherwise route this suite into a REAL S3Client with no real
+// credentials to succeed with.
+jest.mock('../modules/documents/storage.js', () => ({
+  getStorageClient: async () => ({
+    upload: async () => undefined,
+    download: async () => Buffer.alloc(0),
+    getPresignedUrl: async () => null,
+    delete: async () => undefined,
+  }),
+}));
+
 const mockUserFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockUserCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockEmploymentFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
@@ -43,7 +59,15 @@ const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) =>
 const mockAuditCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
 const prismaStub = {
-  user: { findUnique: mockUserFindUnique, create: mockUserCreate },
+  user: {
+    findUnique: mockUserFindUnique,
+    create: mockUserCreate,
+    // createUser()'s mandatory-photo step writes profile_photo_key back via
+    // update() after the (mocked, see getStorageClient() above) upload
+    // succeeds; its rollback path on a downstream failure calls delete().
+    update: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+    delete: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+  },
   employmentRecord: { findUnique: mockEmploymentFindUnique, create: mockEmploymentCreate },
   hotel: { findUnique: mockHotelFindUnique },
   auditLog: { create: mockAuditCreate },
@@ -161,7 +185,9 @@ describe('RULE A — create is 1-level-down only, enforced on both creation surf
               last_name: 'User',
               role: target,
             } as any,
-            { userId: `actor_${actor}`, email: 'actor@test.com', role: actor, permissions: [] }
+            { userId: `actor_${actor}`, email: 'actor@test.com', role: actor, permissions: [] },
+            undefined,
+            { buffer: Buffer.from(''), mimetype: 'image/jpeg', originalname: 'photo.jpg' }
           );
 
           if (allowed) {
@@ -182,7 +208,9 @@ describe('RULE A — create is 1-level-down only, enforced on both creation surf
       await expect(
         service.createUser(
           { email: 'x@test.com', password: 'pw12345678', first_name: 'X', last_name: 'Y', role: 'worker' } as any,
-          { userId: 'actor_x', email: 'actor@test.com', role: 'superadmin', permissions: [] }
+          { userId: 'actor_x', email: 'actor@test.com', role: 'superadmin', permissions: [] },
+          undefined,
+          { buffer: Buffer.from(''), mimetype: 'image/jpeg', originalname: 'photo.jpg' }
         )
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
       expect(mockUserCreate).not.toHaveBeenCalled();

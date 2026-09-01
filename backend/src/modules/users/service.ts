@@ -24,6 +24,18 @@ import { employeeManagementService } from '../employee-management/service.js';
 import { notificationService } from '../notifications/service.js';
 import type { DatabaseTransaction } from '../../lib/db.js';
 import { getEnv } from '../../config/env.js';
+import { generateProfilePhotoKey, guessPhotoMimeType } from './photo.js';
+import { getStorageClient } from '../documents/storage.js';
+
+// The uploaded photo's bytes, as multer's memoryStorage hands them to the
+// controller (req.file) -- mirrors documents/controller.ts's own inline
+// shape for the same reason: no disk write, no separate DTO for a 3-field
+// pass-through.
+export interface UploadedPhoto {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+}
 
 export class UserService extends BaseService {
   // ADR-030 PR-4 (D-7, C-14): GET /users was previously unscoped for
@@ -138,7 +150,7 @@ export class UserService extends BaseService {
           first_name: true,
           last_name: true,
           phone: true,
-          profile_photo_url: true,
+          profile_photo_key: true,
           role: true,
           is_active: true,
           created_at: true,
@@ -161,7 +173,7 @@ export class UserService extends BaseService {
       // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
       // stored column (dropped).
       users: users.map(
-        ({ employment_record, ...u }) => ({
+        ({ employment_record, profile_photo_key, ...u }) => ({
           ...u,
           role: u.role.toLowerCase(),
           permissions: ROLE_PERMISSIONS[u.role] ?? [],
@@ -172,6 +184,8 @@ export class UserService extends BaseService {
           // deliberately distinct from any status value, so the UI can tell
           // "not applicable" apart from "pending".
           employment_status: employment_record?.status ?? null,
+          // Never the raw S3 key -- see auth/types.ts's AuthUser.has_profile_photo.
+          has_profile_photo: profile_photo_key != null,
         })
       ),
       pagination: {
@@ -194,7 +208,7 @@ export class UserService extends BaseService {
         first_name: true,
         last_name: true,
         phone: true,
-        profile_photo_url: true,
+        profile_photo_key: true,
         role: true,
         is_active: true,
         created_at: true,
@@ -259,7 +273,7 @@ export class UserService extends BaseService {
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
     // stored column (dropped). created_by_id is authorization-internal
     // (used only in the scope check above) and never sent to the client.
-    const { employment_record, ...rest } = user;
+    const { employment_record, profile_photo_key, ...rest } = user;
     return {
       ...rest,
       role: user.role.toLowerCase(),
@@ -267,12 +281,29 @@ export class UserService extends BaseService {
       // Null = no EmploymentRecord (admin, or a pre-ADR-065 account), which
       // is distinct from any status value — see listUsers' note.
       employment_status: employment_record?.status ?? null,
+      // Never the raw S3 key -- see auth/types.ts's AuthUser.has_profile_photo.
+      has_profile_photo: profile_photo_key != null,
       deleted_at: undefined,
       created_by_id: undefined,
     };
   }
 
-  async createUser(data: CreateUserRequest, actor: AuthContext, ip?: string) {
+  /**
+   * Bytes for the stable GET /users/:id/photo route. Deliberately calls
+   * getUser() first rather than duplicating its scope check: "can this actor
+   * view the photo" is exactly "can this actor view the profile", so any
+   * ForbiddenError/NotFoundError it throws applies unchanged here.
+   */
+  async getUserPhoto(userId: string, actorId: string, actorRole: string, actorScope: UserScope | null) {
+    await this.getUser(userId, actorId, actorRole, actorScope);
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { profile_photo_key: true } });
+    if (!user?.profile_photo_key) throw new NotFoundError('Profile photo not found');
+    const storage = await getStorageClient();
+    const buffer = await storage.download(user.profile_photo_key);
+    return { buffer, mimeType: guessPhotoMimeType(user.profile_photo_key) };
+  }
+
+  async createUser(data: CreateUserRequest, actor: AuthContext, ip: string | undefined, photo: UploadedPhoto) {
     const actorId = actor.userId;
     const actorRole = actor.role;
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
@@ -330,6 +361,35 @@ export class UserService extends BaseService {
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', user.id, { action: 'create', email: user.email }, ip);
+
+    // Mandatory profile photo: every account created through this path gets
+    // a real photo, uploaded straight to S3 -- never a client-supplied URL
+    // (see auth/service.ts#updateProfile for why that field was removed
+    // instead of reused). Uploaded AFTER the User row exists, since the key
+    // embeds user.id, and BEFORE the EmploymentRecord step below, using the
+    // exact same delete-the-row-and-let-the-caller-retry compensating
+    // pattern that step already established for its own failure mode.
+    const photoKey = generateProfilePhotoKey(user.id, photo.originalname);
+    try {
+      const storage = await getStorageClient();
+      await storage.upload(photoKey, photo.buffer, photo.mimetype);
+      await this.prisma.user.update({ where: { id: user.id }, data: { profile_photo_key: photoKey } });
+    } catch (error) {
+      logger.error('user_create_photo_upload_failed', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      try {
+        await this.prisma.user.delete({ where: { id: user.id } });
+      } catch (cleanupError) {
+        logger.error('user_create_rollback_failed', {
+          userId: user.id,
+          email: user.email,
+          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+        });
+      }
+      throw new ConflictError('Account could not be created: uploading the profile photo failed. Please try again.');
+    }
 
     // ADR-065 (Universal Onboarding Gate, ratified 2026-08-11): every
     // non-Admin account -- Worker, Checker, Manager, AND Regional Manager --
@@ -393,6 +453,19 @@ export class UserService extends BaseService {
             userId: user.id,
             email: user.email,
             error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+          });
+        }
+        // The photo uploaded moments ago is now unreferenced -- best-effort
+        // cleanup, logged rather than thrown: the User row is already gone,
+        // so a failure here leaves an orphaned S3 object, not a broken
+        // account.
+        try {
+          await (await getStorageClient()).delete(photoKey);
+        } catch (photoCleanupError) {
+          logger.error('user_create_rollback_photo_cleanup_failed', {
+            userId: user.id,
+            photoKey,
+            error: photoCleanupError instanceof Error ? photoCleanupError.message : String(photoCleanupError),
           });
         }
         // 2026-08-13 fix (reported: "error message when a user is created
@@ -472,8 +545,14 @@ export class UserService extends BaseService {
     }
 
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
-    // stored column (dropped).
-    return { ...user, role: user.role.toLowerCase(), permissions: ROLE_PERMISSIONS[user.role] ?? [] };
+    // stored column (dropped). has_profile_photo is unconditionally true --
+    // reaching this line means the upload above already succeeded.
+    return {
+      ...user,
+      role: user.role.toLowerCase(),
+      permissions: ROLE_PERMISSIONS[user.role] ?? [],
+      has_profile_photo: true,
+    };
   }
 
   async updateUser(
@@ -752,9 +831,17 @@ export class UserService extends BaseService {
   ): Promise<void> {
     const name = `${user.first_name} ${user.last_name}`.trim();
     const title = 'Account email changed';
-    
+
+    // PUSH has no "address" -- a token is registered per account (user.id),
+    // not per email -- so it is only meaningful on the FIRST message below
+    // (confirming the change to whoever currently holds the account, on
+    // their own device). Applying it to the second, old-address message too
+    // does not reach a different audience: it is the exact same device
+    // getting a second, near-duplicate push for one event. Scoped to
+    // WORKER/CHECKER (the mobile-app roles) only; admin/manager/regional_manager
+    // are web-only and get email alone, as before.
     const isMobileUser = user.role === 'WORKER' || user.role === 'CHECKER';
-    const newEmailTransports = isMobileUser ? [OutboxTransport.EMAIL, OutboxTransport.PUSH] : [OutboxTransport.EMAIL];
+    const newAddressTransports = isMobileUser ? [OutboxTransport.EMAIL, OutboxTransport.PUSH] : [OutboxTransport.EMAIL];
 
     // The user, in-app and by email at the NEW address (the default
     // resolution, since the record now holds it).
@@ -765,7 +852,7 @@ export class UserService extends BaseService {
         title,
         message: `Your sign-in email was changed to ${nextEmail}. You have been signed out on all devices and will need to sign in again.`,
         data: { previous_email: previousEmail, new_email: nextEmail },
-        transports: newEmailTransports,
+        transports: newAddressTransports,
         sourceModule: OutboxSourceModule.USERS,
         producerService: 'UserService',
       },
@@ -776,14 +863,16 @@ export class UserService extends BaseService {
     // message would resolve `to` at send time and land at the new address as
     // well -- telling whoever now holds the account what they already know,
     // and telling the previous owner nothing. This is the one message that
-    // makes a hostile change visible to the person losing access.
+    // makes a hostile change visible to the person losing access -- EMAIL
+    // only: see newAddressTransports' comment above for why PUSH here would
+    // just repeat the first message to the same device.
     await notificationService.enqueue(
       {
         recipientId: user.id,
         type: NotificationType.USER_EMAIL_CHANGED,
         title,
         message: `The sign-in email for this account was changed to ${nextEmail}. If you did not expect this, contact an administrator immediately.`,
-        transports: newEmailTransports,
+        transports: [OutboxTransport.EMAIL],
         emailTo: previousEmail,
         sourceModule: OutboxSourceModule.USERS,
         producerService: 'UserService',

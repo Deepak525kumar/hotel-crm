@@ -1563,6 +1563,13 @@ export class AssignmentService extends BaseService {
           lte: maxDay,
         },
       },
+      // Unlike every sibling sweep job (no-show, session, retention, ...),
+      // this had no batch cap at all -- an unbounded findMany re-run every
+      // 5 minutes. Bounded here rather than left open: any candidate this
+      // cap defers is still a candidate next sweep (shift_reminder_sent_at
+      // stays null until it is actually notified), so a large backlog only
+      // delays a reminder by another 5-minute cycle, never drops it.
+      take: 500,
     });
 
     let notifiedCount = 0;

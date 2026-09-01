@@ -3,7 +3,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 const mockLogger = { warn: jest.fn(), info: jest.fn(), error: jest.fn() };
 jest.mock('../lib/logger.js', () => ({ logger: mockLogger }));
 
-import { OutboxWorker, OutboxWorkerConfig } from '../modules/notifications/outbox-worker.js';
+import { OutboxWorker, OutboxWorkerConfig, defaultSleep } from '../modules/notifications/outbox-worker.js';
 
 const CONFIG: OutboxWorkerConfig = {
   pollIntervalMs: 5000,
@@ -130,5 +130,28 @@ describe('OutboxWorker (ADR-029 §3 Platform Worker)', () => {
     worker.start(); // no throw, no second loop
     const startLogs = mockLogger.info.mock.calls.filter((c) => c[0] === 'Platform Worker started');
     expect(startLogs).toHaveLength(1);
+  });
+
+  // Regression: the loop's only thing keeping the Platform Worker process
+  // alive between ticks is the pending sleep timer -- an idle PrismaClient
+  // connection does NOT hold the event loop open on its own (verified live:
+  // production ran the process into a ~3-second PM2 restart loop, thousands
+  // of restarts within hours, once this timer was unref'd). Asserted via a
+  // real (unfaked) timer, since a fake-timer .unref() call is a no-op that
+  // would pass either way and prove nothing.
+  it('defaultSleep never unrefs its timer', async () => {
+    const realSetTimeout = global.setTimeout;
+    const unref = jest.fn(() => timer);
+    let timer: ReturnType<typeof setTimeout>;
+    const spy = jest.spyOn(global, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) => {
+      timer = realSetTimeout(fn, ms);
+      timer.unref = unref;
+      return timer;
+    }) as typeof setTimeout);
+
+    await defaultSleep(1);
+
+    expect(unref).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

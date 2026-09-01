@@ -155,7 +155,7 @@ async function main() {
       )
       .register(
         new ShiftReminderJob({
-          intervalMs: 5 * 60 * 1000,
+          intervalMs: env.SHIFT_REMINDER_INTERVAL_MS,
         })
       );
 

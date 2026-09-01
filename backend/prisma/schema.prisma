@@ -321,7 +321,13 @@ model User {
   first_name         String
   last_name          String
   phone              String?   @unique
-  profile_photo_url  String?
+  // An S3 object key (documents/storage.ts's StorageClient), NOT a URL --
+  // renamed from profile_photo_url, which the column never actually held (no
+  // upload path ever wrote to it). Resolved to bytes only inside the stable
+  // GET /users/:id/photo route (users/service.ts#getUserPhoto), never
+  // serialized directly into a JSON response -- has_profile_photo is the
+  // client-facing signal instead (auth/types.ts's AuthUser).
+  profile_photo_key  String?
   role               UserRole  @default(WORKER)
   // ADR-031 M-3 (PR-7): the stored permission snapshot is retired. Permissions
   // are derived request-time from ROLE_PERMISSIONS[role] (D-1); this column

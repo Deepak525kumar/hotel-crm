@@ -35,7 +35,13 @@ export const CreateUserSchema = z
     // schema but defaulted explicitly at the call site; ADR-065 §6 item 8 is
     // clear that this is set by the creating actor at creation time and is
     // NOT inferred from nationality.
-    work_permit_required: z.boolean().optional(),
+    // .preprocess() (mirrors documents/validation.ts's identical field):
+    // POST /users is now multipart (RULE-PHOTO-01, the mandatory photo
+    // upload below), so this arrives as the form-field string "true"/"false",
+    // not a JSON boolean -- a bare z.boolean() rejected every request.
+    work_permit_required: z
+      .preprocess((val) => (val === 'true' ? true : val === 'false' ? false : val), z.boolean())
+      .optional(),
     // The assignment the creating actor intends for this account: a hotel for
     // a Manager, a group for a Regional Manager. These become the employment
     // record's TARGET fields, never its live scope -- ADR-065 Decision 2 is

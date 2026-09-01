@@ -98,6 +98,18 @@ export function getAccessToken(): string | null {
   return _accessToken;
 }
 
+/**
+ * Stable, user-id-keyed URL for `GET /users/:id/photo` (backend
+ * users/routes.ts) -- never a presigned one, which is what lets
+ * `expo-image`'s disk cache key on this exact string instead of re-fetching
+ * the photo on every screen that shows it. Bearer auth (this app has no
+ * cookie transport) is supplied by the caller via `source={{ uri, headers }}`
+ * -- see components/UserAvatar.tsx.
+ */
+export function getUserPhotoUrl(userId: string): string {
+  return `${BASE_URL}/users/${userId}/photo`;
+}
+
 export function getRefreshToken(): string | null {
   return _refreshToken;
 }

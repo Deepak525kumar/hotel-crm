@@ -8,9 +8,10 @@ import { SymbolView } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NotificationBell } from '@/components/NotificationBell';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Badge, Button, Card, ListRow, SectionHeader } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -43,7 +44,6 @@ export default function ProfileScreen() {
   if (!user) return null;
 
   const fullName = `${user.first_name} ${user.last_name}`.trim();
-  const initials = `${user.first_name?.[0] ?? ''}${user.last_name?.[0] ?? ''}`.toUpperCase();
 
   return (
     <ThemedView style={styles.container}>
@@ -70,11 +70,7 @@ export default function ProfileScreen() {
           </View>
 
           <Card style={styles.identity}>
-            <View style={[styles.avatar, { backgroundColor: theme.primarySubtle }]}>
-              <ThemedText type="subtitle" style={{ color: theme.primary }}>
-                {initials}
-              </ThemedText>
-            </View>
+            <UserAvatar userId={user.id} name={fullName || user.email} hasPhoto={user.has_profile_photo} size={56} />
             <View style={styles.identityText}>
               <ThemedText type="smallBold" numberOfLines={1}>
                 {fullName || user.email}
@@ -167,13 +163,6 @@ const styles = StyleSheet.create({
   },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   identity: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   identityText: { flex: 1, gap: Spacing.half },
   badges: { flexDirection: 'row', gap: Spacing.one, marginTop: Spacing.half },
   // The rows draw their own dividers, so the card supplies no extra gap.
