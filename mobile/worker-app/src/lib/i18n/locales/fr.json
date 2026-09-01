@@ -1220,6 +1220,7 @@
       "reworkSubmitted": "Reprise soumise"
     },
     "suggestions": "Suggestions:",
-    "goToCheckIn": "Aller au pointage d'arrivée"
+    "goToCheckIn": "Aller au pointage d'arrivée",
+    "loggedCount": "{{n}} chambres"
   }
 }

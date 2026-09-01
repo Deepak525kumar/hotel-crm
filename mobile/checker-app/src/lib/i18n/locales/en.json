@@ -1220,6 +1220,7 @@
       "needsRework": "Needs rework",
       "reworkSubmitted": "Rework submitted"
     },
-    "goToCheckIn": "Go to check-in"
+    "goToCheckIn": "Go to check-in",
+    "loggedCount": "{{n}} rooms"
   }
 }

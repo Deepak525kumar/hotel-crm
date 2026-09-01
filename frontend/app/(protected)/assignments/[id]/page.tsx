@@ -84,6 +84,36 @@ export default function AssignmentDetailPage() {
   const [reworkOpen, setReworkOpen] = useState(false);
   const [loggedVerification, setLoggedVerification] = useState<QualityVerification | null>(null);
 
+  // Worker-side rework completion (CRR §14). This page can be EITHER the
+  // original assignment or the rework assignment raised off it (ADR-069 makes
+  // the rework its own shift), and only the latter is completable -- which is
+  // what `rework_of_assignment_id` distinguishes. Self-scoped server side to
+  // the assignment's own worker, so the check here is an affordance, not the
+  // boundary.
+  const [reworkPhotos, setReworkPhotos] = useState<File[]>([]);
+  const [reworkPhotoError, setReworkPhotoError] = useState<string | null>(null);
+  const submitRework = useAsyncAction();
+  const isReworkShift = !!assignment?.rework_of_assignment_id;
+  const isOwnShift = !!currentUser && currentUser.id === assignment?.worker_id;
+  const canCompleteRework =
+    isReworkShift && isOwnShift && assignment?.status !== "COMPLETED";
+
+  const onSubmitRework = () => {
+    if (reworkPhotos.length === 0) {
+      // Mirrors the server's own rule (it rejects an empty upload): the photo
+      // IS the completion record, so there is nothing to submit without one.
+      setReworkPhotoError(t("quality.reworkPhotoRequired"));
+      return;
+    }
+    setReworkPhotoError(null);
+    submitRework.run(() => qualityApi.completeRework(id, reworkPhotos), {
+      onSuccess: async () => {
+        setReworkPhotos([]);
+        await mutate();
+      },
+    });
+  };
+
   const start = () => {
     // Workers must use the Attendance module (Bug 35): calling
     // assignmentsApi.start() as a worker returns 403. Instead, issue a
@@ -267,6 +297,54 @@ export default function AssignmentDetailPage() {
           }
         />
       </div>
+
+      {/* The worker's own half of CRR §14, previously app-only: this shift IS
+          the rework (ADR-069 raises it as its own assignment), so the worker
+          who owns it uploads the fix here and marks it done. Placed above the
+          details card because on a rework shift it is the only thing the
+          worker came to this page to do. */}
+      {canCompleteRework && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("quality.reworkTitle")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <label
+              htmlFor="rework-photos"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              {t("quality.photos")}
+            </label>
+            <input
+              id="rework-photos"
+              type="file"
+              accept={ACCEPTED_PHOTO_TYPES}
+              multiple
+              // Same `capture` reasoning as the inspection input below: opens
+              // the camera on a phone, a file picker at a desk.
+              capture="environment"
+              onChange={(e) => {
+                setReworkPhotoError(null);
+                setReworkPhotos(Array.from(e.target.files ?? []));
+              }}
+              className="block w-full text-sm"
+            />
+            {reworkPhotos.length > 0 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {reworkPhotos.map((p) => p.name).join(", ")}
+              </p>
+            )}
+            <FormError>{reworkPhotoError ?? submitRework.error}</FormError>
+            <Button
+              onClick={onSubmitRework}
+              loading={submitRework.pending}
+              disabled={submitRework.pending}
+            >
+              {t("quality.markDone")}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

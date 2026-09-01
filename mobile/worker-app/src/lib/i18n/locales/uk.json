@@ -1220,6 +1220,7 @@
       "reworkSubmitted": "Переробку надіслано"
     },
     "suggestions": "Suggestions:",
-    "goToCheckIn": "Перейти до реєстрації приходу"
+    "goToCheckIn": "Перейти до реєстрації приходу",
+    "loggedCount": "{{n}} кімнат"
   }
 }

@@ -138,4 +138,25 @@ describe("qualityApi.createVerification", () => {
     const body = lastCall().init.body as FormData;
     expect(body.get("room_number")).toBe("412");
   });
+
+  // The worker's half of CRR §14, web-side since 2026-09-01. The worker app
+  // has posted this since the feature shipped; the web had no method at all,
+  // so a worker on a laptop could see "rework pending" and had no way to
+  // clear it. Wire-level because everything that matters here -- the field
+  // NAME the server reads the files from, and the absence of any worker_id
+  // (self-scoped server-side) -- is invisible to tsc once it is FormData.
+  it("posts rework photos under the field name the server reads", async () => {
+    const photo = new File(["x"], "fixed.jpg", { type: "image/jpeg" });
+    await qualityApi.completeRework("rework-assignment-1", [photo]);
+
+    const { url, init } = lastCall();
+    expect(url).toBe("/api/v1/quality/rework/rework-assignment-1/complete");
+    expect(init.method).toBe("POST");
+
+    const body = init.body as FormData;
+    expect(body.getAll("photos")).toHaveLength(1);
+    // Never sent: the server takes the worker from the assignment, and a
+    // client-supplied one would be an authorization input.
+    expect(body.get("worker_id")).toBeNull();
+  });
 });

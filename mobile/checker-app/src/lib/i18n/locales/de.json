@@ -1220,6 +1220,7 @@
       "reworkSubmitted": "Nacharbeit eingereicht"
     },
     "suggestions": "Suggestions:",
-    "goToCheckIn": "Zum Einchecken"
+    "goToCheckIn": "Zum Einchecken",
+    "loggedCount": "{{n}} Zimmer"
   }
 }

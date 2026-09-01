@@ -1221,6 +1221,7 @@
       "reworkSubmitted": "تم إرسال إعادة العمل"
     },
     "suggestions": "Suggestions:",
-    "goToCheckIn": "الذهاب إلى تسجيل الحضور"
+    "goToCheckIn": "الذهاب إلى تسجيل الحضور",
+    "loggedCount": "{{n}} غرف"
   }
 }

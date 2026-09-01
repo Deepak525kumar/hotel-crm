@@ -1221,6 +1221,7 @@
       "reworkSubmitted": "دوبارہ کام جمع کرایا"
     },
     "suggestions": "Suggestions:",
-    "goToCheckIn": "چیک اِن پر جائیں"
+    "goToCheckIn": "چیک اِن پر جائیں",
+    "loggedCount": "{{n}} کمرے"
   }
 }

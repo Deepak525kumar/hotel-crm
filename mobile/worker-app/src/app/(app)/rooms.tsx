@@ -180,7 +180,10 @@ export default function RoomsScreen() {
       >
         <View style={[styles.roomRow, { borderBottomColor: theme.border }]}>
           <View style={styles.roomMain}>
-            <ThemedText type="smallBold">{room.room_number}</ThemedText>
+            {/* The room number is what the worker scans this list for, so it
+                carries the row rather than sitting at the same weight as the
+                hotel line beside it. */}
+            <ThemedText type="subtitle">{room.room_number}</ThemedText>
             {showHotel && room.hotel_name ? (
               <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
                 {room.hotel_name} · {room.day}
@@ -230,7 +233,17 @@ export default function RoomsScreen() {
               {(data?.needs_rework ?? []).length > 0 ? (
                 <>
                   <SectionHeader title={t('rooms.needsYourAttention', 'Needs your attention')} />
-                  <Card style={styles.listCard}>
+                  {/* Given a warning edge so it reads as urgent at a glance
+                      rather than as a third neutral list: these rooms carry a
+                      20-minute rework clock, and previously they sat in a card
+                      identical to "Logged today" directly below. */}
+                  <Card
+                    style={{
+                      ...styles.listCard,
+                      ...styles.attentionCard,
+                      borderLeftColor: theme.warning,
+                    }}
+                  >
                     {(data?.needs_rework ?? []).map((room) => renderRoom(room, { showHotel: true }))}
                   </Card>
                 </>
@@ -319,9 +332,19 @@ export default function RoomsScreen() {
                 </Card>
               )}
 
+              {/* Was the bare count ("3") as a subtitle, which read as an
+                  unlabelled number next to the heading. */}
               <SectionHeader
                 title={t('rooms.todayTitle', 'Logged today')}
-                subtitle={String((data?.rooms ?? []).length)}
+                // `n`, not i18next's reserved `count`: passing `count` selects
+                // a plural form, and Arabic and Ukrainian need more forms than
+                // English does -- so a single string would silently fall back
+                // for them. This is one string with one placeholder in every
+                // locale instead.
+                subtitle={t('rooms.loggedCount', {
+                  n: (data?.rooms ?? []).length,
+                  defaultValue: '{{n}} rooms',
+                })}
               />
             </>
           }
@@ -359,6 +382,7 @@ const styles = StyleSheet.create({
   },
   listCard: { gap: 0, paddingVertical: 0 },
   checkInCard: { gap: Spacing.three, alignItems: 'flex-start' },
+  attentionCard: { borderLeftWidth: 3 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   input: {
     flex: 1,
