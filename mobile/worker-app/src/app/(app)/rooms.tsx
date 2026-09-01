@@ -18,6 +18,7 @@ import { ThemedView } from '@/components/themed-view';
 import { NotificationBell } from '@/components/NotificationBell';
 import { Badge, Button, Card, SectionHeader } from '@/components/ui';
 import { api } from '@/lib/api';
+import { isoDateInCalendarTimezone } from '@/lib/calendar-dates';
 import { useAuthStore } from '@/stores/auth-store';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -80,12 +81,27 @@ export default function RoomsScreen() {
     { refreshInterval: 5000 }
   );
   const todayShift = useMemo<WorkerAssignment | undefined>(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return (assignments ?? []).find(
-      (a: WorkerAssignment) =>
-        a.day === today &&
-        !a.rework_of_assignment_id &&
-        (a.status === 'IN_PROGRESS' || a.status === 'COMPLETED')
+    const loggable = (assignments ?? []).filter(
+      (a: WorkerAssignment) => !a.rework_of_assignment_id
+    );
+    // A shift that is IN_PROGRESS is the one being worked right now, whatever
+    // any date arithmetic says -- so it wins outright, and is matched before
+    // the day is considered at all.
+    //
+    // Reported live as "shift ended more than two hours ago" while standing
+    // in an in-progress shift. `today` was read as new Date().toISOString(),
+    // which is the UTC date, while the server dates shifts in Europe/Berlin
+    // (rooms/service.ts toDayDate). From 22:00 UTC onwards the two disagree,
+    // so the app skipped the in-progress shift dated tomorrow-in-Berlin and
+    // picked YESTERDAY's completed one instead -- which the server then
+    // refused, correctly, for being long over.
+    const inProgress = loggable.find((a: WorkerAssignment) => a.status === 'IN_PROGRESS');
+    if (inProgress) return inProgress;
+
+    // Otherwise the day's finished shift, still inside its post-shift grace.
+    const today = isoDateInCalendarTimezone(0);
+    return loggable.find(
+      (a: WorkerAssignment) => a.day === today && a.status === 'COMPLETED'
     );
   }, [assignments]);
 
@@ -94,7 +110,8 @@ export default function RoomsScreen() {
   // IN_PROGRESS/COMPLETED, matching what the server will accept) so the
   // empty state can point at something concrete instead of only explaining.
   const pendingShift = useMemo<WorkerAssignment | undefined>(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    // Europe/Berlin, matching the server -- see todayShift's note.
+    const today = isoDateInCalendarTimezone(0);
     return (assignments ?? []).find(
       (a: WorkerAssignment) =>
         a.day === today && !a.rework_of_assignment_id && a.status === 'CONFIRMED'
