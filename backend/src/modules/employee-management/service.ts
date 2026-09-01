@@ -2012,7 +2012,7 @@ export class EmployeeManagementService extends BaseService {
             first_name: true,
             last_name: true,
             phone: true,
-            profile_photo_url: true,
+            profile_photo_key: true,
             role: true,
             created_at: true,
             updated_at: true,

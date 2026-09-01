@@ -7,11 +7,11 @@ import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NotificationBell } from '@/components/NotificationBell';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Badge, Button, Card, ListRow, SectionHeader } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { workerDisplayName } from '@/lib/greeting';
 import { SymbolView } from 'expo-symbols';
 
 /**
@@ -45,13 +45,7 @@ export default function ProfileScreen() {
 
   if (!user) return null;
 
-  const displayName = workerDisplayName(user.first_name);
   const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
-  // Initials for the avatar, falling back to the email so the circle is never
-  // empty (and never shows a cuid fragment).
-  const initials =
-    (displayName?.[0] ?? user.email?.[0] ?? '?').toUpperCase() +
-    (user.last_name?.[0]?.toUpperCase() ?? '');
 
   const employmentTone =
     user.employment_status === 'ACTIVE'
@@ -96,11 +90,7 @@ export default function ProfileScreen() {
             style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
           >
             <Card style={styles.identity}>
-            <View style={[styles.avatar, { backgroundColor: theme.primarySubtle }]}>
-              <ThemedText type="subtitle" style={{ color: theme.primary }}>
-                {initials}
-              </ThemedText>
-            </View>
+            <UserAvatar userId={user.id} name={fullName || user.email} hasPhoto={user.has_profile_photo} size={56} />
             <View style={styles.identityText}>
               <ThemedText type="smallBold" numberOfLines={1}>
                 {fullName || user.email}
@@ -203,13 +193,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   identity: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   identityText: { flex: 1, gap: Spacing.half },
   badges: { flexDirection: 'row', gap: Spacing.one, marginTop: Spacing.half },
   // The rows draw their own dividers, so the card supplies no extra gap.

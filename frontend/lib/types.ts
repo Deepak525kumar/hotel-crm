@@ -23,7 +23,12 @@ export interface AuthUser {
   first_name: string;
   last_name: string;
   phone?: string;
-  profile_photo_url?: string;
+  /**
+   * Never the raw S3 key or a presigned URL — just whether one exists. The
+   * actual bytes come from the stable `GET /users/:id/photo` route
+   * (components/users/UserAvatar.tsx), which the browser can cache by URL.
+   */
+  has_profile_photo?: boolean;
   role: Role;
   permissions: string[];
   /**
@@ -128,7 +133,8 @@ export interface UserSummary {
   first_name: string;
   last_name: string;
   phone: string | null;
-  profile_photo_url: string | null;
+  /** See AuthUser.has_profile_photo — same never-the-raw-key convention. */
+  has_profile_photo: boolean;
   role: Role;
   /**
    * ACCOUNT flag only — "can this person sign in". True from the moment the
@@ -211,7 +217,10 @@ export interface UpdateProfileInput {
   first_name?: string;
   last_name?: string;
   phone?: string;
-  profile_photo_url?: string;
+  // No profile_photo_url field: see backend auth/service.ts#updateProfile
+  // for why accepting an arbitrary photo URL string here was removed rather
+  // than kept — the mandatory photo now only ever comes from the controlled
+  // multipart upload at account creation (usersApi.create).
   /**
    * UI language (lib/locales.ts `UiLocale`). Typed to allow an explicit
    * `null`, which is not the same as omitting the key: `null` clears the

@@ -341,7 +341,11 @@ export class AuthService extends BaseService {
         first_name: user.first_name,
         last_name: user.last_name,
         phone: user.phone ?? undefined,
-        profile_photo_url: user.profile_photo_url ?? undefined,
+        // Never the raw S3 key over the wire -- the client fetches the
+        // photo from the stable GET /users/:id/photo route (users/photo-
+        // serving.ts), keyed by the user id it already has, not by a key
+        // this response would otherwise leak.
+        has_profile_photo: user.profile_photo_key != null,
         role: user.role.toLowerCase(),
         // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
         // stored column (dropped).
@@ -484,7 +488,11 @@ export class AuthService extends BaseService {
         first_name: user.first_name,
         last_name: user.last_name,
         phone: user.phone ?? undefined,
-        profile_photo_url: user.profile_photo_url ?? undefined,
+        // Never the raw S3 key over the wire -- the client fetches the
+        // photo from the stable GET /users/:id/photo route (users/photo-
+        // serving.ts), keyed by the user id it already has, not by a key
+        // this response would otherwise leak.
+        has_profile_photo: user.profile_photo_key != null,
         role: user.role.toLowerCase(),
         // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
         // stored column (dropped).
@@ -573,7 +581,7 @@ export class AuthService extends BaseService {
         first_name: true,
         last_name: true,
         phone: true,
-        profile_photo_url: true,
+        profile_photo_key: true,
         role: true,
         is_active: true,
         // 2026-08-16: read by SessionBootstrap on both clients to pick the
@@ -760,7 +768,18 @@ export class AuthService extends BaseService {
         first_name: data.first_name ?? user.first_name,
         last_name: data.last_name ?? user.last_name,
         phone: data.phone ?? user.phone,
-        profile_photo_url: data.profile_photo_url ?? user.profile_photo_url,
+        // profile_photo_key is deliberately NOT writable here. Before this
+        // comment, UpdateProfileSchema accepted an arbitrary `profile_photo_
+        // url` STRING from any authenticated caller and wrote it straight to
+        // the column with no validation beyond "is a URL" -- a user could
+        // point their own profile photo at any external image (or none of
+        // this platform's), and it would then be shown to every colleague
+        // who visits their profile. No client ever actually sent the field
+        // (verified: zero references in frontend/ or mobile/ before this
+        // change), so nothing regresses by removing it. A photo can only be
+        // set via the mandatory multipart upload at account creation
+        // (users/service.ts#createUser); there is deliberately no
+        // self-service re-upload path yet.
         // Deliberately NOT the `data.x ?? user.x` idiom used above. That
         // pattern cannot distinguish "key absent" from "key present and
         // null", and for this field the difference is the whole feature:
@@ -779,7 +798,7 @@ export class AuthService extends BaseService {
         first_name: true,
         last_name: true,
         phone: true,
-        profile_photo_url: true,
+        profile_photo_key: true,
         role: true,
         is_active: true,
         preferred_language: true,
@@ -790,7 +809,17 @@ export class AuthService extends BaseService {
     await this.logAudit(userId, user.role, 'MODIFY', 'USER', userId, { fields: Object.keys(data) }, ip);
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
     // stored column (dropped).
-    return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
+    // profile_photo_key is destructured OUT rather than spread through: it's
+    // an S3 object key, an internal storage detail with no meaning to a
+    // client and no reason to leave this process -- has_profile_photo is the
+    // client-facing signal (see the two response sites above).
+    const { profile_photo_key, ...rest } = updated;
+    return {
+      ...rest,
+      role: updated.role.toLowerCase(),
+      permissions: ROLE_PERMISSIONS[updated.role] ?? [],
+      has_profile_photo: profile_photo_key != null,
+    };
   }
 
   // ADR-016: backend-auth is the authoritative writer of AuditLog and owns

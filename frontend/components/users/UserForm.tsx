@@ -1,7 +1,8 @@
 "use client";
 
 import { SKILL_OPTIONS } from "@/lib/skills";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { UserRound, UploadCloud } from "lucide-react";
 import {
   Button,
   Card,
@@ -98,9 +99,17 @@ export interface UserFormProps {
   hotelGroups?: HotelGroup[];
   submitting?: boolean;
   error?: string | null;
-  onSubmit: (values: UserFormSubmitValues) => void;
+  /**
+   * `photo` is non-null only in create mode (mandatory there — see the
+   * `valid` check below); edit mode has no photo-change UI yet, so it always
+   * passes `null`.
+   */
+  onSubmit: (values: UserFormSubmitValues, photo: File | null) => void;
   onCancel?: () => void;
 }
+
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 /** Presentational create/edit form for user accounts. */
 export function UserForm({
@@ -140,6 +149,37 @@ export function UserForm({
   const set = <K extends keyof UserFormValues>(key: K, value: UserFormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  // Mandatory at creation (RULE-PHOTO-01): every account created through this
+  // form must carry a real photo, uploaded straight to the backend's S3
+  // storage — never a URL field (see auth/service.ts#updateProfile on the
+  // backend for why that was removed rather than reused). Edit mode has no
+  // photo-change affordance yet, so this state is unused there.
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      setPhotoError("Photo must be a JPEG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_SIZE_BYTES) {
+      setPhotoError("Photo must be smaller than 5 MB.");
+      return;
+    }
+
+    setPhotoError(null);
+    setPhoto(file);
+    setPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
+
   // ADR-065: admin accounts have no onboarding/EmploymentRecord concept.
   // RULE A means `admin` is never actually in `allowedCreateRoles`, but this
   // stays role-derived (not hardcoded to "always show") so it degrades
@@ -148,19 +188,22 @@ export function UserForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      ...form,
-      email: form.email.trim(),
-      first_name: form.first_name.trim(),
-      last_name: form.last_name.trim(),
-      // Blank phone must not be sent as "" — phone is unique-but-nullable,
-      // and "" collides with every other user who also left it blank.
-      phone: form.phone.trim() || null,
-      job_title: form.job_title.trim(),
-      ...(form.role === "worker" ? { skills: form.skills } : {}),
-      ...(form.role === "manager" ? { hotel_id: form.hotel_id } : {}),
-      ...(form.role === "regional_manager" ? { hotel_group_id: form.hotel_group_id } : {}),
-    });
+    onSubmit(
+      {
+        ...form,
+        email: form.email.trim(),
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        // Blank phone must not be sent as "" — phone is unique-but-nullable,
+        // and "" collides with every other user who also left it blank.
+        phone: form.phone.trim() || null,
+        job_title: form.job_title.trim(),
+        ...(form.role === "worker" ? { skills: form.skills } : {}),
+        ...(form.role === "manager" ? { hotel_id: form.hotel_id } : {}),
+        ...(form.role === "regional_manager" ? { hotel_group_id: form.hotel_group_id } : {}),
+      },
+      mode === "create" ? photo : null,
+    );
   };
 
   const valid =
@@ -173,6 +216,8 @@ export function UserForm({
         // RULE A: never let a create submit carry a role the viewer may not
         // create, even if form state somehow held a stale value.
         allowedCreateRoles.includes(form.role) &&
+        // Mandatory: see the photo input below.
+        photo !== null &&
         // ADR-065: required for every non-admin role at creation.
         (!requiresOnboardingFields ||
           (form.job_title.trim() && form.start_date && form.employment_type))));
@@ -201,6 +246,45 @@ export function UserForm({
                 value={form.password}
                 onChange={(e) => set("password", e.target.value)}
               />
+
+              <div className="sm:col-span-2">
+                <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Profile photo <span className="text-red-600">*</span>
+                </span>
+                <div className="mt-1.5 flex items-center gap-4">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+                    {photoPreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- a local blob: preview URL, not a remote image next/image can optimise.
+                      <img src={photoPreview} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <UserRound className="h-7 w-7 text-gray-400" />
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    ref={photoInputRef}
+                    className="hidden"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoChange}
+                    disabled={submitting}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={submitting}
+                  >
+                    <UploadCloud className="me-2 h-4 w-4" />
+                    {photo ? "Change photo" : "Upload photo"}
+                  </Button>
+                </div>
+                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  Required. JPEG, PNG, or WebP, up to 5 MB — this is what everyone sees on this
+                  person&apos;s profile.
+                </p>
+                {photoError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{photoError}</p>}
+              </div>
             </div>
           ) : (
             <Input label={t("fields.email")} value={form.email} disabled readOnly />

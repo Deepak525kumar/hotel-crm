@@ -864,8 +864,20 @@ export const usersApi = {
 
   get: (id: string) => apiFetch<UserDetail>(`/users/${id}`),
 
-  create: (input: CreateUserInput) =>
-    apiFetch<UserDetail>("/users", { method: "POST", body: input }),
+  /**
+   * Always multipart: the profile photo is mandatory (backend enforces this
+   * with a 400 when `photo` is missing from the request), so there is no
+   * JSON-body code path to keep in sync with this one.
+   */
+  create: (input: CreateUserInput, photo: File) => {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(input)) {
+      if (value === undefined || value === null) continue;
+      form.append(key, String(value));
+    }
+    form.append("photo", photo);
+    return apiFetch<UserDetail>("/users", { method: "POST", body: form });
+  },
 
   /** Update a user's profile fields. The backend route is a PUT, not a PATCH. */
   update: (id: string, input: UpdateUserInput) =>

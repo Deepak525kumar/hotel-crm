@@ -1,8 +1,44 @@
 import { create } from 'zustand';
 import { deleteItem, getItem, setItem } from '@/lib/persistent-storage';
 import { router } from 'expo-router';
-import { api, setAccessToken, setRefreshToken, setOnTokenRefreshed, setOnAuthFailure, getAccessToken, getRefreshToken } from '@/lib/api';
+import {
+  api,
+  setAccessToken,
+  setRefreshToken,
+  setOnTokenRefreshed,
+  setOnAuthFailure,
+  getAccessToken,
+  getRefreshToken,
+  getUserPhotoUrl,
+} from '@/lib/api';
 import type { User } from '@/types/api';
+
+/**
+ * Warms expo-image's disk cache for the signed-in user's own photo right
+ * after sign-in/session-restore, so the profile screen never shows a blank
+ * circle-then-pop-in on first visit -- by the time anyone taps into it, the
+ * fetch already happened. Fire-and-forget: a failure here is never worse
+ * than the pre-prefetch behavior (UserAvatar just fetches on-demand), so it
+ * must not block or fail auth.
+ */
+function prefetchOwnPhoto(user: User, accessToken: string): void {
+  if (!user.has_profile_photo) return;
+  // Lazy require, not a top-level import: this module is imported by test
+  // files running under Jest's `node` test environment (same constraint as
+  // the react-i18next KNOWN GAP above lib/api.ts's BASE_URL) -- expo-image's
+  // own import chain touches Expo's runtime setup, which references
+  // `__DEV__` and crashes there. The early return above means this line is
+  // only reached with a real photo-bearing user, so it never executes in
+  // those suites' mocked responses.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Image } = require('expo-image') as typeof import('expo-image');
+  void Image.prefetch(getUserPhotoUrl(user.id), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cachePolicy: 'disk',
+  }).catch(() => {
+    // Best-effort -- UserAvatar falls back to fetching on-demand.
+  });
+}
 
 const KEYS = {
   ACCESS_TOKEN: 'hotel_crm_access_token',
@@ -40,7 +76,9 @@ export const useAuthStore = create<AuthState>((set) => ({
           // Read tokens from the module mirror after me() returns: a transparent startup
           // refresh inside request() updates _accessToken/_refreshToken before returning,
           // so these values are always current regardless of whether a refresh occurred.
-          set({ user, accessToken: getAccessToken(), refreshToken: getRefreshToken(), isInitialized: true });
+          const currentAccessToken = getAccessToken();
+          set({ user, accessToken: currentAccessToken, refreshToken: getRefreshToken(), isInitialized: true });
+          if (currentAccessToken) prefetchOwnPhoto(user, currentAccessToken);
           return;
         } catch {
           setAccessToken(null);
@@ -78,6 +116,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         refreshToken: response.refresh_token,
         isLoading: false,
       });
+      prefetchOwnPhoto(response.user, response.access_token);
     } catch (error) {
       set({ isLoading: false });
       throw error;

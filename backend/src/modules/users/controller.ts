@@ -61,7 +61,19 @@ export class UserController {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (!req.auth) throw new UnauthorizedError();
-        const user = await userService.createUser(req.body, req.auth, req.ip);
+        // Mandatory: routes.ts's upload.single('photo') (memory storage, no
+        // disk write) populates req.file; there is no account-creation path
+        // that skips it. Checked here rather than in the Zod body schema --
+        // multer parses the file separately from the JSON-shaped `req.body`
+        // fields Zod validates.
+        if (!req.file) {
+          throw new ValidationError('A profile photo is required', [{ field: 'photo', message: 'required' }]);
+        }
+        const user = await userService.createUser(req.body, req.auth, req.ip, {
+          buffer: req.file.buffer,
+          mimetype: req.file.mimetype,
+          originalname: req.file.originalname,
+        });
         res.status(201).json({
           status: 'success',
           data: user,
@@ -172,6 +184,28 @@ export class UserController {
       }
     },
   ];
+
+  async getUserPhoto(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const { buffer, mimeType } = await userService.getUserPhoto(
+        req.params['user_id']!,
+        req.auth.userId,
+        req.auth.role,
+        req.auth.scope ?? null
+      );
+      // A stable URL keyed only by user id (never a presigned, per-request
+      // one) is the whole point of this route: it's what lets the browser
+      // and expo-image cache the photo by URL instead of re-fetching it on
+      // every profile view. private: the image is authenticated, not public
+      // CDN-cacheable.
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      res.setHeader('Content-Type', mimeType);
+      res.status(200).send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
 
   async deleteUser(req: Request, res: Response, next: NextFunction) {
     try {

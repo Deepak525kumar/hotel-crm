@@ -49,7 +49,9 @@ export interface AuthUser {
   first_name: string;
   last_name: string;
   phone?: string;
-  profile_photo_url?: string;
+  // Never the raw S3 key -- fetch the image itself from the stable
+  // GET /users/:id/photo route, keyed by `id` on this same object.
+  has_profile_photo?: boolean;
   role: string;
   permissions: string[];
   is_active: boolean;

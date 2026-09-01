@@ -543,11 +543,17 @@ describe('UserService', () => {
   });
 
   describe('createUser', () => {
+    // Mandatory-photo feature: every createUser() call now takes an
+    // UploadedPhoto as its 4th argument. The buffer content is irrelevant to
+    // these tests -- getStorageClient() resolves to the stub client (no
+    // S3_BUCKET in the test env), whose upload() is a no-op.
+    const mockPhoto = { buffer: Buffer.from(''), mimetype: 'image/jpeg', originalname: 'photo.jpg' };
+
     it('throws ConflictError when email exists', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'existing' });
 
       await expect(
-        service.createUser({ email: 'exists@test.com', password: 'pw12345678', first_name: 'A', last_name: 'B', role: 'worker', phone: '+1234567890' }, { userId: 'actor', email: 'actor@test.com', role: 'admin', permissions: [] })
+        service.createUser({ email: 'exists@test.com', password: 'pw12345678', first_name: 'A', last_name: 'B', role: 'worker', phone: '+1234567890' }, { userId: 'actor', email: 'actor@test.com', role: 'admin', permissions: [] }, undefined, mockPhoto)
       ).rejects.toMatchObject({ name: 'ConflictError' });
     });
 
@@ -560,7 +566,9 @@ describe('UserService', () => {
       await expect(
         service.createUser(
           { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Mal', last_name: 'Ory', role: 'admin', phone: '+1234567890' },
-          { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+          { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] },
+          undefined,
+          mockPhoto
         )
       // Message changed with RULE A (2026-08-12): the old HOTFIX-AUTH-003
       // guard ("Only admins can assign admin role") was superseded by the
@@ -584,7 +592,9 @@ describe('UserService', () => {
       await expect(
         service.createUser(
           { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Real', last_name: 'Admin', role: 'admin', phone: '+1234567890' },
-          { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] }
+          { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] },
+          undefined,
+          mockPhoto
         )
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
 
@@ -601,7 +611,9 @@ describe('UserService', () => {
 
       const result = await service.createUser(
         { email: 'rm@test.com', password: 'pw12345678', first_name: 'Reg', last_name: 'Man', role: 'regional_manager', phone: '+1234567890' },
-        { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] }
+        { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] },
+        undefined,
+        mockPhoto
       );
 
       expect(result.role).toBe('regional_manager');
@@ -619,7 +631,9 @@ describe('UserService', () => {
 
       const result = await service.createUser(
         { email: 'worker@test.com', password: 'pw12345678', first_name: 'Work', last_name: 'Er', role: 'worker', phone: '+1234567890' },
-        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] },
+        undefined,
+        mockPhoto
       );
 
       expect(result.role).toBe('worker');
@@ -648,7 +662,9 @@ describe('UserService', () => {
 
       await service.createUser(
         { email: 'newworker@test.com', password: 'ChosenPw123!', first_name: 'New', last_name: 'Worker', role: 'worker', phone: '+1234567890' },
-        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] },
+        undefined,
+        mockPhoto
       );
 
       expect(mockNotificationEnqueue).toHaveBeenCalledTimes(1);
@@ -692,7 +708,9 @@ describe('UserService', () => {
 
       const result = await service.createUser(
         { email: 'resilient@test.com', password: 'pw12345678', first_name: 'Res', last_name: 'Ilient', role: 'worker', phone: '+1234567890' },
-        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] },
+        undefined,
+        mockPhoto
       );
 
       expect(result.id).toBe('u_worker3');

@@ -24,6 +24,11 @@ export interface User {
    * included. Absent for admins, who hold no EmploymentRecord by design.
    */
   employment_status?: string | null;
+  /**
+   * Never the raw S3 key -- just whether one exists. The bytes come from the
+   * stable, cacheable `GET /users/:id/photo` route (components/UserAvatar.tsx).
+   */
+  has_profile_photo?: boolean;
 }
 
 export interface AuthResponse {

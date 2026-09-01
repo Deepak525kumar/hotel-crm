@@ -22,8 +22,15 @@ function NewUser() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = async (values: UserFormSubmitValues) => {
+  const onSubmit = async (values: UserFormSubmitValues, photo: File | null) => {
     setError(null);
+    // UserForm's own `valid` check already blocks submit without a photo in
+    // create mode -- this is defence-in-depth, not the real gate, matching
+    // the backend's own 400 when `photo` is missing from the multipart body.
+    if (!photo) {
+      setError("A profile photo is required.");
+      return;
+    }
     setSubmitting(true);
     const payload: CreateUserInput = {
       email: values.email,
@@ -61,8 +68,8 @@ function NewUser() {
         : {}),
     };
     try {
-      const created = await usersApi.create(payload);
-      
+      const created = await usersApi.create(payload, photo);
+
       await mutate((key) => Array.isArray(key) && key[0] === "users");
       router.replace(`/users/${created.id}`);
     } catch (err) {

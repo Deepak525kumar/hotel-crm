@@ -43,7 +43,15 @@ const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) =>
 const mockAuditCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
 const prismaStub = {
-  user: { findUnique: mockUserFindUnique, create: mockUserCreate },
+  user: {
+    findUnique: mockUserFindUnique,
+    create: mockUserCreate,
+    // createUser()'s mandatory-photo step writes profile_photo_key back via
+    // update() after the (stubbed, no S3_BUCKET in this test env) upload
+    // succeeds; its rollback path on a downstream failure calls delete().
+    update: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+    delete: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+  },
   employmentRecord: { findUnique: mockEmploymentFindUnique, create: mockEmploymentCreate },
   hotel: { findUnique: mockHotelFindUnique },
   auditLog: { create: mockAuditCreate },
@@ -161,7 +169,9 @@ describe('RULE A — create is 1-level-down only, enforced on both creation surf
               last_name: 'User',
               role: target,
             } as any,
-            { userId: `actor_${actor}`, email: 'actor@test.com', role: actor, permissions: [] }
+            { userId: `actor_${actor}`, email: 'actor@test.com', role: actor, permissions: [] },
+            undefined,
+            { buffer: Buffer.from(''), mimetype: 'image/jpeg', originalname: 'photo.jpg' }
           );
 
           if (allowed) {
@@ -182,7 +192,9 @@ describe('RULE A — create is 1-level-down only, enforced on both creation surf
       await expect(
         service.createUser(
           { email: 'x@test.com', password: 'pw12345678', first_name: 'X', last_name: 'Y', role: 'worker' } as any,
-          { userId: 'actor_x', email: 'actor@test.com', role: 'superadmin', permissions: [] }
+          { userId: 'actor_x', email: 'actor@test.com', role: 'superadmin', permissions: [] },
+          undefined,
+          { buffer: Buffer.from(''), mimetype: 'image/jpeg', originalname: 'photo.jpg' }
         )
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
       expect(mockUserCreate).not.toHaveBeenCalled();

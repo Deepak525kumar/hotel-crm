@@ -17,6 +17,7 @@ import {
   WorkerOnboardingGate,
 } from "@/components/auth/RoleGate";
 import { RoleBadge } from "@/components/users/RoleBadge";
+import { UserAvatar } from "@/components/users/UserAvatar";
 import { DocumentsCard } from "@/components/documents/DocumentsCard";
 import { PayslipRequestsCard } from "@/components/hr/PayslipRequestsCard";
 import { ContractCard } from "@/components/hr/ContractCard";
@@ -162,44 +163,54 @@ function UserDetail() {
         </Card>
       ) : (
         <>
-          <PageHeader
-            title={
-              <span className="flex items-center gap-3">
-                {user.first_name} {user.last_name}
-                {/* Employment status is what a reviewer reads this badge as.
-                    `is_active` is the account/sign-in flag and is true from
-                    creation, so on its own it showed "Active" for someone who
-                    has not onboarded. Only falls back to the account flag for
-                    accounts with no employment record (admins, pre-ADR-065). */}
-                {user.employment_status ? (
-                  <Badge tone={EMPLOYMENT_STATUS_TONE[user.employment_status]}>
-                    {EMPLOYMENT_STATUS_LABEL[user.employment_status]}
-                  </Badge>
-                ) : (
-                  <ActiveBadge active={user.is_active} />
-                )}
-              </span>
-            }
-            description={user.email}
-            actions={
-              // Edit now admits in-scope manager/RM too (2026-08-06 scope
-              // fix to updateUser) -- but the backend only ever permits a
-              // manager/RM to edit a worker/checker target or themselves,
-              // never a fellow manager/admin. Hide the button rather than
-              // linking to a page that will 403 on submit (or, for a
-              // non-worker/checker target, on load).
-              currentUser?.role === "admin" ||
-              isSelf ||
-              user.role === "worker" ||
-              user.role === "checker" ? (
-                <RoleGate allow={["admin", "manager", "regional_manager"]}>
-                  <Link href={`/users/${id}/edit`}>
-                    <Button variant="outline">{t("common.edit")}</Button>
-                  </Link>
-                </RoleGate>
-              ) : null
-            }
-          />
+          <div className="flex items-center gap-4">
+            <UserAvatar
+              userId={user.id}
+              name={`${user.first_name} ${user.last_name}`}
+              hasPhoto={user.has_profile_photo}
+              size="lg"
+            />
+            <div className="min-w-0 flex-1">
+              <PageHeader
+                title={
+                  <span className="flex items-center gap-3">
+                    {user.first_name} {user.last_name}
+                    {/* Employment status is what a reviewer reads this badge as.
+                        `is_active` is the account/sign-in flag and is true from
+                        creation, so on its own it showed "Active" for someone who
+                        has not onboarded. Only falls back to the account flag for
+                        accounts with no employment record (admins, pre-ADR-065). */}
+                    {user.employment_status ? (
+                      <Badge tone={EMPLOYMENT_STATUS_TONE[user.employment_status]}>
+                        {EMPLOYMENT_STATUS_LABEL[user.employment_status]}
+                      </Badge>
+                    ) : (
+                      <ActiveBadge active={user.is_active} />
+                    )}
+                  </span>
+                }
+                description={user.email}
+                actions={
+                  // Edit now admits in-scope manager/RM too (2026-08-06 scope
+                  // fix to updateUser) -- but the backend only ever permits a
+                  // manager/RM to edit a worker/checker target or themselves,
+                  // never a fellow manager/admin. Hide the button rather than
+                  // linking to a page that will 403 on submit (or, for a
+                  // non-worker/checker target, on load).
+                  currentUser?.role === "admin" ||
+                  isSelf ||
+                  user.role === "worker" ||
+                  user.role === "checker" ? (
+                    <RoleGate allow={["admin", "manager", "regional_manager"]}>
+                      <Link href={`/users/${id}/edit`}>
+                        <Button variant="outline">{t("common.edit")}</Button>
+                      </Link>
+                    </RoleGate>
+                  ) : null
+                }
+              />
+            </div>
+          </div>
 
           <Card>
             <CardHeader>
