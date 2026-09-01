@@ -1,5 +1,24 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+// createUser()'s mandatory-photo upload goes through documents/storage.js's
+// getStorageClient(). Mocked away entirely, the same convention every other
+// suite that exercises a storage-backed write path follows (see e.g.
+// quality.test.ts) -- this suite tests createUser()'s own authz/rollback
+// logic, not S3 wiring. Without this, whether these tests pass depends on
+// whether S3_BUCKET happens to be set in the environment: unset locally,
+// getStorageClient() quietly falls back to a no-op stub and these tests
+// pass; CI sets S3_BUCKET=test-bucket (documents-storage-s3.test.ts needs
+// a bucket name to exist), which routes here into a REAL S3Client attempting
+// a real network call that has no real credentials to succeed with.
+jest.mock('../modules/documents/storage.js', () => ({
+  getStorageClient: async () => ({
+    upload: async () => undefined,
+    download: async () => Buffer.alloc(0),
+    getPresignedUrl: async () => null,
+    delete: async () => undefined,
+  }),
+}));
+
 // Vacancy-history model (2026-08-06): demoting a Regional Manager/Manager who
 // still owns a group/hotel now auto-clears the assignment (rather than
 // blocking), so updateUserRole() also writes hotelGroup/hotel and their
@@ -545,8 +564,8 @@ describe('UserService', () => {
   describe('createUser', () => {
     // Mandatory-photo feature: every createUser() call now takes an
     // UploadedPhoto as its 4th argument. The buffer content is irrelevant to
-    // these tests -- getStorageClient() resolves to the stub client (no
-    // S3_BUCKET in the test env), whose upload() is a no-op.
+    // these tests -- getStorageClient() is mocked above, whose upload() is
+    // a no-op regardless of this environment's S3_BUCKET setting.
     const mockPhoto = { buffer: Buffer.from(''), mimetype: 'image/jpeg', originalname: 'photo.jpg' };
 
     it('throws ConflictError when email exists', async () => {

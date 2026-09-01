@@ -35,6 +35,22 @@ jest.mock('../config/feature-flags.js', () => ({
   isRmRoleEnabled: () => true,
 }));
 
+// createUser()'s mandatory-photo upload goes through documents/storage.js's
+// getStorageClient(). Mocked away entirely (same convention as quality.test.ts
+// and every other suite exercising a storage-backed write path) rather than
+// relying on S3_BUCKET being unset to fall through to the real module's own
+// no-op stub -- CI sets S3_BUCKET=test-bucket for documents-storage-s3.test.ts,
+// which would otherwise route this suite into a REAL S3Client with no real
+// credentials to succeed with.
+jest.mock('../modules/documents/storage.js', () => ({
+  getStorageClient: async () => ({
+    upload: async () => undefined,
+    download: async () => Buffer.alloc(0),
+    getPresignedUrl: async () => null,
+    delete: async () => undefined,
+  }),
+}));
+
 const mockUserFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockUserCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockEmploymentFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
@@ -47,7 +63,7 @@ const prismaStub = {
     findUnique: mockUserFindUnique,
     create: mockUserCreate,
     // createUser()'s mandatory-photo step writes profile_photo_key back via
-    // update() after the (stubbed, no S3_BUCKET in this test env) upload
+    // update() after the (mocked, see getStorageClient() above) upload
     // succeeds; its rollback path on a downstream failure calls delete().
     update: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
     delete: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
