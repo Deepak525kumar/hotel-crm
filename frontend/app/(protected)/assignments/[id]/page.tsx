@@ -8,11 +8,12 @@ import { useHotel, useUserOptions } from "@/hooks/useHotels";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useRoomsForCheck } from "@/hooks/useRooms";
+import { useRoomsForCheck, useRoomsForAssignment } from "@/hooks/useRooms";
 import { useAuthStore } from "@/stores/auth";
 import { ApiError, assignmentsApi, attendanceApi, qualityApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
+import { RoomStateBadge } from "@/components/rooms/RoomStateBadge";
 import { formatDateTime } from "@/lib/format";
 import {
   Badge,
@@ -487,7 +488,14 @@ export default function AssignmentDetailPage() {
 
       {/* The manager's "rooms completed" entry card stood here until
           2026-09-01. See the comment beside this page's state declarations for
-          why it is gone and where the number comes from now. */}
+          why it is gone and where the number comes from now.
+
+          What stands here instead (2026-09-02): the rooms THIS shift actually
+          logged. Retiring the manual count left this page with no room
+          information at all -- the replacement view is per-hotel and
+          today-only, so a manager opening a shift, and any past shift at all,
+          showed nothing. */}
+      <ShiftRoomsCard assignmentId={id} />
 
       {/*
         quality:write (backend/src/config/constants.ts ROLE_PERMISSIONS) is
@@ -775,6 +783,51 @@ function ReassignModal({
  * it was rendered. Without this the photos were write-only -- uploaded,
  * stored, and impossible to look at.
  */
+/**
+ * The rooms this shift logged, with the state of each.
+ *
+ * Reads the assignment-scoped endpoint rather than filtering a day-scoped one:
+ * a shift being looked at is very often not today's, and the picker read that
+ * the inspection modal uses excludes `worker` outright, while the worker whose
+ * shift this is has every reason to see their own list here.
+ *
+ * Renders nothing at all when the shift logged no rooms -- an empty card on
+ * every admin-created or not-yet-started shift would be noise, and the absence
+ * of rooms is not information anyone is looking for on this page.
+ */
+function ShiftRoomsCard({ assignmentId }: { assignmentId: string }) {
+  const { t } = useTranslation();
+  const { data, error } = useRoomsForAssignment(assignmentId);
+  const rooms = data?.rooms ?? [];
+
+  // A 403 here is ordinary, not a failure worth showing: the endpoint is
+  // scoped to whoever may see the shift, and this card is rendered for
+  // everyone who can open the page.
+  if (error || rooms.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          {t("rooms.todayTitle")} · {rooms.length}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="py-2">
+        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+          {rooms.map((room) => (
+            <li key={room.id} className="flex items-center justify-between gap-4 py-2">
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {room.room_number}
+              </span>
+              <RoomStateBadge state={room.state} />
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
 function VerificationEvidence({ verificationId }: { verificationId: string }) {
   const { t } = useTranslation();
   const [photos, setPhotos] = useState<{ key: string; url: string | null }[] | null>(null);

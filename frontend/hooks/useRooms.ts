@@ -59,3 +59,17 @@ export function useRoomsForHotel(hotelId: string | null | undefined) {
     ([, id]) => roomsApi.forHotels({ hotel_id: id }),
   );
 }
+
+/**
+ * Every room logged on one shift, for that shift's page.
+ *
+ * Polls like the other room reads so a manager watching a shift in progress
+ * sees rooms appear as the worker logs them, rather than having to reload.
+ */
+export function useRoomsForAssignment(assignmentId: string | null | undefined) {
+  return useSWR(
+    assignmentId ? ["rooms-for-assignment", assignmentId] : null,
+    ([, id]) => roomsApi.forAssignment(id),
+    { refreshInterval: process.env.NODE_ENV === 'test' ? 0 : 5000 }
+  );
+}

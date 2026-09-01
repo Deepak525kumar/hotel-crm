@@ -522,6 +522,55 @@ export class RoomService extends BaseService {
   }
 
   /**
+   * Every room logged on ONE shift, for whoever is looking at that shift.
+   *
+   * The three reads above answer "my rooms", "rooms I could inspect" and
+   * "today at my hotels" -- self-scoped, picker-scoped and hotel-and-today
+   * scoped respectively. None of them answers "what was logged on THIS
+   * assignment", which is what an assignment page needs, and the gap was
+   * visible: the manual rooms-completed card was retired when the room log
+   * landed and nothing replaced it there, so a manager opening a shift saw no
+   * room information at all -- including for past shifts, which the
+   * today-scoped read can never cover.
+   *
+   * Scoped to match who may see the assignment itself rather than inventing a
+   * second rule: the worker it belongs to, a checker/manager/RM whose scope
+   * covers its hotel, and admin. Deliberately reuses isHotelInScope, the same
+   * primitive listRoomsForPicker's hotel filter is built on.
+   */
+  async listRoomsForAssignment(
+    assignmentId: string,
+    actor: Actor
+  ): Promise<{ assignment_id: string; rooms: RoomLogDto[] }> {
+    const assignment = await this.prisma.workerAssignment.findUnique({
+      where: { id: assignmentId },
+      select: { id: true, worker_id: true, hotel_id: true },
+    });
+    if (!assignment) throw new NotFoundError('Assignment not found');
+
+    const isOwnShift = assignment.worker_id === actor.userId;
+    if (!isOwnShift && actor.role !== 'admin') {
+      // A worker may only ever read their own shift; every other role is
+      // allowed the shift's hotel if their scope covers it.
+      if (actor.role === 'worker') {
+        throw new ForbiddenError('You can only see the rooms logged on your own shift');
+      }
+      const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('That shift is not at one of your hotels');
+      }
+    }
+
+    const rooms = await this.prisma.roomLog.findMany({
+      where: { assignment_id: assignment.id },
+      include: ROOM_LOG_INCLUDE,
+      orderBy: { room_number: 'asc' },
+    });
+
+    return { assignment_id: assignment.id, rooms: rooms.map((r) => this.toDto(r)) };
+  }
+
+  /**
    * Room numbers already used at a hotel, for the worker's typeahead.
    *
    * This is what makes "trim + upper-case only" normalisation sufficient

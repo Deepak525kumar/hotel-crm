@@ -115,6 +115,23 @@ export class RoomController {
     },
   ];
 
+  // Every room logged on one shift, for the assignment page. No query schema:
+  // the assignment id is the whole input and it comes from the path.
+  listRoomsForAssignment = [
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const result = await roomService.listRoomsForAssignment(
+          req.params['assignment_id'] as string,
+          req.auth
+        );
+        RoomController.ok(req, res, result);
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
   listSuggestions = [
     validateQuery(RoomSuggestionsQuerySchema),
     async (req: Request, res: Response, next: NextFunction) => {

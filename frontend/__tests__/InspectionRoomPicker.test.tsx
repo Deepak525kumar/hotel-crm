@@ -42,7 +42,13 @@ jest.mock("@/hooks/useHotels", () => ({
   useUserOptions: jest.fn(() => ({ users: [], isLoading: false })),
 }));
 jest.mock("@/hooks/useWorkRequests", () => ({ useWorkRequest: jest.fn(() => ({ data: undefined })) }));
-jest.mock("@/hooks/useRooms", () => ({ useRoomsForCheck: jest.fn() }));
+// useRoomsForAssignment feeds the page's "rooms logged on this shift" card,
+// which is unrelated to the picker under test -- stubbed empty so the card
+// renders nothing and leaves these assertions to the picker alone.
+jest.mock("@/hooks/useRooms", () => ({
+  useRoomsForCheck: jest.fn(),
+  useRoomsForAssignment: () => ({ data: undefined, error: undefined }),
+}));
 jest.mock("@/lib/api", () => {
   const actual = jest.requireActual("@/lib/api");
   return {

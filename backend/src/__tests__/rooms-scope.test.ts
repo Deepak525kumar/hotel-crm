@@ -579,3 +579,66 @@ describe('RoomService — a room may only be logged inside its shift window', ()
     expect(mockRoomLog.create).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * Every room logged on ONE shift, for that shift's own page.
+ *
+ * The other three reads are self-scoped, picker-scoped and hotel-and-today
+ * scoped, so none of them could answer "what was logged on this assignment"
+ * -- which is why the assignment page showed no room information at all once
+ * the manual rooms-completed card was retired, past shifts included.
+ *
+ * Access mirrors who may see the assignment itself, so these cases are the
+ * point of the endpoint rather than incidental to it.
+ */
+describe('RoomService — rooms logged on one assignment', () => {
+  const ASSIGNMENT = { id: 'asn1', worker_id: 'w1', hotel_id: 'hotelA' };
+
+  it('returns the shift\'s rooms to the worker whose shift it is', async () => {
+    mockWorkerAssignment.findUnique.mockResolvedValue(ASSIGNMENT);
+    mockRoomLog.findMany.mockResolvedValue([roomLog({ room_number: '412' })]);
+
+    const result = await service.listRoomsForAssignment('asn1', WORKER);
+
+    expect(result.rooms.map((r) => r.room_number)).toEqual(['412']);
+    const call = mockRoomLog.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
+    // Bound to the assignment, never widened to the hotel or the day.
+    expect(call.where.assignment_id).toBe('asn1');
+  });
+
+  it('denies a worker looking at somebody else\'s shift', async () => {
+    mockWorkerAssignment.findUnique.mockResolvedValue(ASSIGNMENT);
+
+    await expect(service.listRoomsForAssignment('asn1', OTHER_WORKER)).rejects.toMatchObject({
+      name: 'ForbiddenError',
+    });
+    expect(mockRoomLog.findMany).not.toHaveBeenCalled();
+  });
+
+  it('allows a manager whose scope covers the shift\'s hotel', async () => {
+    mockWorkerAssignment.findUnique.mockResolvedValue(ASSIGNMENT);
+    mockRoomLog.findMany.mockResolvedValue([roomLog({ room_number: '101' })]);
+
+    const result = await service.listRoomsForAssignment('asn1', MANAGER_HOTEL_A);
+
+    expect(result.rooms).toHaveLength(1);
+  });
+
+  it('denies a manager scoped to a different hotel', async () => {
+    mockWorkerAssignment.findUnique.mockResolvedValue({ ...ASSIGNMENT, hotel_id: 'hotelB' });
+
+    await expect(
+      service.listRoomsForAssignment('asn1', MANAGER_HOTEL_A)
+    ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    expect(mockRoomLog.findMany).not.toHaveBeenCalled();
+  });
+
+  it('404s an assignment that does not exist, without reading rooms', async () => {
+    mockWorkerAssignment.findUnique.mockResolvedValue(null);
+
+    await expect(service.listRoomsForAssignment('nope', ADMIN)).rejects.toMatchObject({
+      name: 'NotFoundError',
+    });
+    expect(mockRoomLog.findMany).not.toHaveBeenCalled();
+  });
+});
