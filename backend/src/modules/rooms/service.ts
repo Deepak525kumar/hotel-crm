@@ -5,7 +5,6 @@ import { isHotelInScope, isScopedManagerRole } from '../../lib/scope.js';
 import { todayInCalendarTimezone } from '../../lib/utils.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { roomKey, type RoomLogDto, type RoomState } from './types.js';
-import { resolveScheduledStart, resolveScheduledEnd } from '../assignments/service.js';
 
 /**
  * How long after a shift ends a worker may still log a room they finished
@@ -40,6 +39,29 @@ interface Actor {
 function toDayDate(day?: string): Date {
   const target = day ?? todayInCalendarTimezone();
   return new Date(`${target}T00:00:00.000Z`);
+}
+
+/**
+ * A room is dated by its SHIFT's day, not by the clock at the moment it was
+ * logged -- so the two disagree for exactly as long as a shift outlives the
+ * calendar day it started on. Reported live: four rooms logged between 22:42
+ * and 01:03 Berlin time against a shift dated the previous day became
+ * invisible in every view the moment Berlin rolled past midnight, because
+ * each of those views filters on "today" alone. The rooms were in the
+ * database the whole time; nothing could show them.
+ *
+ * So the reads span the target day AND the one before it. One day back is
+ * enough for every shape this takes -- a late shift, an overnight shift, and
+ * the 00:00-02:00 window where Berlin is a day ahead of UTC -- while keeping
+ * the list short enough to stay scannable. `needs_rework` already ignores the
+ * day filter entirely for the same class of reason.
+ */
+const ROOM_VISIBILITY_LOOKBACK_DAYS = 1;
+
+function dayRangeFrom(target: Date): { gte: Date; lte: Date } {
+  const from = new Date(target);
+  from.setUTCDate(from.getUTCDate() - ROOM_VISIBILITY_LOOKBACK_DAYS);
+  return { gte: from, lte: target };
 }
 
 function isoDay(day: Date): string {
@@ -140,9 +162,10 @@ export class RoomService extends BaseService {
   async logRoom(assignmentId: string, roomNumber: string, actor: Actor, ip?: string): Promise<RoomLogDto> {
     const assignment = await this.prisma.workerAssignment.findUnique({
       where: { id: assignmentId },
-      // work_request_id/job_request_id are what resolveScheduledStart/End read
-      // the shift's clock through -- a WorkerAssignment carries no time of its
-      // own (see their comment).
+      // started_at/completed_at are the shift's OWN clock, written by check-in
+      // and check-out. The logging window below is measured off these rather
+      // than the linked JobRequest's scheduled times, because the assignments
+      // workers actually log against carry no linked request at all.
       select: {
         id: true,
         worker_id: true,
@@ -150,8 +173,8 @@ export class RoomService extends BaseService {
         day: true,
         status: true,
         rework_of_assignment_id: true,
-        work_request_id: true,
-        job_request_id: true,
+        started_at: true,
+        completed_at: true,
       },
     });
     if (!assignment) throw new NotFoundError('Assignment not found');
@@ -176,43 +199,45 @@ export class RoomService extends BaseService {
       );
     }
 
-    if (
-      assignment.status !== AssignmentStatus.IN_PROGRESS &&
-      assignment.status !== AssignmentStatus.COMPLETED
-    ) {
+    // WHEN a room may be logged (owner decision, 2026-09-02): during the
+    // shift, plus two hours afterwards for anything forgotten in the last
+    // rush. Never before the worker has actually started.
+    //
+    // Measured off the shift's OWN timestamps -- started_at/completed_at,
+    // written by check-in and check-out -- not off the linked JobRequest's
+    // scheduled times. An earlier version of this rule used the scheduled
+    // clock and was silently inert in production: the assignments workers
+    // actually log against carry neither work_request_id nor job_request_id,
+    // so resolveScheduledStart returned null and the whole window was
+    // skipped. Every real shift has these two columns.
+    //
+    // status alone was never sufficient either, and specifically admitted the
+    // case reported here: COMPLETED passes it, so a shift the worker never
+    // checked into -- completed by a manager, or auto-completed -- accepted
+    // rooms indefinitely.
+    if (assignment.status !== AssignmentStatus.IN_PROGRESS && assignment.status !== AssignmentStatus.COMPLETED) {
       throw new ValidationError('Check in to your shift before logging rooms');
     }
 
-    // Owner decision (2026-09-02): a room may only be logged DURING the shift
-    // it was cleaned on, plus a two-hour grace afterwards for anything the
-    // worker forgot in the last rush.
-    //
-    // The status check above is not sufficient on its own, in both
-    // directions. A worker who checks in early is IN_PROGRESS before their
-    // shift has started, and a COMPLETED shift stayed loggable forever -- so
-    // rooms could be attributed to a shift days after it ended, which is also
-    // the window in which a checker has already inspected and closed it out.
-    //
-    // Skipped when the shift has no resolvable time. A calendar-placed
-    // assignment carries a day but no start/end (resolveScheduledStart's own
-    // comment: a data-model gap tracked in #365), and there is no clock to
-    // bound it against -- so it keeps the status-only rule rather than being
-    // refused outright for a gap that is not the worker's doing.
-    const scheduledStart = await resolveScheduledStart(this.prisma, assignment);
-    if (scheduledStart) {
-      const now = new Date();
-      if (now < scheduledStart) {
-        throw new ValidationError('Your shift has not started yet -- you can log rooms once it does');
-      }
-      // resolveScheduledEnd handles the overnight case (an end time earlier
-      // than the start time belongs to the following day), so the grace is
-      // measured from the real end instant, not a wall-clock comparison.
-      const scheduledEnd = await resolveScheduledEnd(this.prisma, assignment);
-      if (scheduledEnd && now.getTime() > scheduledEnd.getTime() + POST_SHIFT_LOGGING_GRACE_MS) {
-        throw new ValidationError(
-          'This shift ended more than two hours ago. Ask your manager to add any room you missed.'
-        );
-      }
+    // The check-in itself, not the status, is what says the work has begun.
+    if (!assignment.started_at) {
+      throw new ValidationError('Check in to your shift before logging rooms');
+    }
+
+    const now = new Date();
+    if (now < assignment.started_at) {
+      // Defensive: a clock skew or a back-dated check-in should not open a
+      // window before the shift began.
+      throw new ValidationError('Your shift has not started yet -- you can log rooms once it does');
+    }
+
+    if (
+      assignment.completed_at &&
+      now.getTime() > assignment.completed_at.getTime() + POST_SHIFT_LOGGING_GRACE_MS
+    ) {
+      throw new ValidationError(
+        'This shift ended more than two hours ago. Ask your manager to add any room you missed.'
+      );
     }
 
     const trimmed = roomNumber.trim();
@@ -351,7 +376,7 @@ export class RoomService extends BaseService {
     const target = toDayDate(day);
     const [rooms, openRework] = await Promise.all([
       this.prisma.roomLog.findMany({
-        where: { worker_id: actor.userId, day: target },
+        where: { worker_id: actor.userId, day: dayRangeFrom(target) },
         include: ROOM_LOG_INCLUDE,
         orderBy: { logged_at: 'desc' },
       }),
@@ -475,7 +500,7 @@ export class RoomService extends BaseService {
     }
 
     const logs = await this.prisma.roomLog.findMany({
-      where: { day: target, ...hotelFilter },
+      where: { day: dayRangeFrom(target), ...hotelFilter },
       include: ROOM_LOG_INCLUDE,
       orderBy: { room_key: 'asc' },
     });

@@ -17,6 +17,29 @@ import { UpdateChecker } from '@/components/UpdateChecker';
 
 SplashScreen.preventAutoHideAsync();
 
+/**
+ * The route the app opens on.
+ *
+ * Reported live: the app started on the Consent screen -- the one under
+ * Profile -- whether or not consent had been given, so the dashboard was
+ * never the landing screen. Cause: expo-router's getSortedChildren() places
+ * EXPLICITLY DECLARED <Stack.Screen> children ahead of the file-system
+ * routes, and React Navigation treats the first screen in a stack as its
+ * initial route when none is named. This layout declares `consent` first
+ * (purely to set headerShown), which silently made it the app's entry point
+ * -- so index.tsx, whose whole job is to redirect to (app) or to login, was
+ * never rendered at all.
+ *
+ * Naming the anchor fixes it without depending on the order options happen
+ * to be declared in. `anchor` is this version's name for it;
+ * `initialRouteName` is still read as a fallback (getRoutesCore.js), and both
+ * are given so a version move in either direction keeps working.
+ */
+export const unstable_settings = {
+  anchor: 'index',
+  initialRouteName: 'index',
+};
+
 export default function RootLayout() {
   const { t } = useTranslation();
   const colorScheme = useColorScheme();
