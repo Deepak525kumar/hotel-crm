@@ -182,6 +182,7 @@ export function UserForm({
         // Blank phone must not be sent as "" — phone is unique-but-nullable,
         // and "" collides with every other user who also left it blank.
         phone: form.phone.trim() || null,
+
         ...(form.role === "worker" ? { skills: form.skills } : {}),
         ...(form.role === "manager" ? { hotel_id: form.hotel_id } : {}),
         ...(form.role === "regional_manager" ? { hotel_group_id: form.hotel_group_id } : {}),
