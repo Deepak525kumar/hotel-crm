@@ -15,7 +15,7 @@ import { roomsApi } from "@/lib/api";
 
 /** The signed-in worker's own rooms. Self-scoped server-side; no id is sent. */
 export function useMyRooms() {
-  return useSWR(["rooms-mine"], () => roomsApi.mine());
+  return useSWR(["rooms-mine"], () => roomsApi.mine(), { refreshInterval: process.env.NODE_ENV === 'test' ? 0 : 5000 });
 }
 
 /**
@@ -48,6 +48,7 @@ export function useRoomsForCheck(hotelId: string | null | undefined) {
   return useSWR(
     hotelId ? ["rooms-for-check", hotelId] : null,
     ([, id]) => roomsApi.forCheck({ hotel_id: id }),
+    { refreshInterval: process.env.NODE_ENV === 'test' ? 0 : 5000 }
   );
 }
 

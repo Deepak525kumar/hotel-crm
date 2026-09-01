@@ -65,7 +65,11 @@ export default function RootLayout() {
       <UpdateChecker>
         <AuthGuard>
           <ConsentGate>
-            <Stack screenOptions={{ headerShown: false }} />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="consent" options={{ headerShown: false }} />
+              <Stack.Screen name="hr" options={{ headerShown: false }} />
+              <Stack.Screen name="settings" options={{ headerShown: false }} />
+            </Stack>
           </ConsentGate>
         </AuthGuard>
       </UpdateChecker>

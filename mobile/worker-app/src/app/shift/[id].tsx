@@ -100,7 +100,9 @@ function CheckRow({ check, onPress }: { check: QualityCheck; onPress: () => void
           {check.score}
         </ThemedText>
         <ThemedText type="small" style={{ color: tone }}>
-          {check.status.replace(/_/g, ' ')}
+          {check.status === 'PASSED' && (check.rework_rounds?.length ?? 0) > 0
+            ? 'Rework completed'
+            : check.status.replace(/_/g, ' ')}
         </ThemedText>
       </View>
     </Pressable>

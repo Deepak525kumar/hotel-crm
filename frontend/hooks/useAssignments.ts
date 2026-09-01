@@ -23,6 +23,7 @@ export function useAssignments(query: ListAssignmentsQuery = {}) {
     ["assignments", { ...query, per_page: perPage }],
     () => assignmentsApi.list({ ...query, per_page: perPage }),
     perPage,
+    { refreshInterval: process.env.NODE_ENV === 'test' ? 0 : 5000 }
   );
   return { ...swr, assignments: items, hasNext };
 }
@@ -46,6 +47,7 @@ export function useCalendarEntries(query: ListCalendarEntriesQuery = {}) {
     ["calendar-entries", { ...query, per_page: perPage }],
     () => assignmentsApi.listCalendarEntries({ ...query, per_page: perPage }),
     perPage,
+    { refreshInterval: process.env.NODE_ENV === 'test' ? 0 : 5000 }
   );
   return { ...swr, calendarEntries: items, hasNext };
 }

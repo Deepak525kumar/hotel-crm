@@ -1390,9 +1390,22 @@ export class EmployeeManagementService extends BaseService {
    * strictly larger than anything a scope-bound manager is trusted with.
    */
   async delete(actor: AuthContext, employeeId: string, deletedReason: string) {
+    const record = await this.findRecordOrThrow(employeeId);
+
     if (actor.role !== 'admin') {
-      throw new ForbiddenError('Only Admin may delete an employee');
+      if (record.status !== EmploymentStatus.PENDING) {
+        throw new ForbiddenError('Only Admin may delete an active employee');
+      }
+      // If PENDING, allow managers. findRecordOrThrow doesn't enforce scope,
+      // so we must enforce it here manually like we do in getRecord/update:
+      if (actor.role === 'manager' || actor.role === 'regional_manager') {
+        const canAccess = await this.isRecordInScope(actor, record);
+        if (!canAccess) throw new ForbiddenError('Access denied to this employee');
+      } else {
+        throw new ForbiddenError('Only Admin or Managers may delete an employee');
+      }
     }
+
 
     if (!deletedReason || !deletedReason.trim()) {
       throw new ValidationError('deleted_reason is required', [
@@ -1400,8 +1413,6 @@ export class EmployeeManagementService extends BaseService {
       ]);
     }
     const reason = deletedReason.trim();
-
-    const record = await this.findRecordOrThrow(employeeId);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const now = new Date();
