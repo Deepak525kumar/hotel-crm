@@ -124,7 +124,7 @@ function CheckCard({ item }: { item: OwnInspection }) {
                 </ThemedText>
               </View>
               <Badge
-                label={item.status === 'PASSED' && item.rework_rounds?.length > 0 ? t('quality.reworkCompleted', 'Rework completed') : t(STATUS_LABEL_KEY[item.status])}
+                label={item.status === 'PASSED' && (item.rework_rounds?.length ?? 0) > 0 ? t('quality.reworkCompleted', 'Rework completed') : t(STATUS_LABEL_KEY[item.status])}
                 tone={STATUS_TONE[item.status]}
               />
             </View>

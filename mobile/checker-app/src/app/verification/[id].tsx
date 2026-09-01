@@ -245,7 +245,7 @@ export default function VerificationEvidenceScreen() {
               <Text style={styles.score}>{verification.score}</Text>
               <View style={[styles.badge, { backgroundColor: statusColor }]}>
                 <Text style={styles.badgeText}>
-                  {verification.status === 'PASSED' && verification.rework_rounds?.length > 0
+                  {verification.status === 'PASSED' && (verification.rework_rounds?.length ?? 0) > 0
                     ? t('quality.reworkCompleted', 'Rework completed')
                     : verification.status}
                 </Text>
