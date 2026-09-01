@@ -37,10 +37,16 @@ const mockHotel = {
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockJobRequest = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   roomLog: mockRoomLog,
   workerAssignment: mockWorkerAssignment,
   hotel: mockHotel,
+  // resolveScheduledStart/End read the shift's clock through here.
+  jobRequest: mockJobRequest,
   auditLog: { create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}) },
 };
 
@@ -486,5 +492,90 @@ describe('RoomService — derived room state', () => {
     // The original score is preserved as the record of the first attempt
     // (owner decision) -- the room passed, the number did not change.
     expect(room?.score).toBe(40);
+  });
+});
+
+/**
+ * Owner decision (2026-09-02): a room may only be logged DURING its shift,
+ * plus two hours afterwards for anything forgotten in the last rush.
+ *
+ * The status check alone allowed both ends of that to be wrong -- a worker
+ * who checks in early is IN_PROGRESS before their shift starts, and a
+ * COMPLETED shift stayed loggable indefinitely, so rooms could be attributed
+ * to a shift days after a checker had already closed it out.
+ *
+ * Hotel timezone is UTC in these tests purely so the expected instants are
+ * readable; resolveScheduledStart's zone handling is covered by its own
+ * module's tests.
+ */
+describe('RoomService — a room may only be logged inside its shift window', () => {
+  // 09:00-17:00 UTC on the shift day. Grace therefore runs to 19:00.
+  const SHIFT = {
+    shift_date: new Date('2026-09-01T00:00:00.000Z'),
+    shift_start_time: '09:00',
+    shift_end_time: '17:00',
+  };
+
+  function arrangeTimedShift(now: string) {
+    jest.useFakeTimers().setSystemTime(new Date(now));
+    mockWorkerAssignment.findUnique.mockResolvedValue(
+      assignment({ job_request_id: 'jr1', work_request_id: null })
+    );
+    mockJobRequest.findUnique.mockResolvedValue(SHIFT);
+    mockHotel.findUnique.mockResolvedValue({ timezone: 'UTC' });
+  }
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('refuses a room logged before the shift has started', async () => {
+    arrangeTimedShift('2026-09-01T08:00:00.000Z');
+
+    await expect(service.logRoom('asn1', '412', WORKER)).rejects.toMatchObject({
+      name: 'ValidationError',
+    });
+    expect(mockRoomLog.create).not.toHaveBeenCalled();
+  });
+
+  it('accepts a room logged during the shift', async () => {
+    arrangeTimedShift('2026-09-01T12:00:00.000Z');
+
+    await service.logRoom('asn1', '412', WORKER);
+
+    expect(mockRoomLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a room logged inside the two-hour grace after the shift', async () => {
+    arrangeTimedShift('2026-09-01T18:30:00.000Z');
+
+    await service.logRoom('asn1', '412', WORKER);
+
+    expect(mockRoomLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a room logged after the grace has run out', async () => {
+    arrangeTimedShift('2026-09-01T19:30:00.000Z');
+
+    await expect(service.logRoom('asn1', '412', WORKER)).rejects.toMatchObject({
+      name: 'ValidationError',
+    });
+    expect(mockRoomLog.create).not.toHaveBeenCalled();
+  });
+
+  // A calendar-placed assignment has a day but no start/end time at all
+  // (resolveScheduledStart returns null -- the data-model gap tracked in
+  // #365). There is no clock to bound it against, so it keeps the
+  // status-only rule rather than being refused for a gap that is not the
+  // worker's doing.
+  it('falls back to the status rule when the shift has no resolvable time', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-05T23:00:00.000Z'));
+    mockWorkerAssignment.findUnique.mockResolvedValue(
+      assignment({ job_request_id: null, work_request_id: null })
+    );
+
+    await service.logRoom('asn1', '412', WORKER);
+
+    expect(mockRoomLog.create).toHaveBeenCalledTimes(1);
   });
 });
