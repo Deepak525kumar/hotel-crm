@@ -396,6 +396,13 @@ const envSchema = z.object({
   ASSIGNMENT_NO_SHOW_INTERVAL_MS: z.coerce.number().int().positive().default(900000), // 15 mins
   // Grace period before marking a shift as NO_SHOW (default 2 hours past shift end time)
   ASSIGNMENT_NO_SHOW_GRACE_PERIOD_MS: z.coerce.number().int().positive().default(7200000), // 2 hours
+
+  // Default 5 minutes: how often sweepShiftReminders() checks for CONFIRMED
+  // shifts starting within its own 70-minute lookahead window. Was hardcoded
+  // in worker.ts before -- every sibling scheduled job's interval is
+  // env-driven; this is the one exception, and an untunable one (a redeploy,
+  // not a config change, was the only way to adjust it).
+  SHIFT_REMINDER_INTERVAL_MS: z.coerce.number().int().positive().default(300000), // 5 mins
   // -------------------------------------------------------------------------
   // SPEC-CHATBOT-001 (ADR-013, ADR-053) — scaffold cutover flag. Defaults
   // FALSE: while off, `/chatbot` routes fall through to the 404 handler,

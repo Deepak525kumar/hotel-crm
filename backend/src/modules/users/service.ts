@@ -831,9 +831,17 @@ export class UserService extends BaseService {
   ): Promise<void> {
     const name = `${user.first_name} ${user.last_name}`.trim();
     const title = 'Account email changed';
-    
+
+    // PUSH has no "address" -- a token is registered per account (user.id),
+    // not per email -- so it is only meaningful on the FIRST message below
+    // (confirming the change to whoever currently holds the account, on
+    // their own device). Applying it to the second, old-address message too
+    // does not reach a different audience: it is the exact same device
+    // getting a second, near-duplicate push for one event. Scoped to
+    // WORKER/CHECKER (the mobile-app roles) only; admin/manager/regional_manager
+    // are web-only and get email alone, as before.
     const isMobileUser = user.role === 'WORKER' || user.role === 'CHECKER';
-    const newEmailTransports = isMobileUser ? [OutboxTransport.EMAIL, OutboxTransport.PUSH] : [OutboxTransport.EMAIL];
+    const newAddressTransports = isMobileUser ? [OutboxTransport.EMAIL, OutboxTransport.PUSH] : [OutboxTransport.EMAIL];
 
     // The user, in-app and by email at the NEW address (the default
     // resolution, since the record now holds it).
@@ -844,7 +852,7 @@ export class UserService extends BaseService {
         title,
         message: `Your sign-in email was changed to ${nextEmail}. You have been signed out on all devices and will need to sign in again.`,
         data: { previous_email: previousEmail, new_email: nextEmail },
-        transports: newEmailTransports,
+        transports: newAddressTransports,
         sourceModule: OutboxSourceModule.USERS,
         producerService: 'UserService',
       },
@@ -855,14 +863,16 @@ export class UserService extends BaseService {
     // message would resolve `to` at send time and land at the new address as
     // well -- telling whoever now holds the account what they already know,
     // and telling the previous owner nothing. This is the one message that
-    // makes a hostile change visible to the person losing access.
+    // makes a hostile change visible to the person losing access -- EMAIL
+    // only: see newAddressTransports' comment above for why PUSH here would
+    // just repeat the first message to the same device.
     await notificationService.enqueue(
       {
         recipientId: user.id,
         type: NotificationType.USER_EMAIL_CHANGED,
         title,
         message: `The sign-in email for this account was changed to ${nextEmail}. If you did not expect this, contact an administrator immediately.`,
-        transports: newEmailTransports,
+        transports: [OutboxTransport.EMAIL],
         emailTo: previousEmail,
         sourceModule: OutboxSourceModule.USERS,
         producerService: 'UserService',

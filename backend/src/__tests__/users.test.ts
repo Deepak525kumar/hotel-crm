@@ -788,6 +788,27 @@ describe('UserService', () => {
       expect(toSubject[0].transports).toContain('EMAIL');
     });
 
+    // Regression: PUSH has no "old address" -- a device token is registered
+    // per account, not per email, so adding PUSH to the pinned old-address
+    // message does not reach a different audience. It silently became a
+    // second, near-duplicate push to the SAME device as the new-address
+    // message below, for every WORKER/CHECKER email change. `subject` above
+    // is already role WORKER, which is what let this slip past the previous
+    // (loose, `toContain`-only) version of the test above.
+    it('never PUSHes the pinned old-address message, even for a mobile-app role', async () => {
+      arrange();
+      await service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null);
+
+      const calls = mockNotificationEnqueue.mock.calls.map((c: any[]) => c[0]);
+      const pinned = calls.find((c) => c.emailTo === 'old@example.com');
+      expect(pinned?.transports).toEqual(['EMAIL']);
+
+      // The new-address message, by contrast, legitimately reaches the
+      // account holder's own device -- PUSH belongs there.
+      const toSubject = calls.find((c) => c.recipientId === 'u1' && !c.emailTo);
+      expect(toSubject?.transports).toEqual(['EMAIL', 'PUSH']);
+    });
+
     it('notifies the hotel manager and the group regional manager', async () => {
       arrange();
       await service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null);
