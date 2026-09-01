@@ -1475,6 +1475,35 @@ describe('UserService', () => {
       });
     });
 
+    // Reported live: "still not able to delete users who were pending".
+    // The route admits manager/regional_manager and the service permits them
+    // against a PENDING record -- but it then delegated with an AuthContext
+    // built inline that carried NO scope, and employeeManagementService's
+    // isRecordInScope() denies by default on a missing scope claim. So the
+    // delegate refused every non-admin with "Access denied to this employee",
+    // and the PENDING allowance above it was unreachable in practice. The
+    // actor's real scope is what makes it reachable, so that is what this
+    // asserts.
+    it('passes the actor scope through when a manager deletes a PENDING account', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', deleted_at: null, email: 'u@t.com' });
+      mockPrisma.user.update.mockResolvedValue({ id: 'u1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({
+        employee_id: 'EMP-1',
+        deleted_at: null,
+        status: 'PENDING',
+      });
+
+      const scope = { type: 'hotel' as const, hotel_id: 'h1' };
+      await service.deleteUser('u1', 'mgr1', 'manager', undefined, scope);
+
+      const [actorArg] = (employeeManagementService.delete as jest.Mock).mock.calls[0] as [
+        { role: string; scope: unknown },
+      ];
+      expect(actorArg.role).toBe('manager');
+      expect(actorArg.scope).toEqual(scope);
+    });
+
     it('soft-deletes user and bumps token_generation (no employment record)', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', deleted_at: null, email: 'u@t.com' });
       mockPrisma.user.update.mockResolvedValue({ id: 'u1' });
