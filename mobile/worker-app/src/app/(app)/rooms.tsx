@@ -258,22 +258,27 @@ export default function RoomsScreen() {
                         what keeps room matching conservative server-side
                         without workers inventing three spellings of one room. */}
                     {suggestions.length > 0 ? (
-                      <View style={styles.suggestions}>
-                        {suggestions.map((s) => (
-                          <Pressable
-                            key={s}
-                            onPress={() => void submit(s)}
-                            style={({ pressed }) => [
-                              styles.chip,
-                              {
-                                borderColor: theme.border,
-                                backgroundColor: pressed ? theme.primarySubtle : 'transparent',
-                              },
-                            ]}
-                          >
-                            <ThemedText type="small">{s}</ThemedText>
-                          </Pressable>
-                        ))}
+                      <View style={styles.suggestionsContainer}>
+                        <ThemedText type="small" themeColor="textSecondary" style={styles.suggestionsTitle}>
+                          {t('rooms.suggestions', 'Suggestions:')}
+                        </ThemedText>
+                        <View style={styles.suggestionsGrid}>
+                          {suggestions.map((s) => (
+                            <Pressable
+                              key={s}
+                              onPress={() => void submit(s)}
+                              style={({ pressed }) => [
+                                styles.chip,
+                                {
+                                  borderColor: theme.border,
+                                  backgroundColor: pressed ? theme.primarySubtle : theme.background,
+                                },
+                              ]}
+                            >
+                              <ThemedText type="smallBold">{s}</ThemedText>
+                            </Pressable>
+                          ))}
+                        </View>
                       </View>
                     ) : null}
                   </Card>
@@ -331,18 +336,29 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   input: {
     flex: 1,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 2,
     borderRadius: Radius.md,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.two,
-    fontSize: 16,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    fontSize: 20,
+    fontWeight: '600',
   },
-  suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one, marginTop: Spacing.two },
+  suggestionsContainer: { marginTop: Spacing.three },
+  suggestionsTitle: { marginBottom: Spacing.one },
+  suggestionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   chip: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    minWidth: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 1, // subtle shadow on android
+    shadowColor: '#000', // subtle shadow on ios
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
   },
   roomRow: {
     flexDirection: 'row',

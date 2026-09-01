@@ -438,6 +438,20 @@ export default function ShiftDetailScreen() {
             </Pressable>
           )}
 
+          {canCheckOut && (
+            <Pressable
+              onPress={() => router.push('/(app)/rooms')}
+              style={({ pressed }) => [
+                styles.logRoomBtn,
+                { opacity: pressed ? 0.7 : 1, borderColor: theme.primary }
+              ]}
+            >
+              <ThemedText type="smallBold" style={{ color: theme.primary }}>
+                {t('rooms.addTitle', 'Log a finished room')}
+              </ThemedText>
+            </Pressable>
+          )}
+
           {/* The checks recorded against this shift. Owner decision,
               2026-08-29: the worker sees every inspection of their own work,
               passed or sent back, and opens one to the same screen the checker
@@ -537,7 +551,8 @@ const styles = StyleSheet.create({
   infoRowColumn: { flexDirection: 'column', paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
   divider: { height: 1, backgroundColor: '#E0E1E6', marginHorizontal: Spacing.three },
   sectionLabel: { marginBottom: Spacing.two, textTransform: 'uppercase', letterSpacing: 0.8 },
-  checkInBtn: { backgroundColor: '#38A169', borderRadius: Spacing.two, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.two },
+  checkInBtn: { backgroundColor: '#3182CE', borderRadius: Spacing.two, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.three },
   checkOutBtn: { backgroundColor: '#DD6B20', borderRadius: Spacing.two, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.three },
+  logRoomBtn: { borderWidth: 2, borderRadius: Spacing.two, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.three },
   btnText: { color: '#fff' },
 });
