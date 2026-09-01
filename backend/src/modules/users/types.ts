@@ -22,26 +22,7 @@ export const CreateUserSchema = z
     last_name: z.string().min(1).max(100),
     phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number'),
     role: z.enum(['worker', 'checker', 'manager', 'admin', 'regional_manager']).default('worker'),
-    // Required for every non-admin role (enforced below, not by .optional()
-    // alone, since Zod has no native "required unless X" for a sibling
-    // field) -- admin accounts have no onboarding/EmploymentRecord concept.
-    job_title: z.string().min(1).max(200).optional(),
-    start_date: z.coerce.date().optional(),
-    employment_type: z.enum(['FULL_TIME', 'PART_TIME']).optional(),
-    // COMPLIANCE (2026-08-13 audit finding): without this the flag defaulted
-    // to false for EVERY account created through the normal UI, so the
-    // document-completeness check never demanded a WORK_PERMIT from anyone --
-    // a legal-compliance hole, not merely a missing field. Optional in the
-    // schema but defaulted explicitly at the call site; ADR-065 §6 item 8 is
-    // clear that this is set by the creating actor at creation time and is
-    // NOT inferred from nationality.
-    // .preprocess() (mirrors documents/validation.ts's identical field):
-    // POST /users is now multipart (RULE-PHOTO-01, the mandatory photo
-    // upload below), so this arrives as the form-field string "true"/"false",
-    // not a JSON boolean -- a bare z.boolean() rejected every request.
-    work_permit_required: z
-      .preprocess((val) => (val === 'true' ? true : val === 'false' ? false : val), z.boolean())
-      .optional(),
+    // Onboarding fields removed from schema per request
     // The assignment the creating actor intends for this account: a hotel for
     // a Manager, a group for a Regional Manager. These become the employment
     // record's TARGET fields, never its live scope -- ADR-065 Decision 2 is
@@ -52,22 +33,6 @@ export const CreateUserSchema = z
     // assign from and the choice was silently lost.
     hotel_id: z.string().min(1).optional(),
     hotel_group_id: z.string().min(1).optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.role === 'admin') return;
-    if (!data.job_title) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['job_title'], message: 'job_title is required' });
-    }
-    if (!data.start_date) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['start_date'], message: 'start_date is required' });
-    }
-    if (!data.employment_type) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['employment_type'],
-        message: 'employment_type is required (FULL_TIME or PART_TIME)',
-      });
-    }
   });
 
 // LEGACY — used only while FEATURE_GD02_MATRIX is off (rollback path). This

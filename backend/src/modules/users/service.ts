@@ -423,12 +423,12 @@ export class UserService extends BaseService {
         await employeeManagementService.createEmployee(actor, {
           user_id: user.id,
           employee_id: `EMP-${user.id.slice(-10).toUpperCase()}`,
-          job_title: data.job_title!,
-          start_date: data.start_date!,
-          employment_type: data.employment_type!,
+          job_title: 'TBD',
+          start_date: new Date(),
+          employment_type: 'FULL_TIME',
           // Threaded through explicitly: omitting it here is what silently
           // disabled the work-permit requirement platform-wide.
-          work_permit_required: data.work_permit_required ?? false,
+          work_permit_required: false,
           // Same failure mode, same fix: the intended assignment reaches
           // createEmployee as a TARGET, not as live scope (ADR-065 Decision 2
           // -- an application holds no operational scope until it is approved

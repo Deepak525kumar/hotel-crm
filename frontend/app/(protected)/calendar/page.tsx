@@ -140,6 +140,7 @@ export default function CalendarGridPage() {
   // These filters are a VIEW convenience over data the server already scoped;
   // they never widen what's visible.
   const isAdmin = user?.role === "admin";
+  const isWorker = user?.role === "worker" || user?.role === "checker";
   const scopeGroupId = user?.scope_hotel_group_id ?? null;
   const scopeHotelId = user?.scope_hotel_id ?? null;
 
@@ -451,6 +452,8 @@ export default function CalendarGridPage() {
                 entries={entriesByDay.get(key) ?? []}
                 absences={absencesByDay.get(key) ?? []}
                 workerNameById={workerNameById}
+                hotelNameById={hotelNameById}
+                isWorker={isWorker}
                 loading={isLoading}
                 canWrite={canWrite}
                 movingEntryId={movingEntryId}
@@ -537,6 +540,8 @@ function DayCell({
   entries,
   absences,
   workerNameById,
+  hotelNameById,
+  isWorker,
   loading,
   canWrite,
   movingEntryId,
@@ -554,6 +559,8 @@ function DayCell({
   entries: CalendarEntryDto[];
   absences: CalendarAbsence[];
   workerNameById: Map<string, string>;
+  hotelNameById: Map<string, string>;
+  isWorker: boolean;
   loading: boolean;
   canWrite: boolean;
   movingEntryId: string | null;
@@ -663,7 +670,7 @@ function DayCell({
                 <PlacementTag
                   key={item.id}
                   entry={item.entry}
-                  label={workerNameById.get(item.workerId) ?? item.workerId}
+                  label={isWorker ? (hotelNameById.get(item.entry.hotel_id) ?? item.entry.hotel_id) : (workerNameById.get(item.workerId) ?? item.workerId)}
                   draggable={canWrite}
                   moving={movingEntryId === item.id}
                   size="sm"
@@ -688,7 +695,7 @@ function DayCell({
               <PlacementTag
                 key={e.id}
                 entry={e}
-                label={workerNameById.get(e.worker_id) ?? e.worker_id}
+                label={isWorker ? (hotelNameById.get(e.hotel_id) ?? e.hotel_id) : (workerNameById.get(e.worker_id) ?? e.worker_id)}
                 draggable={canWrite}
                 moving={movingEntryId === e.id}
                 size="md"
