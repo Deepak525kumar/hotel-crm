@@ -82,6 +82,20 @@ router.get(
   ...roomController.listRoomsForHotels
 );
 
+// Every room logged on one shift, for that shift's own page. No requireRole:
+// a worker legitimately reads their OWN shift here, and every other role is
+// scope-checked against the assignment's hotel in-service -- the same shape
+// as the read routes above, which also carry their real boundary in the
+// service rather than at the route.
+//
+// Registered after the fixed-segment routes above so `/mine`, `/for-check`
+// and `/for-hotels` are never captured as an assignment id.
+router.get(
+  '/for-assignment/:assignment_id',
+  requirePermission('rooms:read'),
+  ...roomController.listRoomsForAssignment
+);
+
 // Typeahead of room numbers already used at a hotel -- what makes the
 // deliberately-conservative room-key normalisation sufficient.
 router.get('/suggestions', requirePermission('rooms:read'), ...roomController.listSuggestions);

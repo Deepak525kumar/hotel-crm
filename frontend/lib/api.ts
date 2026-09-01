@@ -731,6 +731,20 @@ export const roomsApi = {
   mine: (day?: string) => apiFetch<MyRooms>(`/rooms/mine${toQuery({ day })}`),
 
   /**
+   * Every room logged on ONE shift, for that shift's own page.
+   *
+   * Not `forCheck`/`forHotels` filtered client-side: both are scoped to a
+   * single day, so neither can show a past shift's rooms, and `forCheck`
+   * excludes `worker` outright. The server scopes this one to whoever may
+   * see the assignment -- its own worker, an in-scope manager/RM/checker,
+   * admin -- so no day is involved at all.
+   */
+  forAssignment: (assignmentId: string) =>
+    apiFetch<{ assignment_id: string; rooms: RoomLog[] }>(
+      `/rooms/for-assignment/${assignmentId}`,
+    ),
+
+  /**
    * Logs a finished room against a shift the caller is checked in to. Worker
    * only, own shift, IN_PROGRESS or COMPLETED. 409 (with a message naming who
    * logged it) when that room is already logged today at that hotel — the

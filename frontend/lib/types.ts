@@ -1001,6 +1001,16 @@ export interface QualityVerification {
   assignment_id: string;
   hotel_id: string;
   verified_by_id: string;
+  /**
+   * The room this check was made against -- required on the write since
+   * 2026-08-29 and returned by the server on every read
+   * (quality/service.ts's DTO), but missing from this interface until
+   * 2026-09-02. Nothing on the web could render it while the type denied it
+   * existed, which is why a captured room number appeared nowhere on this
+   * side: a check would report a score and a status without ever saying
+   * which room earned them.
+   */
+  room_number: string;
   score: number;
   status: VerificationStatus;
   notes: string | null;
