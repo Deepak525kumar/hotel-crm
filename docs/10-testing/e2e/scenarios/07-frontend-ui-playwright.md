@@ -59,8 +59,15 @@ Admin seeing "My Onboarding" is a **FAIL** — Admin has no onboarding.
 
 ## Step 2 — Worker: `/onboarding` renders the full checklist
 
-**PASS:** all six category labels visible (Tax Number, Social Security Number, Health Insurance,
-ID Card, Passport, Proof of Address) and **six `input[type=file]` elements** present.
+**Corrected 2026-09-02** — verified live via Playwright. **PASS:** all six category labels
+visible (Tax Number, Social Security Number, Health Insurance, ID Card, Passport, Proof of
+Address) and **seven `input[type=file]` elements** present, not six — the seventh is the
+"Signed Contract" (`CONTRACT_SCAN`) upload, which renders as part of the same page's
+Contract card, below the six required-document rows. This is correct, existing behavior, not
+a regression; the original "six" count simply didn't account for the contract upload sharing
+the page. Also confirm the daily consent gate: an unconsented user sees the consent notice
+instead of the checklist (correct, tested separately in scenario 11) — grant it first or this
+step will read as a false failure.
 
 **FAIL:** zero file inputs and/or a `pageerror` — this is the regression signature of the
 `categories` vs `by_category` crash. Check the console output, not just the visible page.
@@ -91,11 +98,29 @@ snapshot of the locators.
 **PASS:** the button is enabled once the checklist is complete and the submit **actually
 persists** (`submitted_for_review_at` non-null in the DB).
 
-**KNOWN OPEN DEFECT — expect this to fail as a worker.** `POST /submit-for-review` is gated
-`requireRole(['admin','manager','regional_manager'])`, so a **worker gets 403**. The UI shows an
-enabled button and the catch-all shows *"Ensure all required documents are uploaded"* — a
-misleading message, since they were. Until resolved, verify submit **as a manager** to proceed,
-and re-check whether the worker case has been fixed. See `08-known-gaps-and-next.md` item 1.
+**Note, confirmed live 2026-09-02:** "checklist complete" (six documents) is not the only
+gate — the signed contract is also required (see `01-onboarding-happy-path.md` Step 6), and
+the button does **not** disable itself for a missing contract, only for missing documents.
+Clicking Submit with docs-complete-but-no-contract produces a real `409` — but this is not a
+silent failure: the backend's exact message
+(`"Cannot submit for review: please download your contract, sign it, and upload the signed
+copy first."`) renders correctly in red text directly below the button
+(`app/(protected)/onboarding/page.tsx`'s `submitError` state), confirmed via a real click in a
+real browser. Initially suspected as a silent-failure defect from an early, hastily-written
+harness check; a second, more careful pass confirmed the error genuinely renders — recorded
+here so this isn't rediscovered as a false alarm.
+
+**CLOSED, corrected 2026-09-02.** The route now reads
+`requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker'])`
+(`employee-management/routes.ts`), with a comment explaining the deliberate omission of
+`requirePermission('employees:write')` — workers/checkers only hold `employees:read`, and
+self-submission authorization is enforced inside `assertLifecycleAuthority` in the service
+layer instead. Extensively re-confirmed via direct API calls throughout the 2026-09-02
+sessions: a worker's own `submit-for-review` call succeeds repeatedly (dozens of times) when
+their own documents/contract are complete, refuses correctly when they aren't (409, naming
+the missing categories), and refuses submitting on someone else's behalf ("Only the applicant
+may submit their own application for review"). Verify **as a worker** going forward — a
+manager-only submit no longer exercises the self-service path this step is actually testing.
 
 ## Step 6 — Manager: Review Queue → Review modal → Approve
 

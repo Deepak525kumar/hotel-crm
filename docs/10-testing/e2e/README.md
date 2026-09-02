@@ -51,7 +51,7 @@ replace them.
 | 04 | `scenarios/04-document-upload-s3.md` | Real multipart upload → S3 → presigned retrieval, rejections |
 | 05 | `scenarios/05-race-conditions.md` | Concurrency: approve/reject, double-submit, reassignment |
 | 06 | `scenarios/06-edge-cases-ambiguity.md` | Deactivation, reassignment, stale state, feature flags |
-| 07 | `scenarios/07-frontend-ui-playwright.md` | Browser-driven UI walkthrough (Playwright) |
+| 07 | `scenarios/07-frontend-ui-playwright.md` | Browser-driven UI walkthrough (Playwright). **Steps 1-5 run live 2026-09-02** — role-gated nav, onboarding checklist, real uploads, client-side guards, submit-for-review all confirmed; two stale "known defects" (worker submit 403, six-not-seven file inputs) closed. Steps 6-9 (manager review modal, double-click race, negative nav, assign-UI gap) not yet run |
 | 08 | `scenarios/08-known-gaps-and-next.md` | Open defects, untested areas, what to cover next time |
 | 09 | `scenarios/09-retention-sweep.md` | Retention sweep job |
 | 10 | `scenarios/10-calendar-shift-summary.md` | Calendar / daily shift summary |
