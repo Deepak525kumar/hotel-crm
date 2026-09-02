@@ -21,7 +21,7 @@ import {
 } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { isScopedManagerRole, isWorkerInGroupScope } from '../../lib/scope.js';
-import { canCreateRole, createRoleDenialMessage } from '../../lib/role-hierarchy.js';
+import { canCreateRole, createRoleDenialMessage, isExactlyOneLevelAbove } from '../../lib/role-hierarchy.js';
 import type { AuthContext } from '../../lib/types.js';
 import { bumpTokenGeneration } from '../auth/service.js';
 import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
@@ -2219,10 +2219,18 @@ export class EmployeeManagementService extends BaseService {
     // exactly one level. Routing to them therefore cannot produce a peer
     // approval (a manager can never have created another manager) and cannot
     // route someone their own application (nobody creates their own account).
-    // canCreateRole() is re-checked here rather than assumed, so a record
-    // predating RULE A, or one whose creator has since changed role, falls
-    // through instead of handing review to someone who no longer outranks the
+    // Rank is re-checked here rather than assumed, so a record predating
+    // RULE A, or one whose creator has since changed role, falls through
+    // instead of handing review to someone who no longer outranks the
     // applicant.
+    //
+    // isExactlyOneLevelAbove, NOT canCreateRole: since 2026-09-02 an admin
+    // may create every role, and routing on creation permission would have
+    // made the admin the reviewer for every account they opened -- the exact
+    // "why is admin seeing all the review requests" complaint this routing
+    // exists to fix. An admin-created worker still belongs in their hotel
+    // manager's queue; an admin-created regional manager still routes to the
+    // admin, because that pair IS one level.
     //
     // Falls through to the target-group routing below when the creator is
     // unknown (created_by_id is SetNull on user deletion) or deactivated.
@@ -2236,7 +2244,7 @@ export class EmployeeManagementService extends BaseService {
         creator &&
         creator.is_active &&
         !creator.deleted_at &&
-        canCreateRole(creator.role, role)
+        isExactlyOneLevelAbove(creator.role, role)
       ) {
         return [creator.id];
       }

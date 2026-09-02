@@ -438,6 +438,12 @@ export class UserService extends BaseService {
           // Manager, where the Admin has no group of their own to copy.
           ...(data.hotel_group_id ? { target_hotel_group_id: data.hotel_group_id } : {}),
           ...(data.hotel_id ? { target_primary_hotel_id: data.hotel_id } : {}),
+          // Fixes a silent discard: the create form has offered skill
+          // checkboxes since it was built and nothing ever carried them here,
+          // so every worker created through the UI was stored with none --
+          // and skills are what job matching runs on. createEmployee has
+          // always accepted them.
+          ...(data.skills && data.skills.length > 0 ? { skills: data.skills } : {}),
         });
       } catch (error) {
         logger.error('user_create_employment_record_failed', {

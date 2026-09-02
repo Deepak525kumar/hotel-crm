@@ -84,7 +84,12 @@ import { EmployeeManagementService, employeeManagementService } from '../modules
 
 /** The ratified table, transcribed independently of the implementation. */
 const RATIFIED: Record<PlatformRole, readonly PlatformRole[]> = {
-  admin: ['regional_manager'],
+  // AMENDED 2026-09-02 (same project-owner authority as RULE A itself): the
+  // admin may create any non-admin role directly, because the hierarchy is
+  // not yet staffed and the admin has to open accounts for everyone. Every
+  // other actor is still bound to one level down, and `admin` is still a
+  // target for nobody -- both asserted below.
+  admin: ['regional_manager', 'manager', 'worker', 'checker'],
   regional_manager: ['manager'],
   manager: ['worker', 'checker'],
   worker: [],
@@ -298,13 +303,33 @@ describe('RULE A — create is 1-level-down only, enforced on both creation surf
       expect(mockEmploymentCreate).not.toHaveBeenCalled();
     });
 
-    it('denies admin creating an employment record for a WORKER (more than one level down)', async () => {
+    // Was the inverse assertion until 2026-09-02, when the owner amended
+    // RULE A so an admin may create any non-admin role directly. Kept as the
+    // ALLOW case rather than deleted: it is the exact pair the amendment
+    // turned over, and the surface must consult the amended table rather than
+    // carry its own copy of the old one.
+    it('allows admin creating an employment record for a WORKER (RULE A amendment)', async () => {
       mockUserFindUnique.mockResolvedValue({ id: 'user_t', role: 'WORKER' });
+
+      await service.createEmployee(actorFor('admin'), {
+        user_id: 'user_t',
+        employee_id: 'E-NEW',
+        job_title: 'Cleaner',
+        start_date: new Date('2026-01-01'),
+      } as any);
+
+      expect(mockEmploymentCreate).toHaveBeenCalledTimes(1);
+    });
+
+    // The amendment's boundary on this surface: `admin` is still nobody's
+    // target, so an admin cannot mint a peer here either.
+    it('denies admin creating an employment record for another ADMIN', async () => {
+      mockUserFindUnique.mockResolvedValue({ id: 'user_t', role: 'ADMIN' });
       await expect(
         service.createEmployee(actorFor('admin'), {
           user_id: 'user_t',
           employee_id: 'E-NEW',
-          job_title: 'Cleaner',
+          job_title: 'Boss',
           start_date: new Date('2026-01-01'),
         } as any)
       ).rejects.toMatchObject({ name: 'ForbiddenError' });

@@ -14,16 +14,13 @@ import {
 } from "@/components/ui";
 import { useAuthStore } from "@/stores/auth";
 import { creatableRolesFor } from "@/lib/roleHierarchy";
-import type { EmploymentType, Role, UserDetail, Hotel, HotelGroup } from "@/lib/types";
+import type { Role, SkillTag, UserDetail, Hotel, HotelGroup } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
-// ADR-065 (Universal Onboarding Gate): mandatory for every non-admin role at
-// creation — mirrors the backend CreateUserSchema.superRefine requirement.
-
-const EMPLOYMENT_TYPE_OPTIONS: { value: EmploymentType; label: string }[] = [
-  { value: "FULL_TIME", label: "Full-time" },
-  { value: "PART_TIME", label: "Part-time" },
-];
+// The onboarding fields (job title, start date, employment type) were taken
+// off this form in #615 and are defaulted server-side, so the options list
+// and the ADR-065 note that described them are gone with them -- they had
+// been left behind as dead code.
 
 const ROLE_LABEL: Record<Role, string> = {
   worker: "Worker",
@@ -51,7 +48,10 @@ export interface UserFormValues {
   phone: string;
   role: Role;
   is_active: boolean;
-  skills: string[];
+  // Typed to the enum, not string[]: these values go straight to the API,
+  // whose CreateUserInput takes SkillTag[] -- so a wrong value is a compile
+  // error here rather than a 422 from the server's enum check.
+  skills: SkillTag[];
   hotel_id?: string;
   hotel_group_id?: string;
 }
@@ -184,7 +184,9 @@ export function UserForm({
         phone: form.phone.trim() || null,
 
         ...(form.role === "worker" ? { skills: form.skills } : {}),
-        ...(form.role === "manager" ? { hotel_id: form.hotel_id } : {}),
+        // Any role that works at a hotel carries one; only a regional manager
+        // is grouped instead.
+        ...(form.role !== "regional_manager" ? { hotel_id: form.hotel_id } : {}),
         ...(form.role === "regional_manager" ? { hotel_group_id: form.hotel_group_id } : {}),
       },
       mode === "create" ? photo : null,
@@ -202,7 +204,19 @@ export function UserForm({
         // create, even if form state somehow held a stale value.
         allowedCreateRoles.includes(form.role) &&
         // Mandatory: see the photo input below.
-        photo !== null));
+        photo !== null &&
+        // A manager needs a hotel, because the server requires a target GROUP
+        // for an admin-created manager and derives it from that hotel
+        // (createEmployee: "Admin must explicitly provide a
+        // target_hotel_group_id"). Blocking submit here turns what would be a
+        // server error naming a field this form never shows into an ordinary
+        // unfilled selector.
+        //
+        // Deliberately NOT required for a regional manager: the server
+        // accepts a null target for them, and requiring one would make the
+        // form unusable on a system that has no hotel groups yet -- the exact
+        // state an admin is in when setting the platform up.
+        (form.role !== "manager" || !!form.hotel_id)));
 
   return (
     <Card>
@@ -314,7 +328,17 @@ export function UserForm({
             />
           </div>
 
-          {form.role === "manager" && (
+          {/* A hotel matters for anyone who works AT one, not just a manager.
+              For a worker or checker it is what puts the applicant in front of
+              the right reviewer: while the record is PENDING, scope falls back
+              to these target fields, so an admin-created applicant with none
+              is visible to nobody but an admin.
+
+              Required for a manager in create mode -- see `valid` below: the
+              server needs a target GROUP for an admin-created manager and
+              derives it from this hotel, so leaving it blank fails the submit
+              with a message about a field this form never showed. */}
+          {(form.role === "manager" || form.role === "worker" || form.role === "checker") && (
             <div className="grid gap-4 sm:grid-cols-2">
               <Select
                 label={t("fields.assignedHotel")}
@@ -325,6 +349,13 @@ export function UserForm({
                   ...hotels.map((h) => ({ value: h.id, label: h.name })),
                 ]}
                 disabled={!canEditRole}
+                hint={
+                  mode === "create" && form.role === "manager"
+                    ? "Required. The manager's hotel group is taken from this hotel."
+                    : mode === "create"
+                      ? "Optional. Without it, only an admin can review this application."
+                      : undefined
+                }
               />
             </div>
           )}

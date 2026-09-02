@@ -2,12 +2,18 @@
  * Role-creation hierarchy — "create is 1-level-down only".
  *
  * Project-owner decision, 2026-08-12 (RULE A): an actor may create a user
- * exactly ONE level below itself, and nothing else:
+ * exactly ONE level below itself. AMENDED 2026-09-02 (same authority): the
+ * admin is exempt and may create any non-admin role directly, because in
+ * practice the hierarchy is not yet staffed and the admin has to open
+ * accounts for everyone. The chain still binds every other actor.
  *
- *   admin            -> regional_manager
+ *   admin            -> regional_manager, manager, worker, checker
  *   regional_manager -> manager
  *   manager          -> worker, checker
  *   worker/checker   -> nobody
+ *
+ * `admin` is creatable by NOBODY, admins included -- unchanged, and
+ * re-confirmed with the amendment.
  *
  * This NARROWS the previous behaviour, in which `POST /employee-management/`
  * admitted admin/manager/regional_manager with no check at all on the role
@@ -49,7 +55,18 @@ export type PlatformRole = (typeof PLATFORM_ROLES)[number];
  * distinguishable from "this role was forgotten".
  */
 const CREATABLE_ROLES: Readonly<Record<PlatformRole, readonly PlatformRole[]>> = Object.freeze({
-  admin: Object.freeze(['regional_manager'] as const),
+  // Owner decision (2026-09-02): an admin may create ANY non-admin role
+  // directly. RULE A's one-level-down chain was written for a fully staffed
+  // hierarchy; in practice few people know the system yet, so the admin has
+  // to open accounts for everyone. The chain still governs everyone else --
+  // a regional manager creates managers, a manager creates workers/checkers
+  // -- so this widens exactly one actor and nothing else.
+  //
+  // `admin` remains creatable by NOBODY, admins included (owner decision,
+  // confirmed 2026-09-02): an admin account is unscoped and can delete any
+  // other, so minting one stays a deliberate out-of-band act rather than a
+  // form submission.
+  admin: Object.freeze(['regional_manager', 'manager', 'worker', 'checker'] as const),
   regional_manager: Object.freeze(['manager'] as const),
   manager: Object.freeze(['worker', 'checker'] as const),
   checker: Object.freeze([] as const),
@@ -75,6 +92,49 @@ export function creatableRolesFor(actorRole: string | null | undefined): readonl
   const actor = asPlatformRole(actorRole);
   if (!actor) return [];
   return CREATABLE_ROLES[actor];
+}
+
+/**
+ * The ORIGINAL one-level-down chain, unaffected by the 2026-09-02 amendment.
+ *
+ * Creation authority and review routing were the same question until the
+ * admin was allowed to create every role; they are not the same question any
+ * more. getReviewQueue routes an application to "whoever created it" only
+ * when that person outranks the applicant by exactly one level -- which is
+ * what makes creator-routing safe (no peer approvals, nobody reviewing
+ * themselves) and what keeps a worker's application in front of their hotel's
+ * MANAGER rather than the admin.
+ *
+ * Without this split, widening creation re-created the exact complaint the
+ * review-queue routing was built to fix: "why is admin seeing all the review
+ * requests". An admin opening accounts for everyone would have become the
+ * reviewer for all of them.
+ */
+const ONE_LEVEL_DOWN: Readonly<Record<PlatformRole, readonly PlatformRole[]>> = Object.freeze({
+  admin: Object.freeze(['regional_manager'] as const),
+  regional_manager: Object.freeze(['manager'] as const),
+  manager: Object.freeze(['worker', 'checker'] as const),
+  checker: Object.freeze([] as const),
+  worker: Object.freeze([] as const),
+});
+
+/**
+ * Whether `actorRole` sits exactly one level above `targetRole` in the
+ * original hierarchy. Deny-by-default on any unrecognized role, same as
+ * canCreateRole.
+ *
+ * Use this for questions about RANK ("may this person review that one?").
+ * Use canCreateRole for questions about PERMISSION ("may this person create
+ * that account?"). They diverged deliberately -- see ONE_LEVEL_DOWN.
+ */
+export function isExactlyOneLevelAbove(
+  actorRole: string | null | undefined,
+  targetRole: string | null | undefined
+): boolean {
+  const actor = asPlatformRole(actorRole);
+  const target = asPlatformRole(targetRole);
+  if (!actor || !target) return false;
+  return ONE_LEVEL_DOWN[actor].includes(target);
 }
 
 /**

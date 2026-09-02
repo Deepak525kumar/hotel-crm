@@ -1049,6 +1049,16 @@ export const usersApi = {
     const form = new FormData();
     for (const [key, value] of Object.entries(input)) {
       if (value === undefined || value === null) continue;
+      // Arrays (today: `skills`) go as ONE JSON field. Multipart has a flat
+      // field model with no array type, and String(["A","B"]) would send
+      // "A,B" -- which the server's enum check would then reject as a single
+      // unknown value. The schema parses this field with JSON.parse for
+      // exactly this reason (users/types.ts), the same convention
+      // qualityApi.createVerification uses for criteria_scores.
+      if (Array.isArray(value)) {
+        if (value.length > 0) form.append(key, JSON.stringify(value));
+        continue;
+      }
       form.append(key, String(value));
     }
     form.append("photo", photo);

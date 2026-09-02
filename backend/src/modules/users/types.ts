@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SkillTag } from '@prisma/client';
 
 // ADR-065 (Universal Onboarding Gate, ratified 2026-08-11): every non-Admin
 // account -- Worker, Checker, Manager, AND Regional Manager -- must get an
@@ -33,6 +34,33 @@ export const CreateUserSchema = z
     // assign from and the choice was silently lost.
     hotel_id: z.string().min(1).optional(),
     hotel_group_id: z.string().min(1).optional(),
+    // A worker's skills, collected on the same form and threaded into the
+    // EmploymentRecord (createEmployee has always accepted them).
+    //
+    // Fixes a silent discard: the create form has offered these checkboxes
+    // since it was built, this schema had no field for them, and Zod strips
+    // unknown keys -- so every worker created through the UI was saved with
+    // no skills at all, and skills drive job matching. Optional (owner
+    // decision, 2026-09-02): they can be set later from the profile.
+    //
+    // .preprocess because POST /users is multipart (the mandatory photo), and
+    // multipart has no array type -- the client sends one JSON string, the
+    // same trick quality/validation.ts uses for criteria_scores. A repeated
+    // field arrives as a real array already and is passed straight through.
+    skills: z
+      .preprocess((val) => {
+        if (typeof val !== 'string') return val;
+        if (val.trim() === '') return undefined;
+        try {
+          return JSON.parse(val);
+        } catch {
+          // Left as the raw string so the enum check below reports it,
+          // rather than silently dropping the field the way the missing
+          // schema entry used to.
+          return val;
+        }
+      }, z.array(z.nativeEnum(SkillTag)))
+      .optional(),
   });
 
 // LEGACY — used only while FEATURE_GD02_MATRIX is off (rollback path). This

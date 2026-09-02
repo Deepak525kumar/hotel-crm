@@ -197,6 +197,14 @@ export interface CreateUserInput {
    */
   hotel_id?: string;
   hotel_group_id?: string;
+  /**
+   * A worker's skills. Previously offered by the create form and silently
+   * dropped: CreateUserSchema had no field for them, so Zod stripped the key
+   * and every worker was stored with none -- while skills are exactly what
+   * job matching runs on. Optional (owner decision, 2026-09-02): they can be
+   * set from the profile later.
+   */
+  skills?: SkillTag[];
 }
 
 /**

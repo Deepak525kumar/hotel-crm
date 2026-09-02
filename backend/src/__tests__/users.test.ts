@@ -624,6 +624,59 @@ describe('UserService', () => {
       expect(mockPrisma.user.create).not.toHaveBeenCalled();
     });
 
+    // Fixes a silent discard: the create form has offered skill checkboxes
+    // since it was built, CreateUserSchema had no field for them, and Zod
+    // strips unknown keys -- so every worker created through the UI was
+    // stored with no skills, while skills are exactly what job matching runs
+    // on. createEmployee accepted them the whole time; nothing carried them.
+    it('threads a worker\'s skills into the employment record', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue({
+        id: 'u_w', email: 'w@test.com', first_name: 'W', last_name: 'K',
+        phone: null, role: 'WORKER', is_active: true, created_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.createUser(
+        {
+          email: 'w@test.com', password: 'pw12345678', first_name: 'W', last_name: 'K',
+          role: 'worker', phone: '+1234567890', skills: ['CLEANER', 'WAITER'],
+        } as never,
+        { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] },
+        undefined,
+        mockPhoto
+      );
+
+      const [, payload] = (employeeManagementService.createEmployee as jest.Mock).mock
+        .calls[0] as [unknown, { skills?: string[] }];
+      expect(payload.skills).toEqual(['CLEANER', 'WAITER']);
+    });
+
+    // Omitted rather than sent as [], so createEmployee's own optional
+    // handling stays in charge of the empty case.
+    it('sends no skills key when none were chosen', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue({
+        id: 'u_w2', email: 'w2@test.com', first_name: 'W', last_name: 'K',
+        phone: null, role: 'WORKER', is_active: true, created_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.createUser(
+        {
+          email: 'w2@test.com', password: 'pw12345678', first_name: 'W', last_name: 'K',
+          role: 'worker', phone: '+1234567891',
+        } as never,
+        { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] },
+        undefined,
+        mockPhoto
+      );
+
+      const [, payload] = (employeeManagementService.createEmployee as jest.Mock).mock
+        .calls[0] as [unknown, { skills?: string[] }];
+      expect(payload.skills).toBeUndefined();
+    });
+
     it('allows an admin to create a REGIONAL_MANAGER account (RULE A: admin -> regional_manager)', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue({

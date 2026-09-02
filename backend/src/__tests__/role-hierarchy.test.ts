@@ -5,6 +5,7 @@ import {
   creatableRolesFor,
   asPlatformRole,
   createRoleDenialMessage,
+  isExactlyOneLevelAbove,
   type PlatformRole,
 } from '../lib/role-hierarchy.js';
 
@@ -35,7 +36,12 @@ import {
  *   checker          -> nobody
  */
 const RATIFIED: Record<PlatformRole, readonly PlatformRole[]> = {
-  admin: ['regional_manager'],
+  // AMENDED 2026-09-02 (same project-owner authority as RULE A itself): the
+  // admin may create any non-admin role directly, because the hierarchy is
+  // not yet staffed and the admin has to open accounts for everyone. Every
+  // other actor is still bound to one level down, and `admin` is still a
+  // target for nobody -- both asserted below.
+  admin: ['regional_manager', 'manager', 'worker', 'checker'],
   regional_manager: ['manager'],
   manager: ['worker', 'checker'],
   worker: [],
@@ -92,17 +98,37 @@ describe('RULE A — create is 1-level-down only (lib/role-hierarchy)', () => {
     });
 
     it('each creating role grants exactly the ratified target set', () => {
-      expect([...creatableRolesFor('admin')]).toEqual(['regional_manager']);
+      expect([...creatableRolesFor('admin')].sort()).toEqual([
+        'checker',
+        'manager',
+        'regional_manager',
+        'worker',
+      ]);
       expect([...creatableRolesFor('regional_manager')]).toEqual(['manager']);
       expect([...creatableRolesFor('manager')].sort()).toEqual(['checker', 'worker']);
     });
 
-    it('no role may create more than one level down (admin cannot reach manager/worker/checker)', () => {
-      expect(canCreateRole('admin', 'manager')).toBe(false);
-      expect(canCreateRole('admin', 'worker')).toBe(false);
-      expect(canCreateRole('admin', 'checker')).toBe(false);
+    // The one-level-down rule still binds every actor EXCEPT the admin
+    // (amended 2026-09-02). Keeping this assertion for the other roles is the
+    // point: widening the admin must not quietly widen anyone else, and a
+    // regional manager reaching a worker is the specific over-reach it guards.
+    it('no role except admin may create more than one level down', () => {
       expect(canCreateRole('regional_manager', 'worker')).toBe(false);
       expect(canCreateRole('regional_manager', 'checker')).toBe(false);
+      expect(canCreateRole('manager', 'regional_manager')).toBe(false);
+    });
+
+    // The amendment's own boundary: the admin gained every non-admin role and
+    // nothing more. `admin` remains a target for nobody, admins included.
+    it('grants the admin every non-admin role, and admin to nobody', () => {
+      expect(canCreateRole('admin', 'regional_manager')).toBe(true);
+      expect(canCreateRole('admin', 'manager')).toBe(true);
+      expect(canCreateRole('admin', 'worker')).toBe(true);
+      expect(canCreateRole('admin', 'checker')).toBe(true);
+      expect(canCreateRole('admin', 'admin')).toBe(false);
+      for (const actor of PLATFORM_ROLES) {
+        expect(canCreateRole(actor, 'admin')).toBe(false);
+      }
     });
 
     it('no role may create upward', () => {
@@ -155,7 +181,11 @@ describe('RULE A — create is 1-level-down only (lib/role-hierarchy)', () => {
     });
 
     it('still denies across casings (normalization does not widen the rule)', () => {
-      expect(canCreateRole('ADMIN', 'WORKER')).toBe(false);
+      // ADMIN -> WORKER moved to the ALLOW list with the 2026-09-02
+      // amendment, so the denials asserted here are the ones that must
+      // survive it: a role reaching sideways, a role reaching itself, and
+      // `admin` as a target.
+      expect(canCreateRole('REGIONAL_MANAGER', 'WORKER')).toBe(false);
       expect(canCreateRole('MANAGER', 'MANAGER')).toBe(false);
       expect(canCreateRole('WORKER', 'WORKER')).toBe(false);
       expect(canCreateRole('ADMIN', 'ADMIN')).toBe(false);
@@ -186,10 +216,53 @@ describe('RULE A — create is 1-level-down only (lib/role-hierarchy)', () => {
   // The policy table must not be mutable at runtime: a caller that could push
   // onto the returned array would widen authorization for every later caller
   // in the process.
+  // Creation authority and RANK were the same question until the admin was
+  // allowed to create every role. They must not be conflated again: the
+  // review queue routes an application to its creator only when that person
+  // outranks the applicant by exactly one level, and routing on creation
+  // permission instead would have made the admin the reviewer for every
+  // account they opened -- the "why is admin seeing all the review requests"
+  // complaint that routing exists to fix.
+  describe('rank is separate from creation permission (2026-09-02 amendment)', () => {
+    it('keeps the original one-level chain for rank', () => {
+      expect(isExactlyOneLevelAbove('admin', 'regional_manager')).toBe(true);
+      expect(isExactlyOneLevelAbove('regional_manager', 'manager')).toBe(true);
+      expect(isExactlyOneLevelAbove('manager', 'worker')).toBe(true);
+      expect(isExactlyOneLevelAbove('manager', 'checker')).toBe(true);
+    });
+
+    it('does not treat the admin as one level above manager/worker/checker', () => {
+      // Precisely the pairs canCreateRole now allows -- so a test that used
+      // one for the other would pass by accident.
+      expect(canCreateRole('admin', 'manager')).toBe(true);
+      expect(isExactlyOneLevelAbove('admin', 'manager')).toBe(false);
+      expect(canCreateRole('admin', 'worker')).toBe(true);
+      expect(isExactlyOneLevelAbove('admin', 'worker')).toBe(false);
+      expect(canCreateRole('admin', 'checker')).toBe(true);
+      expect(isExactlyOneLevelAbove('admin', 'checker')).toBe(false);
+    });
+
+    it('denies by default on unknown or upward pairs', () => {
+      expect(isExactlyOneLevelAbove('superadmin', 'worker')).toBe(false);
+      expect(isExactlyOneLevelAbove('worker', 'manager')).toBe(false);
+      expect(isExactlyOneLevelAbove(null, 'worker')).toBe(false);
+      expect(isExactlyOneLevelAbove('manager', 'manager')).toBe(false);
+    });
+  });
+
   it('the returned target list is frozen (policy cannot be widened at runtime)', () => {
+    // `worker` is admin's legitimately now (2026-09-02), so the widening this
+    // guards against is pushing `admin` -- the one target the amendment
+    // deliberately did NOT grant.
     const targets = creatableRolesFor('admin');
     expect(Object.isFrozen(targets)).toBe(true);
-    expect(() => (targets as PlatformRole[]).push('worker')).toThrow();
-    expect(canCreateRole('admin', 'worker')).toBe(false);
+    expect(() => (targets as PlatformRole[]).push('admin')).toThrow();
+    expect(canCreateRole('admin', 'admin')).toBe(false);
+
+    // The narrower lists must stay closed too.
+    const rmTargets = creatableRolesFor('regional_manager');
+    expect(Object.isFrozen(rmTargets)).toBe(true);
+    expect(() => (rmTargets as PlatformRole[]).push('worker')).toThrow();
+    expect(canCreateRole('regional_manager', 'worker')).toBe(false);
   });
 });

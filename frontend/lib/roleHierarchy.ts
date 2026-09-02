@@ -5,7 +5,7 @@ import type { Role } from "@/lib/types";
  *
  * Mirrors `backend/src/lib/role-hierarchy.ts` exactly:
  *
- *   admin            -> regional_manager ONLY
+ *   admin            -> regional_manager, manager, worker, checker (2026-09-02)
  *   regional_manager -> manager ONLY
  *   manager          -> worker, checker ONLY
  *   worker/checker   -> nobody
@@ -25,7 +25,21 @@ import type { Role } from "@/lib/types";
  * reason.
  */
 const CREATABLE_ROLES: Readonly<Record<Role, readonly Role[]>> = Object.freeze({
-  admin: Object.freeze(["regional_manager"] as const),
+  // Owner decision (2026-09-02): the admin may create ANY non-admin role
+  // directly. RULE A's one-level-down chain assumed a staffed hierarchy; in
+  // practice the admin has to open accounts for everyone. Mirrors
+  // backend/src/lib/role-hierarchy.ts, which is the authority -- this copy
+  // only decides which options the form offers.
+  //
+  // `admin` stays absent from every list, admins included: an admin account
+  // is unscoped and can delete any other, so creating one remains a
+  // deliberate out-of-band act.
+  admin: Object.freeze([
+    "regional_manager",
+    "manager",
+    "worker",
+    "checker",
+  ] as const),
   regional_manager: Object.freeze(["manager"] as const),
   manager: Object.freeze(["worker", "checker"] as const),
   checker: Object.freeze([] as const),
