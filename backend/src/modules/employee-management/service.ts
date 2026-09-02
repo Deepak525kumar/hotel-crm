@@ -980,7 +980,20 @@ export class EmployeeManagementService extends BaseService {
 
       if (newRecord.user.role === 'MANAGER' && payload.primary_hotel_id) {
         const targetHotel = await tx.hotel.findUnique({ where: { id: payload.primary_hotel_id } });
-        if (targetHotel && targetHotel.manager_user_id && targetHotel.manager_user_id !== newRecord.user_id) {
+        // Found 2026-09-02 by real E2E probing (scenario 20 Step 6): this
+        // lookup had no deleted_at filter, so an ARCHIVED hotel -- whose
+        // manager_user_id is null precisely because archiving vacates it
+        // (crm/service.ts deleteHotel) -- passed the "already has a
+        // different manager" check below and got a brand-new manager_user_id
+        // written onto it. resolveScope()'s own deleted_at filter
+        // (e94ba804) makes this harmless in practice (the assignee gets no
+        // real scope from it), but the write itself is still wrong: an
+        // archived hotel should behave as absent to a fresh assignment, the
+        // same way it does to every other write path in this module.
+        if (!targetHotel || targetHotel.deleted_at) {
+          throw new NotFoundError('Target hotel or hotel group not found');
+        }
+        if (targetHotel.manager_user_id && targetHotel.manager_user_id !== newRecord.user_id) {
           throw new ConflictError('Hotel already has a different manager assigned');
         }
 
@@ -1026,7 +1039,12 @@ export class EmployeeManagementService extends BaseService {
         });
       } else if (newRecord.user.role === 'REGIONAL_MANAGER' && payload.hotel_group_id) {
         const targetGroup = await tx.hotelGroup.findUnique({ where: { id: payload.hotel_group_id } });
-        if (targetGroup && targetGroup.regional_manager_user_id && targetGroup.regional_manager_user_id !== newRecord.user_id) {
+        // Same fix as the Manager branch above, same root cause and same
+        // 2026-09-02 finding, mirrored for the RM/HotelGroup pair.
+        if (!targetGroup || targetGroup.deleted_at) {
+          throw new NotFoundError('Target hotel or hotel group not found');
+        }
+        if (targetGroup.regional_manager_user_id && targetGroup.regional_manager_user_id !== newRecord.user_id) {
           throw new ConflictError('Hotel group already has a different regional manager assigned');
         }
 

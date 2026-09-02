@@ -39,6 +39,7 @@ const mockPrisma: any = {
   },
   hotel: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     updateMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
@@ -46,6 +47,14 @@ const mockPrisma: any = {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     updateMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
+  hotelManagerAssignmentHistory: {
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 0 }),
+  },
+  regionalManagerAssignmentHistory: {
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 0 }),
   },
   user: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -161,5 +170,103 @@ describe('assign() requires an APPROVED (ACTIVE) record — privilege-escalation
     ).resolves.toBeDefined();
 
     expect(mockPrisma.employmentRecord.update).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Sibling defect to the one this file already pins, found the same way (real
+// E2E probing, not this suite) on 2026-09-02: assign()'s `targetHotel`/
+// `targetGroup` lookups had no `deleted_at` filter, so an ARCHIVED hotel or
+// group -- whose manager_user_id/regional_manager_user_id is null precisely
+// because archiving vacates it (crm/service.ts deleteHotel/deleteHotelGroup)
+// -- passed the "already has someone else" check and got a brand-new
+// manager/RM written onto it. resolveScope()'s own deleted_at filter
+// (e94ba804) makes the write harmless in practice (the assignee gets no real
+// JWT scope from it), but the write itself was still wrong -- an archived
+// hotel/group should behave as absent to a fresh assignment, matching every
+// other write path in this module. Reproduced live end-to-end before this
+// fix (scenario 20, docs/10-testing/e2e/scenarios/20-archive-delete-scope-vacating.md).
+describe('assign() refuses an archived hotel/group as a target', () => {
+  let service: EmployeeManagementService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new EmployeeManagementService();
+    mockPrisma.$transaction.mockImplementation((cb: any) => cb(mockPrisma));
+  });
+
+  it('refuses assigning a Manager to an archived hotel, and writes nothing', async () => {
+    const active = recordWithStatus(EmploymentStatus.ACTIVE, {
+      user: { id: 'user_1', role: 'MANAGER' },
+    });
+    mockPrisma.employmentRecord.findUnique.mockResolvedValue(active);
+    mockPrisma.employmentRecord.update.mockResolvedValue({
+      ...active,
+      primary_hotel_id: 'htl_archived',
+      version: 2,
+    });
+    // Archived: deleted_at set, and manager_user_id null (archiving vacated it)
+    // -- exactly the state that let the old code's "already has a different
+    // manager" check pass through as if the hotel were free.
+    mockPrisma.hotel.findUnique.mockResolvedValue({
+      id: 'htl_archived',
+      manager_user_id: null,
+      deleted_at: new Date('2026-09-01'),
+    });
+
+    await expect(
+      service.assign(admin as any, 'emp_1', { primary_hotel_id: 'htl_archived' })
+    ).rejects.toThrow(/not found/i);
+
+    expect(mockPrisma.hotel.update).not.toHaveBeenCalled();
+    expect(mockPrisma.hotelManagerAssignmentHistory.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses assigning a Regional Manager to an archived hotel group, and writes nothing', async () => {
+    const active = recordWithStatus(EmploymentStatus.ACTIVE, {
+      user: { id: 'user_1', role: 'REGIONAL_MANAGER' },
+    });
+    mockPrisma.employmentRecord.findUnique.mockResolvedValue(active);
+    mockPrisma.employmentRecord.update.mockResolvedValue({
+      ...active,
+      hotel_group_id: 'grp_archived',
+      version: 2,
+    });
+    mockPrisma.hotelGroup.findUnique.mockResolvedValue({
+      id: 'grp_archived',
+      regional_manager_user_id: null,
+      deleted_at: new Date('2026-09-01'),
+    });
+
+    await expect(
+      service.assign(admin as any, 'emp_1', { hotel_group_id: 'grp_archived' })
+    ).rejects.toThrow(/not found/i);
+
+    expect(mockPrisma.hotelGroup.update).not.toHaveBeenCalled();
+  });
+
+  it('still allows assigning to a live (non-archived) hotel', async () => {
+    const active = recordWithStatus(EmploymentStatus.ACTIVE, {
+      user: { id: 'user_1', role: 'MANAGER' },
+    });
+    mockPrisma.employmentRecord.findUnique.mockResolvedValue(active);
+    mockPrisma.employmentRecord.update.mockResolvedValue({
+      ...active,
+      primary_hotel_id: 'htl_live',
+      version: 2,
+    });
+    mockPrisma.hotel.findUnique.mockResolvedValue({
+      id: 'htl_live',
+      manager_user_id: null,
+      deleted_at: null,
+    });
+    mockPrisma.hotel.update.mockResolvedValue({ id: 'htl_live' });
+
+    await expect(
+      service.assign(admin as any, 'emp_1', { primary_hotel_id: 'htl_live' })
+    ).resolves.toBeDefined();
+
+    expect(mockPrisma.hotel.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'htl_live' } })
+    );
   });
 });
