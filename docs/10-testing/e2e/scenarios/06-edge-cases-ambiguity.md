@@ -24,13 +24,54 @@ Valid reasons are `TEMPORARY_LEAVE`, `SEASONAL`, `SUSPENDED` (not `SICK_LEAVE` �
 `manager_vacancy_reason` = `TEMPORARY`.
 
 **And the authorization consequence (the reason this matters):** re-login as that manager —
-`scope_hotel_id` must be `null`, and `GET /employees/review-queue` must `403`. A `DEACTIVATED`
-manager who still holds hotel scope can still approve applicants; that was a live hole.
+`scope_hotel_id` must be `null`. A `DEACTIVATED` manager who still holds hotel scope can still
+approve applicants; that was a live hole, and `scope_hotel_id: null` still holds
+(re-verified 2026-09-02).
+
+**Corrected 2026-09-02 — the `review-queue` half of this PASS was wrong.** Re-tested against a
+fresh DB: `GET /employees/review-queue` as the deactivated manager returns `200 {"data":[]}`,
+**not** `403`. `getReviewQueue()` (`employee-management/service.ts`) throws an explicit
+`ForbiddenError` for an unscoped `regional_manager` (`'Regional Manager must be scoped to a
+hotel group'`) but has no equivalent branch for `manager` — the original `0e6841cf` (ADR-065
+Phase 2) implementation had one (`'Manager must be scoped to a hotel'`), dropped in the
+2026-08-13 `resolveReviewerRecipients` routing rewrite and never reinstated. **No security
+impact** — the empty result is still correct, zero applicants leak — but it is a real,
+un-flagged regression, and the asymmetry with RM is the tell: RM got a dedicated fix for
+exactly this UX complaint (`d3319faf`, "tell a Regional Manager why their review queue is
+empty"); Manager quietly lost the same guard and nothing has restored it. Fix: reinstate the
+`manager` branch's `ForbiddenError` in `getReviewQueue()`, mirroring the RM one.
 
 ### A2 — Reactivation
-**PASS:** record returns to `ACTIVE`. **Ambiguity to record:** reactivation does **not**
-automatically restore the hotel assignment (a separate `assign` is needed). Confirm whether
-that is the intended product behaviour — it is not explicitly specified.
+
+**Corrected 2026-09-02 — this was filed as an open ambiguity; it is not ambiguous.**
+`reactivate()`'s own docstring states: *"Direct, with no re-approval and no group
+re-resolution... the record is immediately assignable again."* That claim is false as the
+code stands. Root cause, traced 2026-09-02: `deactivate()` clears `Hotel.manager_user_id` via
+`vacateManagedScopes` (correct — someone else may cover the hotel while the manager is away)
+but never touches `EmploymentRecord.hotel_group_id`/`primary_hotel_id` (also correct, and
+exactly what makes A2's premise *look* true). `reactivate()` flips status back to `ACTIVE` and
+touches neither field. But `resolveScope()` (`auth/service.ts:286`) — the function that
+actually produces the JWT's `scope` claim, and thus every scope-gated permission — reads
+**`Hotel.manager_user_id`**, not the employment record's own group/hotel columns. So a
+reactivated manager is `ACTIVE`, shows a fully-populated `EmploymentRecord`, and yet has
+**zero operational authority**: fresh login shows `scope_hotel_id: null`, and any scope-gated
+action (e.g. `approve`) fails with `"you do not manage a hotel group"` — until an admin makes
+a **manual, undocumented, un-prompted** second `assign()` call to restore the pointer the
+docstring claims was never needed.
+
+Reproduced end-to-end 2026-09-02 (fresh DB, real API calls, no seeding): approve+assign a
+manager → deactivate (`TEMPORARY_LEAVE`) → reactivate → fresh login shows
+`scope_hotel_id: null` and `EmploymentRecord.hotel_group_id`/`primary_hotel_id` both still
+set → `approve` on any application fails `FORBIDDEN "you do not manage a hotel group"` →
+explicit `assign()` with the *same* group/hotel required to restore function.
+
+**PASS criterion should be:** after `reactivate()`, a fresh login shows the SAME
+`scope_hotel_id` the manager held before deactivation, with no further action required. As
+implemented, this **FAILS**. Fix candidates: (a) `reactivate()` restores
+`Hotel.manager_user_id` = `record.user_id` when `record.primary_hotel_id` is set (mirrors
+`vacateManagedScopes`'s clear with a symmetric restore), or (b) update the docstring and
+require an explicit `assign()` after every reactivation, and surface that requirement in the
+UI so it isn't silently missed the way it is today.
 
 ### A3 — Same for a Regional Manager
 Deactivating an RM must clear `HotelGroup.regional_manager_user_id` equivalently.
@@ -120,7 +161,10 @@ rediscovered as new.
 
 ## Pass criteria summary
 
-- [ ] Deactivate vacates the hotel/group **and** revokes scope + queue access
+- [x] Deactivate vacates the hotel/group **and** revokes scope — **but** queue access is a
+      silent `200 []`, not the documented `403` (open defect, A1)
+- [ ] **OPEN:** Reactivate restores the SAME scope the manager held before deactivation with no
+      further action (A2 — currently requires a manual, undocumented `assign()`)
 - [ ] Reactivate restores ACTIVE; assignment-restore behaviour recorded
 - [ ] RM deactivation clears the group pointer
 - [ ] Rejected cannot resubmit; `rehire` enforces contract + tier authority

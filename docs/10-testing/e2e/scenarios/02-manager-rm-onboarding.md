@@ -72,7 +72,16 @@ consulted; don't infer it from the env file.
 - A **peer RM** attempting to approve → `403` *"only Admin can manage Regional Manager
   applications"*. This is the important case: RM-approves-RM must not be possible.
 
-## Step 6 — Approve writes NO scope (the critical assertion)
+## Step 6 — Approve promotes the record's own target scope, but never the cross-entity pointer
+
+**Corrected 2026-09-02.** This step used to assert "approve writes NO scope" — that was true
+only until 2026-08-14 (`03ad0ab3`, PR #453, "assign the approved employee's group so their
+creator can see them"). Approve used to be status-only, which left an approved Manager/RM with
+`hotel_group_id: null` — invisible in the Users tab to every manager and RM (including the
+person who approved them), because `listUsers()` scopes every non-admin query to
+`employment_record: { hotel_group_id, status: ACTIVE }`. Confirmed on production at the time:
+both employees onboarded through the UI were `ACTIVE` with `hotel_group_id` null and only
+`target_hotel_group_id` set.
 
 ```bash
 curl -s -X POST http://localhost:3001/api/v1/employees/E2E-M-01/approve \
@@ -81,12 +90,24 @@ curl -s http://localhost:3001/api/v1/crm/hotels/<HOTEL> -H "Authorization: Beare
   | python3 -c "import sys,json; print('manager_user_id:', json.load(sys.stdin)['data']['manager_user_id'])"
 ```
 
-**PASS:** record is `ACTIVE` with `hotel_group_id: null`, `primary_hotel_id: null`, **and**
-`Hotel.manager_user_id` still `null`. The state is *Active, Unassigned*.
+**PASS (current behaviour, re-verified 2026-09-02 against a fresh DB, real API calls):**
+`EmploymentRecord` is `ACTIVE` with `hotel_group_id`/`primary_hotel_id` **promoted from
+`target_hotel_group_id`/`target_primary_hotel_id`** (the scope the application was *created*
+with — approve commits a decision already made, it does not make a new one) — **but**
+`Hotel.manager_user_id` is still `null` after approve alone. The state is *Active, Assigned-on-
+the-record, Unassigned-on-the-Hotel* — assign() (Step 7) remains the sole writer of the
+cross-entity pointer, so a rejected or not-yet-assigned application can never grant real hotel
+authority.
 
-**Why:** approval carries no information about *which* hotel the approver intends — that is a
-separate input only they can supply (`ADR-065` §3 item 6). Worker/Checker's fused behaviour is
-deliberately different; do not "harmonise" them.
+**Why:** promoting `target_*` writes no new decision — the creating actor already chose this
+scope. What approval still does NOT do is decide the *live* `Hotel.manager_user_id` /
+`HotelGroup.regional_manager_user_id` binding, because two different employment records could
+legitimately target the same hotel before only one is actually assigned to run it; collapsing
+that into approve would let approval silently reassign a hotel already staffed. Worker/Checker
+have no analogous cross-entity pointer to begin with (a worker does not "own" a hotel the way a
+Manager does) — their approve() resolves `hotel_group_id` straight from the approving actor's
+own scope and needs no separate assign step at all. That fused, one-step behaviour is
+deliberately different from Manager/RM's two-step approve-then-assign; do not "harmonise" them.
 
 ## Step 7 — Assign (the second, separate action)
 

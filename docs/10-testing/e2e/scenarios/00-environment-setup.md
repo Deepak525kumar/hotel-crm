@@ -135,27 +135,47 @@ cross-boundary target.
 
 ### Users to create (via `POST /api/v1/users`)
 
-> **Corrected 2026-08-17** (consent-gate run). Two things here were stale and cost four failed
-> requests to rediscover:
+> **Corrected 2026-09-02** (post-deploy verification run, `bb9c7f37`). The whole note below
+> from 2026-08-17 is superseded — both the request shape and the creation hierarchy changed
+> on 2026-09-01/02 (owner decision, PRs `8dc58cfb`/`bb44b527`).
 >
-> **1. `POST /api/v1/users` requires more than email/password/name/role.** All four of
-> `phone`, `job_title`, `start_date`, `employment_type` (`FULL_TIME`|`PART_TIME`) are
-> required — each surfaces as a separate 422, one at a time. A working call:
+> **1. `POST /api/v1/users` is `multipart/form-data`, not JSON, and requires a photo.**
+> `job_title`/`start_date`/`employment_type` were removed from the schema entirely
+> ("Onboarding fields removed per request" — `users/types.ts`). What is now required:
+> `email`, `password`, `first_name`, `last_name`, `phone` (E.164, and **globally unique** —
+> use a distinct suffix per user), `role`; a `photo` file field (`image/jpeg`|`png`|`webp`,
+> ≤5MB) is **mandatory** (`ValidationError` if missing, enforced in `controller.ts`, not just
+> a 422 from Zod). Optional: `hotel_id`/`hotel_group_id` (become the application's
+> `target_*` fields — see ADR-065 Decision 2, never live scope), `skills` (worker only, JSON
+> array of `SkillTag`, silently rejects an unknown tag rather than dropping it). A working
+> call:
 >
 > ```bash
 > curl -s -X POST http://localhost:3001/api/v1/users -H "Authorization: Bearer $T" \
->   -H "Content-Type: application/json" -d '{"email":"e2e-rm@test.local",
->   "password":"E2EPass123!","first_name":"RM","last_name":"E2E","phone":"+4915100000001",
->   "role":"regional_manager","job_title":"E2E rm","start_date":"2026-01-01",
->   "employment_type":"FULL_TIME"}'
+>   -F "email=e2e-rm@test.local" -F "password=E2EPass123!" -F "first_name=RM" -F "last_name=E2E" \
+>   -F "phone=+4915100000001" -F "role=regional_manager" -F "hotel_group_id=$G" \
+>   -F "photo=@/path/to/photo.png;type=image/png"
 > ```
 >
-> **2. An Admin may only create `regional_manager`.** The table below implies Admin creates all
-> six users directly; it cannot — `ADR-065`'s hierarchy refuses with *"A admin may only create
-> users with role: regional_manager (attempted: manager)"*. Managers come from an RM,
-> workers/checkers from a manager. Every created user starts `PENDING` with no
-> `hotel_group_id`, so anything depending on resolved scope (or on the decline→manager
-> notification, which needs an **ACTIVE** record with a group) requires the lifecycle first.
+> **2. Admin may now create `regional_manager`, `manager`, `worker`, **and** `checker` — but
+> still refuses `admin`.** `lib/role-hierarchy.ts`'s `admin` entry now lists all four
+> non-admin roles (RULE A, amended 2026-09-02 by owner decision) — this changed from the
+> earlier "admin creates RM only" rule; do not create a manager/worker/checker via an RM/
+> manager applicant first unless specifically testing that path too. Every created user
+> still starts `PENDING` with no live `hotel_group_id`/`primary_hotel_id` — only
+> `target_*` — regardless of who created them; the lifecycle (submit → contract → approve →
+> assign for Manager/RM; submit → contract → approve for Worker/Checker, fused) is still
+> required before scope resolves. See scenario 02's Step 6 for the current approve/assign
+> split (also corrected 2026-09-02 — approve now promotes `target_*` onto the record, but
+> `Hotel.manager_user_id` is still assign()-only).
+>
+> **3. The daily consent gate blocks every non-admin request**, including onboarding calls,
+> until `POST /consent/decisions` is called for that user with `consent_instance:
+> "daily-access-gate"` (the literal string — `CONSENT_INSTANCE.DAILY_ACCESS_GATE` in
+> `modules/consent/types.ts`; do not guess a different instance name) and
+> `notice_version: "v1"` (`CURRENT_NOTICE_VERSION` in `modules/consent/service.ts`). This
+> gate did not exist when this scenario was first written; every user created below needs a
+> grant before anything else in scenarios 01–18 will work for them.
 
 | Purpose | Email | Role |
 |---|---|---|
