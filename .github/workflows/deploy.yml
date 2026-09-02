@@ -40,6 +40,48 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # The build moved OFF the EC2 host and onto this runner (2026-09-03).
+      #
+      # deploy.sh used to run a bare `npm ci` from the repo root plus
+      # `npm run build` on the box itself. In an npm-workspaces monorepo that
+      # root install pulls every workspace -- backend, the Next.js frontend,
+      # and both Expo/React Native apps, dev dependencies included: measured
+      # 1.5 GB of node_modules and 849 hoisted packages on a t3.small with
+      # 1.9 GB of RAM, peaking ~1.27 GB RSS during the install and driving the
+      # machine a gigabyte into swap on every single deploy. It was OOM-killed
+      # outright on 2026-08-03 (`npm ci` was the process the kernel chose).
+      # This runner has an order of magnitude more memory and does the same
+      # work for free.
+      #
+      # Node 20 matches ci.yml, which is the version the code is actually
+      # linted/typechecked/tested against. NOTE: the production host runs Node
+      # v22.23.0 -- a real CI/prod drift that predates this change and is
+      # deliberately not "fixed" here (aligning it could surface unrelated
+      # test failures and deserves its own decision). It is safe for THIS
+      # step specifically: the artifact shipped below is plain JavaScript
+      # emitted by tsc against tsconfig's own target, with no Node-ABI-
+      # sensitive native addons, and the one component that IS
+      # platform-specific -- Prisma's query engine -- is deliberately
+      # generated on the host instead (see deploy.sh).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies (full, incl. dev -- tsc needs them)
+        run: npm ci
+
+      # Required before the build: tsc typechecks against the Prisma client's
+      # generated types. Only the TYPES matter here -- the engine binary this
+      # also produces is not shipped, and the host regenerates its own.
+      - name: Generate Prisma client (for typecheck)
+        run: npx prisma generate
+        working-directory: backend
+
+      - name: Build backend
+        run: npm run build --workspace backend
+
       - name: Start SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -49,6 +91,19 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      # Staged OUTSIDE the repo working tree on the host, so deploy.sh's own
+      # `git reset --hard origin/main` can never clobber it mid-deploy.
+      # deploy.sh moves it into backend/dist after the reset and the
+      # dependency install, and falls back to building on the host if this
+      # transfer never landed -- a failed rsync degrades to the old behaviour
+      # rather than restarting pm2 onto a missing or stale dist.
+      - name: Ship the build to EC2
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            'rm -rf /home/ubuntu/deploy-staging && mkdir -p /home/ubuntu/deploy-staging'
+          rsync -az --delete backend/dist/ \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ubuntu/deploy-staging/dist/
 
       - name: Deploy to EC2
         env:
