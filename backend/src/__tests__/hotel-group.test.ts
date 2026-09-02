@@ -367,6 +367,58 @@ describe('CrmService - Hotel Groups', () => {
       expect(mockPrisma.hotelGroup.delete).not.toHaveBeenCalled();
     });
 
+    // Reported live: a group was archived while it still held Regional
+    // Manager 2. regional_manager_user_id is UNIQUE, so he could not be
+    // assigned to any other group -- and his own profile read as unassigned,
+    // because the group still holding him was archived out of every list.
+    // One missing vacate produced both halves.
+    //
+    // Deliberately NOT undone by restoreHotelGroup: months on, that person
+    // may be gone or posted elsewhere, so the slot is left open to be filled
+    // explicitly rather than silently re-attached.
+    it('releases the regional manager so they can be posted elsewhere', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({
+        id: 'hg_1',
+        name: 'Berlin Group',
+        regional_manager_user_id: 'rm_2',
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.deleteHotelGroup('hg_1', 'admin_1', 'admin');
+
+      const [{ data }] = (mockPrisma.hotelGroup.update as jest.Mock).mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      expect(data.regional_manager_user_id).toBeNull();
+      expect(data.regional_manager_vacated_at).toBeInstanceOf(Date);
+      expect(data.regional_manager_vacancy_reason).toBe('TERMINATED');
+
+      // The posting history is closed too, so the archived group does not
+      // read as an open assignment in anyone's history.
+      expect(mockPrisma.regionalManagerAssignmentHistory.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            hotel_group_id: 'hg_1',
+            regional_manager_user_id: 'rm_2',
+            unassigned_at: null,
+          }),
+        })
+      );
+    });
+
+    it('archives a vacant group without touching assignment history', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({
+        id: 'hg_1',
+        name: 'Berlin Group',
+        regional_manager_user_id: null,
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.deleteHotelGroup('hg_1', 'admin_1', 'admin');
+
+      expect(mockPrisma.regionalManagerAssignmentHistory.updateMany).not.toHaveBeenCalled();
+    });
+
     it('throws NotFoundError when the hotel group does not exist', async () => {
       mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
 

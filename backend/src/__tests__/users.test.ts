@@ -103,6 +103,10 @@ jest.mock('../modules/employee-management/service.js', () => ({
     // happens on ONE path instead of two divergent ones -- that divergence
     // was the "ghost employee" bug (2026-08-13 audit).
     delete: jest.fn(() => Promise.resolve({})),
+    // The plain soft-delete path (no live EmploymentRecord) calls this to
+    // vacate any hotel/group the account headed -- see the ghost-assignment
+    // test below.
+    vacateManagedScopesForUser: jest.fn(() => Promise.resolve()),
   },
 }));
 jest.mock('../config/env.js', () => ({
@@ -1521,6 +1525,31 @@ describe('UserService', () => {
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ token_generation: { increment: 1 } }) })
       );
+    });
+
+    // GHOST ASSIGNMENT regression (reported live 2026-09-02). A Regional
+    // Manager held hotel group "hotel one group one"; after the account was
+    // deleted the group still pointed at them, so it refused a replacement as
+    // "already assigned" and its own page could not load the holder (getUser
+    // refuses a soft-deleted row). The account had no live EmploymentRecord,
+    // so deleteUser took the plain soft-delete path -- which set deleted_at
+    // and bumped the token and vacated nothing. The delegating path had been
+    // fixed for exactly this in the 2026-08-13 audit; this one was missed,
+    // which is why the teardown is now shared rather than written twice.
+    it('vacates a managed hotel/group even with no employment record', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm1', deleted_at: null, email: 'rm@t.com' });
+      mockPrisma.user.update.mockResolvedValue({ id: 'rm1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+
+      await service.deleteUser('rm1', 'admin1', 'admin');
+
+      expect(employeeManagementService.vacateManagedScopesForUser).toHaveBeenCalledTimes(1);
+      const [, targetId, actorId] = (
+        employeeManagementService.vacateManagedScopesForUser as jest.Mock
+      ).mock.calls[0] as [unknown, string, string, Date];
+      expect(targetId).toBe('rm1');
+      expect(actorId).toBe('admin1');
     });
 
     // GHOST EMPLOYEE regression (2026-08-13 audit). This endpoint used to

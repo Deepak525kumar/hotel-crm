@@ -360,10 +360,34 @@ export class CrmService extends BaseService {
     if (hotel.deleted_at) throw new ConflictError('Hotel is already deleted');
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
       const updated = await tx.hotel.update({
         where: { id: hotelId },
-        data: { is_active: false, deleted_at: new Date() },
+        data: {
+          is_active: false,
+          deleted_at: now,
+          // Release the posting along with the hotel. manager_user_id is
+          // unique, so an archived hotel that keeps holding its Manager makes
+          // that person unpostable anywhere else until someone restores or
+          // hand-edits the row -- and their own profile reads as unassigned
+          // meanwhile, because the assignment they still hold is on a hotel
+          // no list shows. Reported live for the group equivalent below.
+          //
+          // Not restored by restoreHotel() on purpose: whoever ran the hotel
+          // months ago may be gone or posted elsewhere, so re-attaching them
+          // silently would be a worse guess than leaving the slot open.
+          manager_user_id: null,
+          manager_assigned_at: null,
+          manager_vacated_at: now,
+          manager_vacancy_reason: 'TERMINATED',
+        },
       });
+      if (hotel.manager_user_id) {
+        await tx.hotelManagerAssignmentHistory.updateMany({
+          where: { hotel_id: hotelId, manager_user_id: hotel.manager_user_id, unassigned_at: null },
+          data: { unassigned_at: now, unassigned_by_id: actorId, reason: 'TERMINATED' },
+        });
+      }
       await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL', hotelId, { name: hotel.name }, ip, undefined, undefined, tx);
       return updated;
     });
@@ -642,10 +666,38 @@ export class CrmService extends BaseService {
     if (group.deleted_at) throw new ConflictError('Hotel group is already deleted');
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
       const updated = await tx.hotelGroup.update({
         where: { id: hotelGroupId },
-        data: { is_active: false, deleted_at: new Date() },
+        data: {
+          is_active: false,
+          deleted_at: now,
+          // Release the Regional Manager with the group. Reported live:
+          // archiving a group left it still holding its RM, and because
+          // regional_manager_user_id is UNIQUE, that RM could not be assigned
+          // to any other group -- while their own profile showed them as
+          // unassigned, since the group holding them was archived out of
+          // every list. Both halves came from this one missing vacate.
+          //
+          // Deliberately not undone by restoreHotelGroup(): the person may
+          // have moved on or been posted elsewhere in the meantime, so the
+          // restore leaves the slot open to be filled explicitly.
+          regional_manager_user_id: null,
+          regional_manager_assigned_at: null,
+          regional_manager_vacated_at: now,
+          regional_manager_vacancy_reason: 'TERMINATED',
+        },
       });
+      if (group.regional_manager_user_id) {
+        await tx.regionalManagerAssignmentHistory.updateMany({
+          where: {
+            hotel_group_id: hotelGroupId,
+            regional_manager_user_id: group.regional_manager_user_id,
+            unassigned_at: null,
+          },
+          data: { unassigned_at: now, unassigned_by_id: actorId, reason: 'TERMINATED' },
+        });
+      }
       await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL_GROUP', hotelGroupId, { name: group.name }, ip, undefined, undefined, tx);
       return updated;
     });

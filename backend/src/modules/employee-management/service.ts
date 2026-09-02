@@ -2334,6 +2334,30 @@ export class EmployeeManagementService extends BaseService {
    * rather than hardcoding: a temporary pause is TEMPORARY, a termination is
    * TERMINATED, and the vacancy history rows must say which actually happened.
    */
+  /**
+   * Public so users/service.ts#deleteUser can reuse it on the path that does
+   * NOT come through delete() above.
+   *
+   * That path is taken whenever the account has no live EmploymentRecord --
+   * an admin, or a pre-ADR-065 account that never got one -- and it only
+   * soft-deleted the User. So deleting a Manager or Regional Manager who held
+   * a hotel or group left the assignment pointing at a deleted user: the
+   * hotel group reported "already assigned" and its detail page could not
+   * load the holder, because getUser refuses a soft-deleted row. Reported
+   * live. Exported rather than duplicated -- the divergence between the two
+   * delete paths IS this bug, and a second copy of the teardown would be the
+   * same mistake again (see delete()'s own comment on the ghost-employee
+   * fix).
+   */
+  async vacateManagedScopesForUser(
+    tx: DatabaseTransaction,
+    userId: string,
+    actorUserId: string,
+    now: Date
+  ): Promise<void> {
+    await this.vacateManagedScopes(tx, userId, actorUserId, 'TERMINATED', now);
+  }
+
   private async vacateManagedScopes(
     tx: DatabaseTransaction,
     userId: string,

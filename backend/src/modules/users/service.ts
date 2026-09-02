@@ -1470,11 +1470,22 @@ export class UserService extends BaseService {
     // deleted account must never remain authorizable on its already-issued
     // access token (SIR-USERS-015, emergency-removal case).
     await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
       await tx.user.update({
         where: { id: userId },
-        data: { deleted_at: new Date(), is_active: false },
+        data: { deleted_at: now, is_active: false },
       });
       await bumpTokenGeneration(tx, userId);
+      // Vacate any hotel or group this person headed. The delegating branch
+      // above already did this (via employeeManagementService.delete); THIS
+      // path -- taken when there is no live EmploymentRecord, i.e. an admin or
+      // a pre-ADR-065 account -- did not, so deleting a Manager or Regional
+      // Manager who held one left the assignment pointing at a soft-deleted
+      // user. Reported live: the hotel group refused a new Regional Manager
+      // as "already assigned", and its own page could not load the holder,
+      // because getUser refuses a deleted row. Same teardown, one path each,
+      // rather than a second divergent copy.
+      await employeeManagementService.vacateManagedScopesForUser(tx, userId, actorId, now);
     });
 
     await this.logAudit(actorId, actorRole, 'DELETE', 'USER', userId, { email: user.email }, ip);
