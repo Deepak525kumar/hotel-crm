@@ -4,12 +4,11 @@
 (commits `8dc58cfb`, `bb44b527`; RULE A amendment in `backend/src/lib/role-hierarchy.ts`) — a
 significant change to the account-creation hierarchy that shipped with **no dedicated
 scenario**, only scattered corrections in `00-environment-setup.md` and
-`02-manager-rm-onboarding.md`. This file is the first end-to-end verification pass for the
-feature as a whole. **Steps 1, 2, and 4 were run live against a fresh DB on 2026-09-02**
-(see `runs/2026-09-02-post-deploy-onboarding-and-rooms.md`) — those are marked
-`PASS (verified 2026-09-02)` with real observed output. **Step 3 and part of Step 5 were
-not** — those are written from reading the source directly and marked accordingly; treat them
-as reasoned, not observed, until someone runs them.
+`02-manager-rm-onboarding.md`. This file has now been run live in full — Steps 1–5 all show
+`PASS` with real observed output (Steps 1, 2, 4 from the first 2026-09-02 pass; Steps 3 and 5
+from a second pass the same day, which also found and fixed a real defect in Step 5). Only
+Step 6 (downstream review-queue routing, side-by-side against an RM-created/Manager-created
+applicant) remains unrun.
 
 **Preconditions:** Scenario 00 complete (multipart create shape, mandatory photo, consent
 gate). Two hotel groups + hotels for the cross-scope cases.
@@ -82,21 +81,18 @@ curl -s -X POST http://localhost:3001/api/v1/users -H "Authorization: Bearer $T"
   # no -F photo=...
 ```
 
-**Expected, not run live this pass — from source, not observation:** `422`,
-`"A profile photo is required"`. `controller.ts` throws this as an explicit `ValidationError`
-after Zod passes (a client that satisfies the schema but omits the file part should get a
-clear, specific refusal rather than a generic multer error) — but this specific negative case
-was never actually sent in the 2026-09-02 run; every create call in that session included a
-photo. Confirm live before checking the box below.
+**PASS (verified 2026-09-02, second pass, live).** `422`,
+`"A profile photo is required"` — the exact `ValidationError` message, from `controller.ts`,
+not a generic multer error.
 
-Also confirm the schema itself: `job_title`, `start_date`, and `employment_type` are **no
-longer accepted fields** at all (removed from `CreateUserSchema` per owner decision, confirmed
-by reading `users/types.ts` directly) — sending them should be silently ignored (Zod strips
-unknown keys), not rejected. **Also not sent live this pass** — confirm by actually including
-these three fields in a create request and checking they have no effect, rather than trusting
-the schema read alone. This is the inverse of the `skills` bug below: an unknown key silently
+`job_title`, `start_date`, and `employment_type` are **no longer accepted fields** at all
+(removed from `CreateUserSchema`). **PASS (verified 2026-09-02, live)** — sent all three on a
+real create call (`job_title=Should Be Ignored`, `start_date=2020-01-01`,
+`employment_type=PART_TIME`) and confirmed at the data layer they had zero effect:
+`EmploymentRecord.job_title` stayed the default `"TBD"`, `employment_type` stayed the default
+`FULL_TIME`. This is the inverse of the `skills` bug below: an unknown key silently
 disappearing is *correct* here only because these three fields were deliberately retired, not
-because dropping unknown keys is safe in general — worth proving, not assuming.
+because dropping unknown keys is safe in general — now proven, not assumed.
 
 ## Step 4 — Skills: validated, deduplicated, and NOT silently dropped
 
@@ -130,25 +126,36 @@ does not silently populate a Manager/RM/Checker's `EmploymentRecord.skills`).
 
 ## Step 5 — The role-appropriate target field
 
+`regional_manager` creation takes `hotel_group_id` directly (no hotel); every other role takes
+`hotel_id`. The API derives `target_hotel_group_id` from that hotel server-side — it does
+**not** trust an independently-sent `hotel_group_id` for these roles, even though the client
+is technically free to send one alongside `hotel_id`.
+
 ```bash
-# manager with a hotel that belongs to no group
-curl ... -F role=manager -F hotel_id=<hotel with no hotel_group_id> ...
+# a mismatched pair: H1 belongs to G1, but G2 is sent as hotel_group_id
+curl ... -F role=manager -F hotel_id=$H1 -F hotel_group_id=$G2 ...
 ```
 
-**Not tested this pass — outcome genuinely unknown, not just unobserved.** Either the create
-is refused, or the record's `target_hotel_group_id` is left `null`; the frontend's own
-`UserForm` should already prevent this by only offering grouped hotels for a Manager creation,
-but that is a UI-only guard unless the service enforces it too. Confirm which layer actually
-catches it (service or UI-only) and record the answer — this is exactly the kind of "which
-layer is the real gate" question this suite exists to pin down rather than assume, and it has
-not been pinned down here.
+**REAL DEFECT, found live 2026-09-02, fixed in the same pass.** Before the fix: `201` success,
+and `EmploymentRecord.target_hotel_group_id` was stored as the **sent** `G2` — the wrong
+group — while `target_primary_hotel_id` correctly pointed at H1 (in G1). This was not merely
+cosmetic: `getReviewQueue()` routes a Manager application by `target_hotel_group_id`, so G2's
+Regional Manager — someone with no relationship to the real target hotel — would gain
+visibility into and approval authority over the application, while G1's RM (who actually owns
+the target hotel) would never see it. Root cause: `createEmployee`'s `admin` actor branch
+validated that a Manager application *has* a `target_hotel_group_id`, but unlike the sibling
+`regional_manager`/`manager` actor branches just below it in the same function — both of which
+derive the group from the actor's own hotel and reject a mismatch — it never cross-checked the
+admin-supplied group against the hotel's real one at all.
 
-`regional_manager` creation takes `hotel_group_id` directly (no hotel); every other role takes
-`hotel_id`, with the group derived from the hotel server-side, not sent independently by a
-well-behaved client (the frontend derives it — see `frontend/app/(protected)/users/new/page.tsx`
-— but the API itself does not require the derivation, so also test sending a *mismatched*
-`hotel_group_id`/`hotel_id` pair and record what happens; this was not tested in the pass that
-authored this scenario).
+**Fixed:** the admin branch now derives `target_hotel_group_id` from `target_primary_hotel_id`
+authoritatively (when a hotel is supplied and the target role isn't `regional_manager`),
+discarding whatever group value the client sent, before the existing "Manager requires a
+group" check runs — so a hotel with no group of its own still correctly refuses, rather than
+silently passing a since-overwritten value. Verified live: the identical mismatched request
+now stores `target_hotel_group_id` as `G1` (derived, correct), not `G2` (sent, wrong). Three
+new unit tests in `employee-management.test.ts` pin the derivation, the ungrouped-hotel
+refusal, and that a Regional Manager application (no hotel to derive from) is untouched.
 
 ## Step 6 — Downstream: the created applicant is reviewable and routes correctly
 
@@ -168,15 +175,16 @@ account.
 - [x] Admin creates `regional_manager`, `manager`, `worker`, `checker` — all `201`, all
       `PENDING` with zero live scope, target fields recorded
 - [x] Admin creating `admin` — `403`, exact refusal message
-- [ ] Missing photo — `422`, explicit message (not a generic multer error) — expected from
-      source, not yet run live
-- [ ] `job_title`/`start_date`/`employment_type` silently accepted-and-ignored (deliberately
-      retired fields) — expected from source, not yet run live
+- [x] Missing photo — `422`, explicit message (not a generic multer error) — verified live
+- [x] `job_title`/`start_date`/`employment_type` silently accepted-and-ignored (deliberately
+      retired fields) — verified live at the data layer (defaults unaffected)
 - [x] Valid `skills` — persisted, deduplicated
 - [x] Invalid `skills` tag — `422` naming the bad index, never silently dropped
-- [ ] Mismatched `hotel_id`/`hotel_group_id` pair — not tested; record the actual behavior
-- [ ] Manager targeting an ungrouped hotel — not tested at the service layer specifically
-      (only the frontend's own filtering was inspected)
+- [x] Mismatched `hotel_id`/`hotel_group_id` pair — **was a real defect** (wrong group stored,
+      misrouted review-queue authority), found and fixed live this pass; re-verified after the
+      fix derives the correct group
+- [x] Manager targeting an ungrouped hotel — covered by the same fix's regression test
+      (unit-level; not separately re-run live against a real ungrouped hotel)
 - [ ] Downstream review-queue routing for an admin-created applicant, side-by-side against an
       RM-created / Manager-created one — not run as its own comparison
 

@@ -111,6 +111,39 @@ export class EmployeeManagementService extends BaseService {
     // Role-based creation guards
     if (actor.role === 'admin') {
       // Admin can create for anyone.
+      //
+      // Found 2026-09-02 by real E2E probing (scenario 19 Step 5): unlike the
+      // `regional_manager` and `manager` branches below -- which both derive
+      // target_hotel_group_id from the actor's own hotel and REJECT a
+      // mismatched client-supplied value -- this branch never cross-checked
+      // target_hotel_group_id against target_primary_hotel_id's real group at
+      // all. A client sending a hotel from one group alongside a
+      // hotel_group_id belonging to a DIFFERENT group got both values stored
+      // verbatim, inconsistently. That is not just cosmetic: getReviewQueue()
+      // routes a Worker/Checker/Manager application by target_hotel_group_id,
+      // so the mismatched group's Regional Manager -- someone with no
+      // relationship to the real target hotel -- gained visibility into and
+      // approval authority over the application, while the RM who actually
+      // owns the target hotel never saw it. Since Admin has no scope of its
+      // own to validate against (the manager/RM branches below check the
+      // ACTOR's own hotel; Admin has none), the hotel is the authoritative
+      // source here: derive the group FROM the hotel and discard whatever
+      // group value the client sent, the same "hotel picks; group follows"
+      // design already used for the create-user frontend's own field
+      // derivation (users/service.ts createUser) -- never trust a second,
+      // independently-suppliable field to agree with the first.
+      //
+      // Runs BEFORE the Manager-requires-a-group check below, deliberately:
+      // that check must see the DERIVED value, not the raw client-supplied
+      // one, or a hotel with no group of its own could pass a check that
+      // already ran against a since-overwritten value.
+      if (targetUser.role !== 'REGIONAL_MANAGER' && data.target_primary_hotel_id) {
+        const targetHotel = await this.prisma.hotel.findUnique({
+          where: { id: data.target_primary_hotel_id },
+          select: { hotel_group_id: true },
+        });
+        data.target_hotel_group_id = targetHotel?.hotel_group_id ?? undefined;
+      }
       // If Admin creates a Manager application, target_hotel_group_id is required.
       if (targetUser.role === 'MANAGER' && !data.target_hotel_group_id) {
         throw new ConflictError('Admin must explicitly provide a target_hotel_group_id when creating a Manager application');

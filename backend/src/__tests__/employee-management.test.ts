@@ -267,6 +267,87 @@ describe('EmployeeManagementService', () => {
     });
   });
 
+  // Regression tests (found by real E2E probing, 2026-09-02, scenario 19 Step
+  // 5): admin's branch never cross-checked a client-supplied
+  // target_hotel_group_id against target_primary_hotel_id's real group, only
+  // the regional_manager/manager branches did. A mismatched pair got stored
+  // verbatim and routed the application's review queue entry to the WRONG
+  // Regional Manager (getReviewQueue() keys on target_hotel_group_id) --
+  // someone with no relationship to the real target hotel. Fixed by deriving
+  // target_hotel_group_id FROM the hotel, discarding any client-supplied
+  // value, mirroring the manager branch's own existing derivation.
+  describe('createEmployee (admin actor) derives target_hotel_group_id from the hotel', () => {
+    it('overrides a mismatched client-supplied group with the hotel\'s real group', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'MANAGER' });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+      mockPrisma.hotel.findUnique.mockResolvedValue({ hotel_group_id: 'grp_real' });
+      const created = fakeRecord({ status: EmploymentStatus.PENDING, target_hotel_group_id: 'grp_real' });
+      mockPrisma.employmentRecord.create.mockResolvedValue(created);
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.createEmployee(admin as any, {
+        user_id: 'user_1',
+        employee_id: 'E-001',
+        job_title: 'Cleaner',
+        start_date: new Date('2026-01-01'),
+        employment_type: 'FULL_TIME',
+        target_primary_hotel_id: 'hotel_1',
+        // Deliberately WRONG -- a different group than hotel_1 actually belongs to.
+        target_hotel_group_id: 'grp_wrong',
+      } as never);
+
+      const createCall = mockPrisma.employmentRecord.create.mock.calls[0][0] as {
+        data: { target_hotel_group_id: string | null };
+      };
+      expect(createCall.data.target_hotel_group_id).toBe('grp_real');
+    });
+
+    it('refuses a Manager application when the hotel has no group of its own', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'MANAGER' });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+      // The hotel is ungrouped -- the client's group value, right or wrong,
+      // must not survive the derivation.
+      mockPrisma.hotel.findUnique.mockResolvedValue({ hotel_group_id: null });
+
+      await expect(
+        service.createEmployee(admin as any, {
+          user_id: 'user_1',
+          employee_id: 'E-001',
+          job_title: 'Cleaner',
+          start_date: new Date('2026-01-01'),
+          employment_type: 'FULL_TIME',
+          target_primary_hotel_id: 'hotel_ungrouped',
+          target_hotel_group_id: 'grp_wrong',
+        } as never)
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+      expect(mockPrisma.employmentRecord.create).not.toHaveBeenCalled();
+    });
+
+    it('does not touch target_hotel_group_id for a Regional Manager (no hotel to derive from)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'REGIONAL_MANAGER' });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+      const created = fakeRecord({ status: EmploymentStatus.PENDING, target_hotel_group_id: 'grp_direct' });
+      mockPrisma.employmentRecord.create.mockResolvedValue(created);
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.createEmployee(admin as any, {
+        user_id: 'user_1',
+        employee_id: 'E-001',
+        job_title: 'Cleaner',
+        start_date: new Date('2026-01-01'),
+        employment_type: 'FULL_TIME',
+        target_hotel_group_id: 'grp_direct',
+      } as never);
+
+      // Not called: an RM application has no target_primary_hotel_id to derive from.
+      expect(mockPrisma.hotel.findUnique).not.toHaveBeenCalled();
+      const createCall = mockPrisma.employmentRecord.create.mock.calls[0][0] as {
+        data: { target_hotel_group_id: string | null };
+      };
+      expect(createCall.data.target_hotel_group_id).toBe('grp_direct');
+    });
+  });
+
   describe('toGeneralProfile serializer', () => {
     it('always omits special-category fields regardless of caller', () => {
       const record = fakeRecord({ konfession: 'catholic', disability_status: 'none' }) as any;
