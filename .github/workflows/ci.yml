@@ -191,8 +191,22 @@ jobs:
             --shadow-database-url postgresql://test:test@localhost:5432/drift_shadow \
             --exit-code
 
+      # --runInBand (npm run test:ci), NOT the parallel default.
+      #
+      # Parallel runs in this suite are unreliable enough to be misleading:
+      # they have reported failures that pass in isolation, and -- worse --
+      # UNDER-reported real ones. A change that genuinely broke two suites
+      # (18 tests) surfaced as 2 failures in parallel, which looks exactly
+      # like the usual noise and is easy to wave through. A gate whose output
+      # you learn to distrust is not a gate.
+      #
+      # Serial costs nothing here: these suites mock Prisma rather than
+      # hitting a database, so worker startup outweighs the parallelism --
+      # measured locally at ~21s serial against ~28-64s parallel.
+      #
+      # `npm test` stays parallel for local iteration; this is the merge gate.
       - name: Tests
-        run: npm test
+        run: npm run test:ci
         working-directory: backend
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/hotelcrm_test
