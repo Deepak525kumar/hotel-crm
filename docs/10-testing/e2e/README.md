@@ -57,13 +57,16 @@ replace them.
 | 10 | `scenarios/10-calendar-shift-summary.md` | Calendar / daily shift summary |
 | 11 | `scenarios/11-daily-consent-gate.md` | Daily consent gate: enforcement, escape hatches, day rollover |
 | 12 | `scenarios/12-checker-photo-evidence-and-rework.md` | Checker photo evidence, rework loop, escalation, ADR-069 metric exclusion |
+| 13 | `scenarios/13-language-and-rtl.md` | Six UI locales, RTL rendering. **Run live 2026-09-02** — found and fixed two real defects (login response missing `preferred_language`; a stale frontend `reconciled` flag) that together left every non-default-language user in the wrong language/direction until a manual reload |
+| 14 | `scenarios/14-payslip-requests.md` | Payslip request intake, manager fulfilment, IDOR guard, cross-group fulfil denial. **Run live 2026-09-02** — no defects found |
+| 15 | `scenarios/15-re-onboarding.md` | `DEACTIVATED → PENDING` re-onboarding (contract expired), vs. `reactivate()` (contract still valid); document preservation; nav lockout. **Run live 2026-09-02** — no defects found |
 | 16 | `scenarios/16-push-notification-delivery.md` | Push delivery end to end: token registration, APNs topic/environment, outbox fan-out, invalid-token pruning |
 | 17 | `scenarios/17-email-delivery.md` | Email delivery end to end: handler resolution, sending-domain authentication, recipient/body shapes, bounce blindness |
 | 18 | `scenarios/18-worker-room-log-and-room-first-check.md` | Worker's room log, one-room-per-day collision, room-first inspection picker + per-role scope matrix, rework state round-trip |
 | 19 | `scenarios/19-admin-creates-any-role.md` | Admin creates regional_manager/manager/worker/checker directly (2026-09-01/02 RULE A amendment); admin-creates-admin still refused; skills validation. **Partially verified** — see the file's own status note |
 | 20 | `scenarios/20-archive-delete-scope-vacating.md` | Deleting a user/hotel/group must not leave ghost assignments or dangling scope pointers; an archived hotel/group must confer no scope, fresh login or stale token alike. **Run live 2026-09-02** — 5/6 steps passed as designed (one stronger than predicted); found and fixed a real defect (`assign()` would bind a live manager/RM to an archived target) |
 
-**Start with 00. Then 01-07, 09-12, 16, 17, 18, 19 and 20 in order.** 08 is not a test — it is the backlog and the
+**Start with 00. Then 01-20 in order (skipping 08).** 08 is not a test — it is the backlog and the
 "what we still haven't checked" list. Read it at the end of a run and update it.
 
 > **18 changes how an inspection starts.** Until 2026-09-01 a checker picked a
@@ -73,37 +76,29 @@ replace them.
 > the same change, which corrected a dead end where nothing could move a room
 > out of `NEEDS_REWORK`.
 
-### Known coverage gaps (recorded 2026-08-22, extended 2026-08-25, one closed 2026-08-28, two more closed 2026-09-02)
+### Known coverage gaps (recorded 2026-08-22, extended 2026-08-25, all closed by 2026-09-02)
 
-Three shipped features have no scenario. Listed here rather than left to be rediscovered, per this
-suite's own rule that a gap found but not written down gets found again from scratch. **These are
-outstanding work, not passed checks.**
+The three shipped-features-with-no-scenario originally listed here (`13-language-and-rtl.md`,
+`14-payslip-requests.md`, `15-re-onboarding.md`) are now all written **and run live** — see
+the scenario index above. 13's pass found and fixed two real defects (a fresh login rendering
+in the wrong language/direction until a manual reload); 14 and 15 found none. `runs/
+2026-09-02-fifth-pass-scenarios-13-14-15.md` has the full results.
 
-| Missing scenario | Feature | Shipped | Governing record |
-|---|---|---|---|
-| `13-language-and-rtl.md` | Six UI locales (`de en fr ar uk ur`), two right-to-left, persisted on `User.preferred_language`, across web and both mobile apps | PRs #471–#484 | **none — undocumented, no specification** |
-| `14-payslip-requests.md` | Payslip request intake, manager fulfilment, date validation | PRs #487–#491 | `ADR-014`, `SPEC-HR-001` |
-| `15-re-onboarding.md` | Re-onboarding of inactive/deactivated workers, nav lockout, capability pin | PRs #468, #469 | `ADR-065` (partially) |
-
-**`19-admin-creates-any-role.md` and `20-archive-delete-scope-vacating.md` were written on
-2026-09-02** and are no longer gaps — see the scenario index above. Both cover
-2026-09-01/02 changes (the RULE A creation-hierarchy amendment, and the delete/archive
-scope-vacating fixes) that had shipped with no scenario at all. **19 is partially verified**
-(some steps run live, some written from source and marked as such — Step 3 and part of Step 5
-remain unrun). **20 was run live the same day**, after initially shipping unverified — 5 of 6
-steps passed as designed, one (the stale-token case) turned out stronger than predicted, and
-the run found and fixed a real defect (`assign()` would silently bind a live manager/RM to an
-archived hotel/group). Running 19's remaining unverified steps is now the highest-value next
-step for this suite.
+`19-admin-creates-any-role.md` and `20-archive-delete-scope-vacating.md`, written the same
+day for two more shipped-with-no-scenario features (the RULE A creation-hierarchy amendment,
+and the delete/archive scope-vacating fixes), are also now **fully run live** — 19's earlier
+"partially verified" note is stale; every step has since been run, finding and fixing one more
+real defect (Step 5's mismatched-hotel/group case). 20 found and fixed a defect of its own
+(`assign()` would silently bind a live manager/RM to an archived hotel/group). Between 13's,
+19's, and 20's own findings, plus the earlier same-day passes on 07 and the original
+post-deploy run, **this single day's testing found and fixed seven real, previously-unknown
+defects** across the codebase — see each scenario's own "New defects found" section, and the
+five run logs dated 2026-09-02, for the complete list.
 
 **`16-push-notification-delivery.md` was written on 2026-08-28** and is no longer a gap — see
 the scenario index above. It was written the expensive way: the missing scenario is exactly
 what let a placeholder APNs bundle ID take out 100% of iOS push, for both apps, undetected for
 as long as it stood. Every observable inside the system stayed green.
-
-The language one matters most of the remaining three, and is the least testable as things stand: there is no specification
-saying which language any surface should render in, so a scenario would have to invent its own pass
-criteria. Writing the specification comes first.
 
 The welcome-email-on-account-creation path (PR #508) landed after the newest run log and is not yet
 exercised by any scenario. Login throttling (`ADR-070`, PR #509) was exercised ad-hoc on

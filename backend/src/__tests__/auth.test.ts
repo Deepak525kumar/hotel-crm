@@ -399,6 +399,42 @@ describe('AuthService', () => {
         expect(result.user.employment_status).toBeNull();
       });
 
+      // Regression test (found 2026-09-02 by real E2E probing, scenario 13
+      // language/RTL) -- the identical bug class as employment_status just
+      // above, for a different field. login()'s response seeds the same
+      // client store LocaleProvider reads to pick the UI language and text
+      // direction the instant auth settles, with no reload in between.
+      // Without this field, a non-default-language user saw the WRONG
+      // language and, for Arabic/Urdu, the wrong text direction (RTL flipped
+      // to LTR) for their entire session -- correcting itself only on a
+      // manual page reload, since only GET /auth/me (getCurrentUser) ever
+      // carried the real value.
+      it('includes preferred_language in the login response', async () => {
+        const hash = await bcrypt.hash('correctpassword', 4);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          failingUser({ password_hash: hash, failed_login_count: 0, preferred_language: 'ar' })
+        );
+        mockPrisma.session.create.mockResolvedValue({ id: 's1' });
+        mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+
+        const result = await service.login({ email: 'user@test.com', password: 'correctpassword' });
+
+        expect(result.user.preferred_language).toBe('ar');
+      });
+
+      it('reports preferred_language null when the user has never chosen one', async () => {
+        const hash = await bcrypt.hash('correctpassword', 4);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          failingUser({ password_hash: hash, failed_login_count: 0, preferred_language: null })
+        );
+        mockPrisma.session.create.mockResolvedValue({ id: 's1' });
+        mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+
+        const result = await service.login({ email: 'user@test.com', password: 'correctpassword' });
+
+        expect(result.user.preferred_language).toBeNull();
+      });
+
       it('issues no counter write on a successful login when the streak is already zero', async () => {
         const hash = await bcrypt.hash('correctpassword', 4);
         mockPrisma.user.findUnique.mockResolvedValue(

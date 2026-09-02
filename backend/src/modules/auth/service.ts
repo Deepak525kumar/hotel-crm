@@ -375,6 +375,11 @@ export class AuthService extends BaseService {
         // authorized-creator path, users/service.ts#createUser, not this
         // public self-signup one).
         employment_status: null,
+        // Same 2026-09-02 fix as login() below -- always null here too, and
+        // correctly so: a self-signup has never had the chance to set a
+        // preference yet (the schema default). The client negotiates a
+        // locale from device/browser languages in that case.
+        preferred_language: user.preferred_language,
         created_at: user.created_at.toISOString(),
         updated_at: user.updated_at?.toISOString(),
         // Reuses the SAME `scope` already resolved above for the JWT -- no
@@ -517,6 +522,22 @@ export class AuthService extends BaseService {
         permissions: ROLE_PERMISSIONS[user.role] ?? [],
         is_active: user.is_active,
         employment_status: employmentRecord?.status ?? null,
+        // Found 2026-09-02 by real E2E probing (scenario 13) -- the exact
+        // same class of bug this file's own 2026-08-13 fix above describes
+        // for employment_status, and the profile-photo fix below it: a field
+        // present on GET /auth/me (getCurrentUser, which SessionBootstrap
+        // reads on every reload) but missing here, on the ONE response that
+        // seeds the store right after a fresh login, with no reload in
+        // between. LocaleProvider reconciles the UI language from
+        // `user.preferred_language` the moment auth settles -- with it
+        // undefined here, a non-German/non-browser-locale user saw the wrong
+        // language AND the wrong text direction (RTL flipped to LTR for
+        // Arabic/Urdu) for their entire session, correcting itself only on a
+        // manual page reload, since only /auth/me ever supplied the real
+        // value. Confirmed the field was already selected on `user` (this
+        // method's own top-level findUnique has no `select`, unlike
+        // getCurrentUser's) -- purely missing from the response shape.
+        preferred_language: user.preferred_language,
         created_at: user.created_at.toISOString(),
         updated_at: user.updated_at?.toISOString(),
         // Reuses the SAME `scope` already resolved above for the JWT -- no
