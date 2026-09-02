@@ -234,8 +234,19 @@ export class AuthService extends BaseService {
     // unique FK (Regional Manager V1 Decision 1 — one group per RM), so at
     // most one row can ever match. Before this constraint existed, findFirst
     // silently picked one of an RM's groups arbitrarily if they held several.
-    const group = await this.prisma.hotelGroup.findUnique({
-      where: { regional_manager_user_id: userId },
+    // `deleted_at: null` (2026-09-02): an ARCHIVED group must not confer
+    // scope. Archiving now releases the RM, so this is defence rather than
+    // the primary control -- but rows archived before that fix, and any
+    // direct database write, can still hold a live person. Found in
+    // production on the hotel side below: an archived hotel still holding a
+    // live manager, which handed them a scope claim over a hotel that is out
+    // of operation (and whose member hotels, for a group, stay live).
+    //
+    // findFirst rather than findUnique because the filter is now composite;
+    // at most one row can still match, since regional_manager_user_id is a
+    // unique FK (Regional Manager V1 Decision 1 -- one group per RM).
+    const group = await this.prisma.hotelGroup.findFirst({
+      where: { regional_manager_user_id: userId, deleted_at: null },
       select: { id: true },
     });
     if (group) {
@@ -264,8 +275,15 @@ export class AuthService extends BaseService {
     // enforces one hotel per manager on the write path
     // (users/service.ts#updateUserRole), but pre-existing rows and any direct
     // database write can still violate it, so this read must stay total.
+    // `deleted_at: null` for the same reason as the group branch above: an
+    // archived hotel must not be the source of a scope claim. This is the
+    // case actually observed in production (hotel_2_group_1, archived, still
+    // pointing at a live manager) -- and because Hotel.manager_user_id has no
+    // unique constraint, an archived hotel with a LOWER id than the
+    // manager's real one would have won the orderBy below and become their
+    // scope outright.
     const hotels = await this.prisma.hotel.findMany({
-      where: { manager_user_id: userId },
+      where: { manager_user_id: userId, deleted_at: null },
       select: { id: true },
       orderBy: { id: 'asc' },
     });

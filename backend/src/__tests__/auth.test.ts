@@ -70,9 +70,15 @@ const mockPrisma = {
   // "no association" (null) so existing tests that don't care about scope
   // are unaffected; dedicated coverage lives in auth-scope-claim.test.ts.
   hotelGroup: {
-    // findUnique, not findFirst — Regional Manager V1 Decision 1 made
-    // regional_manager_user_id a unique FK; resolveScope() (auth/service.ts)
-    // switched lookups accordingly.
+    // findFirst is what resolveScope() uses since 2026-09-02: the lookup
+    // gained `deleted_at: null` so an ARCHIVED group cannot confer scope,
+    // which makes the filter composite. Still a single-row read --
+    // regional_manager_user_id is a unique FK (Regional Manager V1
+    // Decision 1). findUnique stays mocked because other call sites in this
+    // service still use it (e.g. the password-reset RM notification lookup).
+    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // findUnique is still used by other lookups in this service (e.g. the
+    // password-reset notification's RM resolution), so both stay mocked.
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotel: {

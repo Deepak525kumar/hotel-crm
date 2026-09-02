@@ -39,9 +39,12 @@ const mockPrisma = {
     findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
   },
   hotelGroup: {
-    // findUnique, not findFirst: Regional Manager V1 Decision 1 made
-    // regional_manager_user_id a unique FK, so resolveScope() switched
-    // lookups accordingly (auth/service.ts).
+    // findFirst since 2026-09-02: the lookup gained `deleted_at: null` so an
+    // ARCHIVED group cannot confer scope, which makes the filter composite.
+    // At most one row can still match -- regional_manager_user_id is a unique
+    // FK (Regional Manager V1 Decision 1, one group per RM) -- so this is
+    // still a single-row read, not a "pick one of several".
+    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotel: {
@@ -131,7 +134,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       expect(payload.permissions).toBeUndefined();
 
       // Admin short-circuits before any association lookup.
-      expect(mockPrisma.hotelGroup.findUnique).not.toHaveBeenCalled();
+      expect(mockPrisma.hotelGroup.findFirst).not.toHaveBeenCalled();
       expect(mockPrisma.hotel.findMany).not.toHaveBeenCalled();
     });
 
@@ -152,7 +155,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
           password_hash: realPasswordHash,
         })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'group_42' });
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue({ id: 'group_42' });
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -161,8 +164,8 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
 
       expect(payload.role).toBe('regional_manager');
       expect(payload.scope).toEqual({ type: 'hotel_group', hotel_group_id: 'group_42' });
-      expect(mockPrisma.hotelGroup.findUnique).toHaveBeenCalledWith({
-        where: { regional_manager_user_id: 'rm_1' },
+      expect(mockPrisma.hotelGroup.findFirst).toHaveBeenCalledWith({
+        where: { regional_manager_user_id: 'rm_1', deleted_at: null },
         select: { id: true },
       });
     });
@@ -171,7 +174,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'rm_1', email: 'rm@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'group_42' });
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue({ id: 'group_42' });
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -198,7 +201,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
           password_hash: realPasswordHash,
         })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
       mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -214,7 +217,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'hm_1', email: 'hm@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
       mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_7' }]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -224,7 +227,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
 
       expect(payload.scope).toEqual({ type: 'hotel', hotel_id: 'hotel_7' });
       expect(mockPrisma.hotel.findMany).toHaveBeenCalledWith({
-        where: { manager_user_id: 'hm_1' },
+        where: { manager_user_id: 'hm_1', deleted_at: null },
         select: { id: true },
         orderBy: { id: 'asc' },
       });
@@ -242,7 +245,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'hm_multi', email: 'multi@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
       mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_a' }, { id: 'hotel_b' }]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -266,7 +269,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'w_1', email: 'worker@test.com', role: 'WORKER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
       mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -281,7 +284,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'c_1', email: 'checker@test.com', role: 'CHECKER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
       mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -296,7 +299,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'both_1', email: 'both@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'group_99' });
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue({ id: 'group_99' });
       mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_99' }]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -315,7 +318,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.create.mockResolvedValue(
         baseUser({ id: 'new_worker_1', email: 'newworker@test.com', role: 'WORKER' })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
       mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -331,8 +334,8 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       expect(payload.scope).toBeNull();
       // resolveScope is still invoked for uniformity, even though it
       // short-circuits to null for a fresh signup with no associations.
-      expect(mockPrisma.hotelGroup.findUnique).toHaveBeenCalledWith({
-        where: { regional_manager_user_id: 'new_worker_1' },
+      expect(mockPrisma.hotelGroup.findFirst).toHaveBeenCalledWith({
+        where: { regional_manager_user_id: 'new_worker_1', deleted_at: null },
         select: { id: true },
       });
     });
@@ -357,7 +360,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'hm_refresh_1', email: 'hmrefresh@test.com', role: 'MANAGER' })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
       mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_55' }]);
       mockPrisma.session.update.mockResolvedValue({});
 
@@ -379,7 +382,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'hm_p1', email: 'hmp@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
       mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_9' }]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -404,7 +407,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
           password_hash: realPasswordHash,
         })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'group_3' });
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue({ id: 'group_3' });
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -431,7 +434,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'w_p1', email: 'wp@test.com', role: 'WORKER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
       mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -450,17 +453,57 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'hm_me', email: 'hmme@test.com', role: 'MANAGER' })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
       mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_current' }]);
 
       const me = await service.getCurrentUser('hm_me');
 
       expect(me.scope_hotel_id).toBe('hotel_current');
       expect(mockPrisma.hotel.findMany).toHaveBeenCalledWith({
-        where: { manager_user_id: 'hm_me' },
+        where: { manager_user_id: 'hm_me', deleted_at: null },
         select: { id: true },
         orderBy: { id: 'asc' },
       });
     });
   });
+  // Found in production 2026-09-02: hotel_2_group_1 was ARCHIVED and still
+  // held a LIVE manager. Archiving now releases the posting, so this is the
+  // second line of defence -- for rows archived before that fix, and for any
+  // direct database write. It matters because Hotel.manager_user_id has no
+  // unique constraint: an archived hotel with a lower id than the manager's
+  // real one would have won the orderBy and become their whole scope.
+  describe('an archived hotel or group confers no scope', () => {
+    it('ignores an archived group and falls through to the hotel branch', async () => {
+      // The filter is what excludes it, so the lookup simply finds nothing.
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
+
+      const scope = await (service as any).resolveScope('rm_archived', 'regional_manager');
+
+      expect(scope).toBeNull();
+      expect(mockPrisma.hotelGroup.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { regional_manager_user_id: 'rm_archived', deleted_at: null },
+        })
+      );
+    });
+
+    it('asks the database to exclude archived hotels rather than filtering after', async () => {
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
+
+      const scope = await (service as any).resolveScope('mgr_archived', 'manager');
+
+      expect(scope).toBeNull();
+      // Asserted on the QUERY, not the result: filtering in JS would still
+      // let the archived row participate in the orderBy that picks the
+      // scope hotel.
+      expect(mockPrisma.hotel.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { manager_user_id: 'mgr_archived', deleted_at: null },
+        })
+      );
+    });
+  });
+
 });
