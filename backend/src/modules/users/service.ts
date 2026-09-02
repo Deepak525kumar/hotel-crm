@@ -1235,6 +1235,31 @@ export class UserService extends BaseService {
             },
           });
         }
+
+        // Found 2026-09-02 by real E2E probing (scenario 07 Step 9): this
+        // branch wrote the LIVE cross-entity pointer (Hotel.manager_user_id)
+        // but never synced EmploymentRecord.hotel_group_id/primary_hotel_id --
+        // unlike the worker/checker branch below, which has always done both.
+        // listUsers()'s scope filter matches a Manager's OWN visibility via
+        // `managed_hotels` (Hotel.manager_user_id, self-healing), but a
+        // Regional Manager (below) has no equivalent third OR-branch, so the
+        // identical gap there left a freshly-assigned RM invisible in every
+        // scoped user listing -- including their own -- despite holding real,
+        // working authority (resolveScope() reads the Hotel/HotelGroup
+        // pointer directly, so their JWT scope and review-queue access were
+        // both genuinely correct; only visibility broke). Reproduced live:
+        // assign an RM to a group through this endpoint, GET /users as that
+        // RM, and they are absent from their own listing. Synced here for
+        // both roles, matching the worker/checker block's existing pattern,
+        // rather than relying on managed_hotels to keep covering for Manager.
+        const targetHotelGroupId = targetHotel.hotel_group_id;
+        await tx.employmentRecord.updateMany({
+          where: { user_id: userId },
+          data: {
+            primary_hotel_id: data.hotel_id,
+            ...(targetHotelGroupId ? { hotel_group_id: targetHotelGroupId } : {}),
+          },
+        });
       }
 
       // ── New assignment: role = regional_manager ─────────────────────────
@@ -1295,6 +1320,18 @@ export class UserService extends BaseService {
             },
           });
         }
+
+        // Same fix as the Manager branch above, same root cause and same
+        // 2026-09-02 finding -- this is the branch actually reproduced live
+        // (listUsers() has no `managed_hotels`-equivalent OR-branch for a
+        // Regional Manager's group ownership, so this gap directly hid a
+        // freshly-assigned RM from every scoped listing, including their
+        // own, with no self-healing fallback the way Manager happened to
+        // have).
+        await tx.employmentRecord.updateMany({
+          where: { user_id: userId },
+          data: { hotel_group_id: data.hotel_group_id },
+        });
       }
 
       // PROMOTION/DEMOTION SCOPE DESYNC fix (2026-08-13 audit). A role change

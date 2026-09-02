@@ -1,4 +1,4 @@
-# E2E Run — 2026-09-02 (fourth pass) — scenario 07, Steps 1-5 (Playwright)
+# E2E Run — 2026-09-02 (fourth pass) — scenario 07, all 9 steps (Playwright)
 
 - **Commit under test:** `bb9c7f37` (main) plus `fix/manager-queue-guard-and-reactivate-scope`
   (PR #622)
@@ -10,9 +10,10 @@
 
 ## Results
 
-Steps 1–5 of 9 run live, all through a real browser against the real running stack, not API
-calls. Two stale "known defect" notes were closed; one investigation initially looked like a
-third but turned out to be a false alarm from a rushed first check.
+All 9 steps run live, through a real browser against the real running stack, not API calls.
+Two rounds of testing on the same day: Steps 1–5 first (closing two stale "known defect"
+notes and one false alarm), then Steps 6–9 (closing a third stale note and finding one real,
+fixed defect).
 
 | Step | Result |
 |---|---|
@@ -21,10 +22,40 @@ third but turned out to be a false alarm from a rushed first check.
 | 3 — Real uploads through the browser | PASS. All 6 required documents uploaded via real `setInputFiles` calls; confirmed at the data layer (not just screen text, per the scenario's own rule): `document_count: 6`, `is_complete: true` |
 | 4 — Client-side upload guards | PASS, both cases confirmed precisely via before/after DOM diff (not a loose regex, which had a false-positive risk from unrelated page text like "Employment type"): oversized file → `"File exceeds 10MB limit."`; wrong file type → `"Unsupported file type or unexpected field"` |
 | 5 — Submit for Review | PASS, with a note. The button doesn't disable itself for a missing signed contract (only for missing documents) — clicking it in that state produces a real `409`, but the backend's exact message renders correctly in red text below the button. Initially misread as a silent-failure defect by a rushed first check with no scroll/timing care; a second, careful pass with a more precise selector confirmed it renders correctly |
+| 6 — Manager: Review Queue → modal → Approve | PASS, fully. A real submitted applicant appeared in the manager's queue; clicking Review opened a modal with accurate per-document status (correctly showed one category as still not-uploaded — my own harness had skipped it, and the UI reflected the true state); "Signed contract received — approving will confirm it" banner rendered; clicking "Confirm contract & approve" produced zero network/page errors and transitioned the record — verified in Postgres: `status: ACTIVE`, `hotel_group_id`/`primary_hotel_id` set, `Contract.status: ACTIVE` with `confirmed_by_id` set. Cross-group exclusion also confirmed: a second applicant targeting a different group never appeared in this manager's queue |
+| 7 — Double-click Approve (UI race) | PASS. Two near-simultaneous clicks on the Approve button produced only ONE network call — the frontend's own click-handling prevented the second click from ever reaching the server. Verified clean resulting state in Postgres: `version: 2`, exactly one `PENDING → ACTIVE` history row |
+| 8 — Negative navigation | PASS, both cases. A worker hitting `/onboarding/review-queue` directly sees no applicant data — a clean "You do not have permission to view the review queue" message, not a data leak or crash. An already-`ACTIVE` worker visiting `/onboarding` correctly has no Submit button; the known stale surrounding copy (scenario 06 §H) was re-confirmed present, exactly where already tracked — no new action needed |
+| 9 — Assign from the UI | **CLOSED (stale "no assign UI" claim), and found+fixed one real defect.** See below |
 
 ## New defects found
 
-None. Two doc corrections and one closed false alarm — no code defects this pass.
+**`updateUserRole`'s Manager/Regional Manager assignment branches never synced
+`EmploymentRecord`** — `backend/src/modules/users/service.ts`. MEDIUM severity: no
+authorization impact (`resolveScope()` reads the live `Hotel`/`HotelGroup` pointer directly,
+so a freshly-assigned Manager/RM's JWT scope and review-queue access were both genuinely
+correct) — but real, user-visible impact: `listUsers()`'s scope filter reads
+`EmploymentRecord.hotel_group_id`, and this write path never set it for Manager/RM
+assignments (unlike the sibling worker/checker branch in the same function, which always has).
+A Manager's own case happened to self-heal via a separate `managed_hotels` OR-branch reading
+`Hotel.manager_user_id` directly; a Regional Manager's case had no equivalent, so a
+freshly-assigned RM was invisible in every scoped `GET /users` listing — including their own.
+
+Found while investigating scenario 07 Step 9's "no assign UI" claim: that claim turned out
+false in two directions. There IS an inline post-approval assign flow
+(`ReviewQueueTable.tsx`, calling `POST /employees/:id/assign` — driven live, `200`, correct
+DB writes) but it's reachable only in the single moment right after Approve. There is ALSO a
+persistent "Edit assignment" control on every user's own profile page, calling a *different*
+endpoint (`PUT /users/:id/role`) — and driving that one live is what surfaced the sync gap:
+promoted a real Active-Unassigned RM to a group through it, and their own `GET /users` call
+came back without themselves in the list.
+
+**Fixed:** added the same `EmploymentRecord` sync to both branches (`primary_hotel_id` plus a
+derived `hotel_group_id` for Manager; `hotel_group_id` for Regional Manager), mirroring the
+existing worker/checker pattern in the same function. Verified live end-to-end for both
+roles, including the ungrouped-hotel edge case (Manager assigned to a hotel with no group of
+its own correctly gets `primary_hotel_id` set and `hotel_group_id` left `null`, not guessed).
+Three new unit tests in `users.test.ts`. Full backend suite: 148 suites, 3580 tests, serial,
+all passing.
 
 ## Confirmed NOT defects (investigated, ruled out)
 
@@ -52,17 +83,18 @@ None. Two doc corrections and one closed false alarm — no code defects this pa
 
 ## Could not test / not run this pass
 
-- Steps 6–9: manager review-queue → modal → approve flow, the double-click approve race
-  (cross-referenced to scenario 05), negative navigation for worker/already-active accounts,
-  and the documented assign-UI gap (no `employeesApi.assign` fetcher exists — confirm this is
-  still true). None attempted this pass; time-boxed to close out Steps 1–5 thoroughly rather
-  than run all nine shallowly.
+All 9 steps have now been run. Not attempted anywhere in this pass: scenario 05's own
+double-click-approve step (this run's Step 7 exercised the review-queue's own UI race, not
+whatever scenario 05 Step 6 covers independently — cross-check the two are actually the same
+assertion, or run scenario 05 separately).
 
 ## Scenario files updated this run
 
 - `07-frontend-ui-playwright.md` — Step 1 unchanged (matched exactly); Step 2 corrected (file
-  input count); Step 5 extended with the submit-error-rendering note; the stale "KNOWN OPEN
-  DEFECT" replaced with a "CLOSED, corrected" note and evidence
+  input count); Step 5 extended with the submit-error-rendering note; Step 9 rewritten in full
+  (the "no assign UI" claim was stale in two directions; the real defect and its fix
+  documented); the stale "KNOWN OPEN DEFECT" (Step 5, worker submit) replaced with a "CLOSED,
+  corrected" note and evidence
 - `08-known-gaps-and-next.md` — item 10 corrected (environment-dependent, not a standing code
   defect)
 - `README.md` — scenario 07's index entry updated to reflect Steps 1-5 run

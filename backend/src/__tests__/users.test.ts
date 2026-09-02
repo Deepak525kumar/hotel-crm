@@ -63,6 +63,11 @@ const mockPrisma = {
     // a worker/checker's hotel_group_id (existing eligibility field) and
     // primary_hotel_id (new, display-only).
     update: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+    // 2026-09-02 fix: the Manager/Regional Manager assignment branches also
+    // sync EmploymentRecord (previously only worker/checker did), via
+    // updateMany (keyed on user_id, not the record's own id, which isn't in
+    // scope at that point in the transaction).
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
   },
   regionalManagerAssignmentHistory: {
     updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
@@ -1778,6 +1783,73 @@ describe('UserService', () => {
           data: expect.objectContaining({ hotel_group_id: 'g1', primary_hotel_id: 'h1' }),
         })
       );
+    });
+
+    // Regression tests (found by real E2E probing, 2026-09-02): the two
+    // branches above wrote the LIVE cross-entity pointer (Hotel.
+    // manager_user_id / HotelGroup.regional_manager_user_id) but never
+    // synced EmploymentRecord.hotel_group_id/primary_hotel_id, unlike the
+    // worker/checker branch just above, which has always done both.
+    // listUsers()'s scope filter matches a Manager's own visibility via a
+    // `managed_hotels` OR-branch (Hotel.manager_user_id, self-healing), but
+    // has no equivalent for a Regional Manager's group ownership -- so a
+    // freshly-assigned RM was invisible in every scoped user listing,
+    // including their own, despite holding real, working authority
+    // (resolveScope() reads the Hotel/HotelGroup pointer directly, so their
+    // JWT scope was genuinely correct; only listUsers() visibility broke).
+    // Reproduced live: docs/10-testing/e2e/scenarios/07-frontend-ui-playwright.md Step 9.
+    it('assigning a manager to a hotel also syncs EmploymentRecord.primary_hotel_id and hotel_group_id', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotel.findUnique.mockResolvedValue({ id: 'h1', manager_user_id: null, deleted_at: null, hotel_group_id: 'g1' });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'm@test.com', first_name: 'M', last_name: 'Gr',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1' }, adminActor.actorId, adminActor.actorRole, null);
+
+      expect(mockPrisma.employmentRecord.updateMany).toHaveBeenCalledWith({
+        where: { user_id: 'u1' },
+        data: { primary_hotel_id: 'h1', hotel_group_id: 'g1' },
+      });
+    });
+
+    it('assigning a manager to an ungrouped hotel syncs primary_hotel_id only (no hotel_group_id to derive)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotel.findUnique.mockResolvedValue({ id: 'h1', manager_user_id: null, deleted_at: null, hotel_group_id: null });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'm@test.com', first_name: 'M', last_name: 'Gr',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1' }, adminActor.actorId, adminActor.actorRole, null);
+
+      expect(mockPrisma.employmentRecord.updateMany).toHaveBeenCalledWith({
+        where: { user_id: 'u1' },
+        data: { primary_hotel_id: 'h1' },
+      });
+    });
+
+    it('assigning a regional manager to a group also syncs EmploymentRecord.hotel_group_id', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', regional_manager_user_id: null });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'rm@test.com', first_name: 'R', last_name: 'M',
+        phone: null, role: 'REGIONAL_MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g1' }, adminActor.actorId, adminActor.actorRole, null);
+
+      expect(mockPrisma.employmentRecord.updateMany).toHaveBeenCalledWith({
+        where: { user_id: 'u1' },
+        data: { hotel_group_id: 'g1' },
+      });
     });
 
     // REQ-EMP-012 (frozen): primary_hotel_id is display/default-selection

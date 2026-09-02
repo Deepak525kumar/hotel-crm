@@ -142,10 +142,46 @@ See scenario 05 step 6. At most one successful approval; one history row.
 
 ## Step 9 — Assign from the UI
 
-**KNOWN GAP:** there is **no assign UI and no `employeesApi.assign` fetcher**. `POST
-/employees/:id/assign` is unreachable from the browser, so an approved Manager/RM stays
-*Active, Unassigned* as far as a UI user is concerned. Re-check whether this has been built; if
-so, test: approve → assign (hotel picker) → verify `Hotel.manager_user_id` in the DB.
+**CLOSED, corrected 2026-09-02 — the "no assign UI" claim is stale in two directions.**
+
+**Path 1, inline post-approval:** `employeesApi.assign` (`POST /employees/:id/assign`) IS
+called from the UI — `components/onboarding/ReviewQueueTable.tsx`'s post-approval modal,
+which appears immediately after clicking Approve and offers a hotel/group picker. Driven live
+via a real browser click: `POST /employees/:id/assign` returned `200`, and
+`Hotel.manager_user_id` / `HotelGroup.regional_manager_user_id` updated correctly in Postgres.
+This modal is reachable **only** in the single moment right after approval, not later — an
+already-Active-Unassigned record no longer appears in the review queue (the queue filters on
+`PENDING` + `submitted_for_review_at`), so this path cannot re-assign someone approved earlier.
+
+**Path 2, persistent, on the user's own profile page:** a separate "Edit assignment" control
+exists on `/users/:id` at all times, calling `PUT /users/:id/role` (`updateUserRole` —
+`users/service.ts`, the older person-centric-redesign write path, distinct from `assign()`).
+Driven live: opened a real Active-Unassigned RM's profile, clicked "Edit assignment", picked a
+group, saved — `200`, `HotelGroup.regional_manager_user_id` correctly set.
+
+**REAL DEFECT found via Path 2, fixed in the same pass.** `updateUserRole`'s Manager/RM
+assignment branches wrote the live cross-entity pointer (`Hotel.manager_user_id` /
+`HotelGroup.regional_manager_user_id`) but never synced
+`EmploymentRecord.hotel_group_id`/`primary_hotel_id` — unlike the sibling worker/checker
+branch in the same function, which has always done both. `listUsers()`'s scope filter matches
+a Manager's own visibility via a `managed_hotels` OR-branch (self-healing off
+`Hotel.manager_user_id`), but has **no equivalent** for a Regional Manager's group ownership —
+so a freshly-assigned RM was invisible in every scoped user listing, **including their own**,
+despite holding real, working authority (`resolveScope()` reads the Hotel/HotelGroup pointer
+directly, so JWT scope and review-queue access were both genuinely correct — only `listUsers()`
+visibility broke). This is the same class of bug `08-known-gaps-and-next.md` item 11 already
+records for a different symptom (a newly-created applicant invisible pre-approval) — same root
+cause shape (a live scope column left unsynced by one write path while another assumes it),
+different write path.
+
+Fixed by adding the same sync for Manager (`primary_hotel_id`, plus `hotel_group_id` derived
+from the hotel — `null` when the hotel itself has no group, verified live) and Regional
+Manager (`hotel_group_id`) branches, mirroring the existing worker/checker pattern. Verified
+live end-to-end for both roles: a freshly-promoted RM assigned via this endpoint now
+correctly appears in their own `GET /users` listing; a freshly-promoted Manager assigned to
+an ungrouped hotel correctly gets `primary_hotel_id` set with `hotel_group_id` left `null`
+rather than guessed. Three new unit tests in `users.test.ts`. Full backend suite: 148 suites,
+3580 tests, serial, all passing.
 
 ## Step 10 — Console hygiene
 
@@ -155,17 +191,20 @@ so, test: approve → assign (hotel picker) → verify `Hotel.manager_user_id` i
 
 ## Pass criteria summary
 
-- [ ] Nav gating correct for all five roles (esp. Admin has no "My Onboarding")
-- [ ] `/onboarding` renders six categories and six file inputs, no pageerror
-- [ ] Real browser uploads persist (verified in DB, not just on screen)
-- [ ] Oversize and wrong-type files rejected with visible messages; `accept` attribute present
-- [ ] Submit persists (as manager today; re-check worker)
-- [ ] Manager queue → modal → approve works, verified in DB
-- [ ] Queue excludes other groups' applicants
-- [ ] Double-click yields at most one approval
-- [ ] Worker at manager-only URL leaks nothing
-- [ ] No unexpected console/page errors
-- [ ] Harness deleted; `git status` clean (including `frontend/AGENTS.md`)
+- [x] Nav gating correct for all five roles (esp. Admin has no "My Onboarding") — verified live
+- [x] `/onboarding` renders six categories and **seven** file inputs (the 7th is the Signed
+      Contract upload, sharing the page — corrected from the original "six"), no pageerror
+- [x] Real browser uploads persist (verified in DB, not just on screen)
+- [x] Oversize and wrong-type files rejected with visible messages; `accept` attribute present
+- [x] Submit persists (verified **as a worker** — the self-service path this criterion is
+      actually about; the old "as manager today" caveat is stale, see Step 5)
+- [x] Manager queue → modal → approve works, verified in DB
+- [x] Queue excludes other groups' applicants
+- [x] Double-click yields at most one approval
+- [x] Worker at manager-only URL leaks nothing
+- [x] No unexpected console/page errors
+- [x] Harness deleted; `git status` clean (including `frontend/AGENTS.md`) — confirmed after
+      every run this pass
 
 ## Not yet covered — candidates for next time
 
