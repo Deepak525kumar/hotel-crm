@@ -60,8 +60,10 @@ replace them.
 | 16 | `scenarios/16-push-notification-delivery.md` | Push delivery end to end: token registration, APNs topic/environment, outbox fan-out, invalid-token pruning |
 | 17 | `scenarios/17-email-delivery.md` | Email delivery end to end: handler resolution, sending-domain authentication, recipient/body shapes, bounce blindness |
 | 18 | `scenarios/18-worker-room-log-and-room-first-check.md` | Worker's room log, one-room-per-day collision, room-first inspection picker + per-role scope matrix, rework state round-trip |
+| 19 | `scenarios/19-admin-creates-any-role.md` | Admin creates regional_manager/manager/worker/checker directly (2026-09-01/02 RULE A amendment); admin-creates-admin still refused; skills validation. **Partially verified** — see the file's own status note |
+| 20 | `scenarios/20-archive-delete-scope-vacating.md` | Deleting a user/hotel/group must not leave ghost assignments or dangling scope pointers; an archived hotel/group must confer no scope, fresh login or stale token alike. **Not yet run end-to-end** — written from weaker evidence, explicitly marked as such; run this one first next time |
 
-**Start with 00. Then 01-07, 09-12, 16, 17 and 18 in order.** 08 is not a test — it is the backlog and the
+**Start with 00. Then 01-07, 09-12, 16, 17, 18, 19 and 20 in order.** 08 is not a test — it is the backlog and the
 "what we still haven't checked" list. Read it at the end of a run and update it.
 
 > **18 changes how an inspection starts.** Until 2026-09-01 a checker picked a
@@ -71,7 +73,7 @@ replace them.
 > the same change, which corrected a dead end where nothing could move a room
 > out of `NEEDS_REWORK`.
 
-### Known coverage gaps (recorded 2026-08-22, extended 2026-08-25, one closed 2026-08-28)
+### Known coverage gaps (recorded 2026-08-22, extended 2026-08-25, one closed 2026-08-28, two more closed 2026-09-02)
 
 Three shipped features have no scenario. Listed here rather than left to be rediscovered, per this
 suite's own rule that a gap found but not written down gets found again from scratch. **These are
@@ -82,6 +84,14 @@ outstanding work, not passed checks.**
 | `13-language-and-rtl.md` | Six UI locales (`de en fr ar uk ur`), two right-to-left, persisted on `User.preferred_language`, across web and both mobile apps | PRs #471–#484 | **none — undocumented, no specification** |
 | `14-payslip-requests.md` | Payslip request intake, manager fulfilment, date validation | PRs #487–#491 | `ADR-014`, `SPEC-HR-001` |
 | `15-re-onboarding.md` | Re-onboarding of inactive/deactivated workers, nav lockout, capability pin | PRs #468, #469 | `ADR-065` (partially) |
+
+**`19-admin-creates-any-role.md` and `20-archive-delete-scope-vacating.md` were written on
+2026-09-02** and are no longer gaps — see the scenario index above. Both cover
+2026-09-01/02 changes (the RULE A creation-hierarchy amendment, and the delete/archive
+scope-vacating fixes) that had shipped with no scenario at all. **19 is partially verified**
+(some steps run live, some written from source and marked as such); **20 has not been run
+end-to-end** — its own status note explains why and what evidence backs it instead. Running
+20 for real is the highest-value single next step for this suite.
 
 **`16-push-notification-delivery.md` was written on 2026-08-28** and is no longer a gap — see
 the scenario index above. It was written the expensive way: the missing scenario is exactly
