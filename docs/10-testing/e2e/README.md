@@ -61,7 +61,7 @@ replace them.
 | 17 | `scenarios/17-email-delivery.md` | Email delivery end to end: handler resolution, sending-domain authentication, recipient/body shapes, bounce blindness |
 | 18 | `scenarios/18-worker-room-log-and-room-first-check.md` | Worker's room log, one-room-per-day collision, room-first inspection picker + per-role scope matrix, rework state round-trip |
 | 19 | `scenarios/19-admin-creates-any-role.md` | Admin creates regional_manager/manager/worker/checker directly (2026-09-01/02 RULE A amendment); admin-creates-admin still refused; skills validation. **Partially verified** — see the file's own status note |
-| 20 | `scenarios/20-archive-delete-scope-vacating.md` | Deleting a user/hotel/group must not leave ghost assignments or dangling scope pointers; an archived hotel/group must confer no scope, fresh login or stale token alike. **Not yet run end-to-end** — written from weaker evidence, explicitly marked as such; run this one first next time |
+| 20 | `scenarios/20-archive-delete-scope-vacating.md` | Deleting a user/hotel/group must not leave ghost assignments or dangling scope pointers; an archived hotel/group must confer no scope, fresh login or stale token alike. **Run live 2026-09-02** — 5/6 steps passed as designed (one stronger than predicted); found and fixed a real defect (`assign()` would bind a live manager/RM to an archived target) |
 
 **Start with 00. Then 01-07, 09-12, 16, 17, 18, 19 and 20 in order.** 08 is not a test — it is the backlog and the
 "what we still haven't checked" list. Read it at the end of a run and update it.
@@ -89,9 +89,12 @@ outstanding work, not passed checks.**
 2026-09-02** and are no longer gaps — see the scenario index above. Both cover
 2026-09-01/02 changes (the RULE A creation-hierarchy amendment, and the delete/archive
 scope-vacating fixes) that had shipped with no scenario at all. **19 is partially verified**
-(some steps run live, some written from source and marked as such); **20 has not been run
-end-to-end** — its own status note explains why and what evidence backs it instead. Running
-20 for real is the highest-value single next step for this suite.
+(some steps run live, some written from source and marked as such — Step 3 and part of Step 5
+remain unrun). **20 was run live the same day**, after initially shipping unverified — 5 of 6
+steps passed as designed, one (the stale-token case) turned out stronger than predicted, and
+the run found and fixed a real defect (`assign()` would silently bind a live manager/RM to an
+archived hotel/group). Running 19's remaining unverified steps is now the highest-value next
+step for this suite.
 
 **`16-push-notification-delivery.md` was written on 2026-08-28** and is no longer a gap — see
 the scenario index above. It was written the expensive way: the missing scenario is exactly
