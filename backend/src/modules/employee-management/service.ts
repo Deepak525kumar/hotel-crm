@@ -111,6 +111,39 @@ export class EmployeeManagementService extends BaseService {
     // Role-based creation guards
     if (actor.role === 'admin') {
       // Admin can create for anyone.
+      //
+      // Found 2026-09-02 by real E2E probing (scenario 19 Step 5): unlike the
+      // `regional_manager` and `manager` branches below -- which both derive
+      // target_hotel_group_id from the actor's own hotel and REJECT a
+      // mismatched client-supplied value -- this branch never cross-checked
+      // target_hotel_group_id against target_primary_hotel_id's real group at
+      // all. A client sending a hotel from one group alongside a
+      // hotel_group_id belonging to a DIFFERENT group got both values stored
+      // verbatim, inconsistently. That is not just cosmetic: getReviewQueue()
+      // routes a Worker/Checker/Manager application by target_hotel_group_id,
+      // so the mismatched group's Regional Manager -- someone with no
+      // relationship to the real target hotel -- gained visibility into and
+      // approval authority over the application, while the RM who actually
+      // owns the target hotel never saw it. Since Admin has no scope of its
+      // own to validate against (the manager/RM branches below check the
+      // ACTOR's own hotel; Admin has none), the hotel is the authoritative
+      // source here: derive the group FROM the hotel and discard whatever
+      // group value the client sent, the same "hotel picks; group follows"
+      // design already used for the create-user frontend's own field
+      // derivation (users/service.ts createUser) -- never trust a second,
+      // independently-suppliable field to agree with the first.
+      //
+      // Runs BEFORE the Manager-requires-a-group check below, deliberately:
+      // that check must see the DERIVED value, not the raw client-supplied
+      // one, or a hotel with no group of its own could pass a check that
+      // already ran against a since-overwritten value.
+      if (targetUser.role !== 'REGIONAL_MANAGER' && data.target_primary_hotel_id) {
+        const targetHotel = await this.prisma.hotel.findUnique({
+          where: { id: data.target_primary_hotel_id },
+          select: { hotel_group_id: true },
+        });
+        data.target_hotel_group_id = targetHotel?.hotel_group_id ?? undefined;
+      }
       // If Admin creates a Manager application, target_hotel_group_id is required.
       if (targetUser.role === 'MANAGER' && !data.target_hotel_group_id) {
         throw new ConflictError('Admin must explicitly provide a target_hotel_group_id when creating a Manager application');
@@ -980,7 +1013,20 @@ export class EmployeeManagementService extends BaseService {
 
       if (newRecord.user.role === 'MANAGER' && payload.primary_hotel_id) {
         const targetHotel = await tx.hotel.findUnique({ where: { id: payload.primary_hotel_id } });
-        if (targetHotel && targetHotel.manager_user_id && targetHotel.manager_user_id !== newRecord.user_id) {
+        // Found 2026-09-02 by real E2E probing (scenario 20 Step 6): this
+        // lookup had no deleted_at filter, so an ARCHIVED hotel -- whose
+        // manager_user_id is null precisely because archiving vacates it
+        // (crm/service.ts deleteHotel) -- passed the "already has a
+        // different manager" check below and got a brand-new manager_user_id
+        // written onto it. resolveScope()'s own deleted_at filter
+        // (e94ba804) makes this harmless in practice (the assignee gets no
+        // real scope from it), but the write itself is still wrong: an
+        // archived hotel should behave as absent to a fresh assignment, the
+        // same way it does to every other write path in this module.
+        if (!targetHotel || targetHotel.deleted_at) {
+          throw new NotFoundError('Target hotel or hotel group not found');
+        }
+        if (targetHotel.manager_user_id && targetHotel.manager_user_id !== newRecord.user_id) {
           throw new ConflictError('Hotel already has a different manager assigned');
         }
 
@@ -1026,7 +1072,12 @@ export class EmployeeManagementService extends BaseService {
         });
       } else if (newRecord.user.role === 'REGIONAL_MANAGER' && payload.hotel_group_id) {
         const targetGroup = await tx.hotelGroup.findUnique({ where: { id: payload.hotel_group_id } });
-        if (targetGroup && targetGroup.regional_manager_user_id && targetGroup.regional_manager_user_id !== newRecord.user_id) {
+        // Same fix as the Manager branch above, same root cause and same
+        // 2026-09-02 finding, mirrored for the RM/HotelGroup pair.
+        if (!targetGroup || targetGroup.deleted_at) {
+          throw new NotFoundError('Target hotel or hotel group not found');
+        }
+        if (targetGroup.regional_manager_user_id && targetGroup.regional_manager_user_id !== newRecord.user_id) {
           throw new ConflictError('Hotel group already has a different regional manager assigned');
         }
 
@@ -1323,6 +1374,83 @@ export class EmployeeManagementService extends BaseService {
         from: record.status,
         to: EmploymentStatus.ACTIVE,
       }, undefined, undefined, undefined, tx);
+
+      // Restore the cross-entity authority pointer deactivate() cleared.
+      //
+      // Found 2026-09-02 by real E2E probing: reactivate() flipped status back
+      // to ACTIVE and left EmploymentRecord.hotel_group_id/primary_hotel_id
+      // untouched (deactivate() never clears those -- see its own comment),
+      // which reads as "fully restored". But resolveScope() (auth/service.ts)
+      // derives a Manager's JWT scope from Hotel.manager_user_id, and an RM's
+      // from HotelGroup.regional_manager_user_id -- NEITHER of which
+      // reactivate() ever wrote back, even though deactivate()'s own
+      // vacateManagedScopes() call is what cleared them. Net effect: a
+      // reactivated Manager was ACTIVE, their own record looked fully scoped,
+      // and yet a fresh login showed scope_hotel_id: null and every
+      // scope-gated action (e.g. approve()) failed -- directly contradicting
+      // this method's own docstring ("no re-approval and no group
+      // re-resolution... the record is immediately assignable again").
+      //
+      // Restored only when the slot is still unclaimed -- mirroring assign()'s
+      // own "Hotel already has a different manager assigned" guard just above
+      // this method. TEMPORARY_LEAVE means "expected back", not "guaranteed
+      // nobody covered for them"; if an interim manager/RM was assigned while
+      // this person was away, that assignment is real and must not be
+      // silently evicted by their return. In that edge case the reactivated
+      // record stays ACTIVE but unassigned, exactly like a fresh approve()
+      // with no matching target -- an admin resolves it deliberately via
+      // assign(), same as any other unassigned-but-active record.
+      const targetUser = await tx.user.findUnique({ where: { id: record.user_id }, select: { role: true } });
+      const now = new Date();
+      if (targetUser?.role === 'MANAGER' && record.primary_hotel_id) {
+        const hotel = await tx.hotel.findUnique({
+          where: { id: record.primary_hotel_id },
+          select: { manager_user_id: true },
+        });
+        if (hotel && !hotel.manager_user_id) {
+          await tx.hotel.update({
+            where: { id: record.primary_hotel_id },
+            data: {
+              manager_user_id: record.user_id,
+              manager_assigned_at: now,
+              manager_vacated_at: null,
+              manager_vacancy_reason: null,
+            },
+          });
+          await tx.hotelManagerAssignmentHistory.create({
+            data: {
+              hotel_id: record.primary_hotel_id,
+              manager_user_id: record.user_id,
+              assigned_at: now,
+              assigned_by_id: actor.userId,
+            },
+          });
+        }
+      } else if (targetUser?.role === 'REGIONAL_MANAGER' && record.hotel_group_id) {
+        const group = await tx.hotelGroup.findUnique({
+          where: { id: record.hotel_group_id },
+          select: { regional_manager_user_id: true },
+        });
+        if (group && !group.regional_manager_user_id) {
+          await tx.hotelGroup.update({
+            where: { id: record.hotel_group_id },
+            data: {
+              regional_manager_user_id: record.user_id,
+              regional_manager_assigned_at: now,
+              regional_manager_vacated_at: null,
+              regional_manager_vacancy_reason: null,
+            },
+          });
+          await tx.regionalManagerAssignmentHistory.create({
+            data: {
+              hotel_group_id: record.hotel_group_id,
+              regional_manager_user_id: record.user_id,
+              assigned_at: now,
+              assigned_by_id: actor.userId,
+            },
+          });
+        }
+      }
 
       // The counterpart to deactivate()'s notification. Reactivation is the
       // one the person most needs pushed: they were told to stop, and nothing
@@ -2025,6 +2153,22 @@ export class EmployeeManagementService extends BaseService {
     }
     if (actor.role === 'regional_manager' && actor.scope?.type !== 'hotel_group') {
       throw new ForbiddenError('Regional Manager must be scoped to a hotel group');
+    }
+    // Symmetric guard for Manager, restored 2026-09-02 (found by real E2E
+    // probing, not the suite -- a deactivated/unassigned Manager got a silent
+    // `200 { data: [] }` instead of an explicit refusal). This existed at
+    // ADR-065 Phase 2 (0e6841cf) but was dropped in the 2026-08-13
+    // resolveReviewerRecipients routing rewrite, which replaced the old
+    // per-role hand-written predicates wholesale and only carried the RM
+    // branch's guard forward. No data ever leaked -- the post-filter below
+    // still yields nothing for an unscoped actor either way -- but the queue
+    // gave no reason, unlike RM's own dedicated fix for the identical
+    // complaint (d3319faf, "tell a Regional Manager why their review queue is
+    // empty"). Deliberately does not also require assignment for admin/RM
+    // (RM's own guard above already covers that role; admin never has hotel
+    // scope and must remain unaffected).
+    if (actor.role === 'manager' && actor.scope?.type !== 'hotel') {
+      throw new ForbiddenError('Manager must be scoped to a hotel');
     }
     // NOTE: this deliberately no longer refuses a Regional Manager.
     //

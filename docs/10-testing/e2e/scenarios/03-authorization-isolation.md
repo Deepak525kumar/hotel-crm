@@ -33,8 +33,23 @@ nothing from group B. RM filters on `target_hotel_group_id`.
 
 ## Step 3 — Admin's queue
 
-**PASS:** Admin sees pending Manager **and** Regional Manager applications with no scope
-restriction.
+**Corrected 2026-09-02.** "Manager and RM only" was true only through 2026-08-12. The
+2026-08-13 reviewer-routing rewrite (code comment at `employee-management/service.ts`
+`getReviewQueue()`) replaced hand-written Prisma predicates with a shared resolver
+(`resolveReviewerRecipients`) that routes by **who the applicant is and where they are
+headed**, not by tier:
+`Regional Manager applicant -> Admin`; `Manager applicant -> the RM of their target group
+(Admin if none, or while RM role is disabled)`; `Worker/Checker applicant -> the manager of
+their target hotel, else that group's RM, else Admin`. Admin is the reviewer of **last
+resort** for every tier, so a Worker/Checker application whose target hotel has no manager
+(and whose group has no RM) legitimately appears in Admin's queue too — re-verified
+2026-09-02: an admin-created worker targeting an unmanaged hotel/group showed up in Admin's
+queue with no other route available. This is intentional — the alternative is an application
+no reviewer can ever see.
+
+**PASS:** Admin sees every pending application with no scope restriction — Manager and
+Regional Manager applications always, plus any Worker/Checker application that has no
+in-scope Manager or RM to route to.
 
 **Security check on this response:** it embeds the applicant `user`. Confirm the payload
 contains **no `password_hash`** and no other sensitive field:
@@ -97,9 +112,30 @@ Covered in depth in scenario 06, but assert the authorization consequence here:
 curl -s http://localhost:3001/api/v1/employees/review-queue -H "Authorization: Bearer $MT_FRESH"
 ```
 
-**PASS:** `403` *"Manager must be scoped to a hotel"*, and their fresh login shows
-`scope_hotel_id: null`. A `DEACTIVATED` manager retaining hotel scope was a **live
-authorization hole** — this is the regression test for it.
+**PASS:** `scope_hotel_id: null` on a fresh login. A `DEACTIVATED` manager retaining hotel
+scope was a **live authorization hole** — the `scope: null` half of this assertion is the
+regression test for it, and still holds (re-verified 2026-09-02).
+
+**FAIL, found 2026-09-02, unfixed:** `review-queue` does **not** return `403` for a
+deactivated (or otherwise unscoped) manager — it returns `200` with `data: []`. The original
+`0e6841cf` (ADR-065 Phase 2) implementation had an explicit guard, symmetric with the RM one
+still present today:
+```ts
+if (actor.role === 'manager') {
+  if (actor.scope?.type !== 'hotel') {
+    throw new ForbiddenError('Manager must be scoped to a hotel');
+  }
+  ...
+```
+It was dropped in the 2026-08-13 `resolveReviewerRecipients` rewrite (`getReviewQueue()`,
+`employee-management/service.ts`) and never reinstated — only `regional_manager`'s guard
+survives there today (`'Regional Manager must be scoped to a hotel group'`). No security
+impact — the filter still returns zero rows either way, confirmed by direct test (deactivated
+manager's `review-queue` call: `200 {"data":[]}`) — but it is a real, silent regression: the
+RM side got its own dedicated fix for this exact complaint (`d3319faf`, "tell a Regional
+Manager why their review queue is empty"); the Manager side lost its explicit message and
+nothing has restored it. Fix: reinstate the `manager` branch's `ForbiddenError`, mirroring the
+RM one, in `getReviewQueue()`.
 
 ---
 
@@ -114,7 +150,8 @@ authorization hole** — this is the regression test for it.
 - [ ] Reviewer document access follows scope; worker self-access works, cross-worker doesn't
 - [ ] Worker at the manager-only URL renders no applicant data
 - [ ] Admin has no "My Onboarding"; worker has no "Review Queue"
-- [ ] Deactivated manager loses scope and queue access
+- [x] Deactivated manager loses scope (`scope_hotel_id: null`) — **but** see the open defect
+      below: the queue call itself returns `200 []`, not the documented `403`
 
 ## Defects this scenario has caught
 
@@ -123,3 +160,5 @@ authorization hole** — this is the regression test for it.
 | Manager queue always empty | Filtered on `target_primary_hotel_id`, never populated at creation |
 | `password_hash` returned in the queue | `include: { user: true }` with no `select` |
 | Deactivated manager kept full hotel authority | `deactivate()` never cleared `Hotel.manager_user_id` |
+| **OPEN (found 2026-09-02):** deactivated/unscoped manager gets a silent `200 []` from `review-queue` instead of an explicit `403` | The 2026-08-13 `resolveReviewerRecipients` rewrite dropped the original per-role scope guard for `manager` (present at `0e6841cf`) and never reinstated it; only `regional_manager`'s survives. No data leaks — filter still yields zero rows — but the manager gets no explanation, unlike the RM case (`d3319faf` fixed the identical complaint for RM only). Fix: restore the `manager` branch's `ForbiddenError` in `getReviewQueue()`. |
+| **Doc-only (found 2026-09-02):** `deactivate()`/`reactivate()` asymmetry | `deactivate()` correctly clears `Hotel.manager_user_id` via `vacateManagedScopes`; `reactivate()` restores `EmploymentRecord.status`/`hotel_group_id`/`primary_hotel_id` but never restores `Hotel.manager_user_id`. `resolveScope()` (`auth/service.ts`) reads `Hotel.manager_user_id`, not the employment record's own fields — so a reactivated manager is `ACTIVE` and "scoped" on their own record, yet has **zero operational authority** (fresh login: `scope_hotel_id: null`) until an admin calls `assign()` again. Contradicts `reactivate()`'s own docstring ("no re-approval and no group re-resolution... the record is immediately assignable again"). See scenario 06 (deactivate/reactivate lifecycle) for the primary write-up; flagged here because it is what this scenario's own Step 8 setup hit directly. |

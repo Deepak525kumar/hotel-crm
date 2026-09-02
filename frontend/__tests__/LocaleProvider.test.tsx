@@ -79,4 +79,54 @@ describe("LocaleProvider", () => {
 
     await waitFor(() => expect(i18n.language).toBe("de"));
   });
+
+  // Regression test (found 2026-09-02 by real E2E probing, scenario 13):
+  // this is a NEW instance of the exact bug class this file's own header
+  // comment describes, one layer further back. The login response was
+  // missing preferred_language (fixed separately, backend) -- but even with
+  // it present, the UI stayed in the wrong language/direction after a real
+  // login until a manual reload.
+  //
+  // Root cause: the public login screen (unauthenticated) already flips
+  // `reconciled` to true, so the app can render THAT screen in a negotiated
+  // language too. router.replace("/dashboard") after a successful login is
+  // client-side navigation -- LocaleProvider never remounts, so `reconciled`
+  // never resets, and its reconciliation effect's own guard then silently
+  // skips the newly-authenticated user's REAL preference for the rest of
+  // the session. Fixed by having the auth store's setUser() action -- the
+  // one call in the app that only ever carries fresh, authoritative server
+  // data -- reconcile the locale store directly, unconditionally, rather
+  // than relying on this component's gated effect to notice.
+  //
+  // Deliberately does NOT render <LocaleProvider>: the fix lives in
+  // stores/auth.ts's setUser, not here, so this proves the fix holds even
+  // with no component in the tree to help it along.
+  it("reconciles the locale on a real login, even though the public screen already marked reconciled=true", async () => {
+    // The unauthenticated login/password-reset screen's own reconciliation --
+    // exactly what leaves `reconciled: true` sitting there before login.
+    useLocaleStore.setState({ locale: "en", reconciled: true });
+    await i18n.changeLanguage("en");
+
+    // Not useAuthStore.setState -- the real action, so this actually
+    // exercises the fix rather than bypassing it the way `mount()` above
+    // deliberately does for the other tests in this file.
+    useAuthStore.getState().setUser({
+      id: "u1",
+      email: "u@test.com",
+      first_name: "U",
+      last_name: "1",
+      role: "worker",
+      permissions: [],
+      is_active: true,
+      employment_status: null,
+      preferred_language: "ar",
+      created_at: new Date().toISOString(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    await waitFor(() => {
+      expect(useLocaleStore.getState().locale).toBe("ar");
+      expect(i18n.language).toBe("ar");
+    });
+  });
 });

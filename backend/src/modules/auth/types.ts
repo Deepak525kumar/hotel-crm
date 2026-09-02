@@ -63,6 +63,11 @@ export interface AuthUser {
    * users/service.ts's identical convention.
    */
   employment_status: string | null;
+  // Null means "never chosen" (not "no data") -- the client negotiates a
+  // locale from device/browser languages in that case, per lib/locales.ts's
+  // own convention. Read by SessionBootstrap/LocaleProvider on every client
+  // to pick the initial UI language and text direction before first paint.
+  preferred_language: string | null;
   created_at: string;
   updated_at?: string;
   // Calendar scoping (2026-08-10): the SAME scope already computed for the

@@ -112,9 +112,14 @@ Do **not** seed a Contract row directly for this step: seeding an `ACTIVE` contr
 exactly the path that was broken. Upload the signed copy the way an applicant does — as a
 `CONTRACT_SCAN` document on their own record (self-upload, RULE B):
 
+**Corrected 2026-09-02:** the upload also requires `original_filename` and `mime_type` as
+separate form fields — omitting either 422s with `"Required"` per field, independent of the
+`file` part's own filename/content-type:
+
 ```bash
 curl -s -X POST http://localhost:3001/api/v1/documents/workers/<WORKER_USER_ID>/documents \
-  -H "Authorization: Bearer $WT" -F "category=CONTRACT_SCAN" -F "file=@signed.pdf"
+  -H "Authorization: Bearer $WT" -F "category=CONTRACT_SCAN" \
+  -F "original_filename=signed.pdf" -F "mime_type=application/pdf" -F "file=@signed.pdf"
 ```
 
 **PASS at the data layer:** a `WorkerDocument` row with `category = CONTRACT_SCAN` and
