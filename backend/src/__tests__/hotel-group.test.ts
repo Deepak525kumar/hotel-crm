@@ -393,6 +393,18 @@ describe('CrmService - Hotel Groups', () => {
       expect(data.regional_manager_vacated_at).toBeInstanceOf(Date);
       expect(data.regional_manager_vacancy_reason).toBe('TERMINATED');
 
+      // Their scope was DERIVED from that pointer (auth resolveScope), and
+      // authMiddleware takes `scope` from the JWT rather than re-deriving it
+      // -- so without invalidating the token the RM keeps acting on the
+      // archived group's still-live member hotels until it expires. ADR-031
+      // D-4 is the convention every other authorization change follows.
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'rm_2' },
+          data: { token_generation: { increment: 1 } },
+        })
+      );
+
       // The posting history is closed too, so the archived group does not
       // read as an open assignment in anyone's history.
       expect(mockPrisma.regionalManagerAssignmentHistory.updateMany).toHaveBeenCalledWith(
@@ -417,6 +429,8 @@ describe('CrmService - Hotel Groups', () => {
       await service.deleteHotelGroup('hg_1', 'admin_1', 'admin');
 
       expect(mockPrisma.regionalManagerAssignmentHistory.updateMany).not.toHaveBeenCalled();
+      // Nobody's authorization changed, so nobody is signed out.
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundError when the hotel group does not exist', async () => {

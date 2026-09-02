@@ -36,6 +36,21 @@ function NewUser() {
     // selector, so this needs no extra request.
     const derivedGroupId =
       hotels.find((h) => h.id === values.hotel_id)?.hotel_group_id ?? null;
+
+    // The server refuses an admin-created manager with no target group, and
+    // the group is derived from the hotel -- so a hotel that belongs to no
+    // group cannot produce one. UserForm only offers grouped hotels for this
+    // case; this catches the residue (a selection made before the hotel list
+    // loaded, or a group removed from the hotel in another tab) and says so
+    // here rather than surfacing a server error about `target_hotel_group_id`,
+    // a field this form never shows.
+    if (values.role === "manager" && !derivedGroupId) {
+      setError(
+        "Choose a hotel that belongs to a hotel group — a manager's group is taken from their hotel.",
+      );
+      setSubmitting(false);
+      return;
+    }
     const payload: CreateUserInput = {
       email: values.email,
       password: values.password,

@@ -138,6 +138,20 @@ export function UserForm({
   const set = <K extends keyof UserFormValues>(key: K, value: UserFormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  // A manager's target GROUP is derived from their hotel, and the server
+  // REFUSES an admin-created manager with no group ("Admin must explicitly
+  // provide a target_hotel_group_id"). Hotel.hotel_group_id is nullable, so a
+  // group-less hotel would have satisfied this form and then failed the
+  // submit with a message about a field the form never showed. Offering only
+  // grouped hotels for that one case keeps the derivation total.
+  //
+  // Every other role keeps the full list: their hotel is an optional routing
+  // hint, not the source of a required value.
+  const selectableHotels =
+    mode === "create" && form.role === "manager"
+      ? hotels.filter((h) => !!h.hotel_group_id)
+      : hotels;
+
   // Mandatory at creation (RULE-PHOTO-01): every account created through this
   // form must carry a real photo, uploaded straight to the backend's S3
   // storage — never a URL field (see auth/service.ts#updateProfile on the
@@ -346,12 +360,14 @@ export function UserForm({
                 onChange={(e) => set("hotel_id", e.target.value)}
                 options={[
                   { value: "", label: "Unassigned (leave vacant)" },
-                  ...hotels.map((h) => ({ value: h.id, label: h.name })),
+                  ...selectableHotels.map((h) => ({ value: h.id, label: h.name })),
                 ]}
                 disabled={!canEditRole}
                 hint={
                   mode === "create" && form.role === "manager"
-                    ? "Required. The manager's hotel group is taken from this hotel."
+                    ? selectableHotels.length === 0
+                      ? "No hotel belongs to a group yet. Put a hotel in a group first — a manager's group is taken from their hotel."
+                      : "Required. The manager's hotel group is taken from this hotel."
                     : mode === "create"
                       ? "Optional. Without it, only an admin can review this application."
                       : undefined

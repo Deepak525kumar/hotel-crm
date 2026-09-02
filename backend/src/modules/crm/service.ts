@@ -11,6 +11,11 @@ import { listEligibleHotelIds } from '../../lib/roster-scope.js';
 import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
 import { jobRequestService } from '../job-requests/service.js';
 import { notificationService } from '../notifications/service.js';
+// ADR-031 D-4: a state change that alters authorization must invalidate
+// already-issued access tokens atomically with the change itself. Archiving
+// releases the manager/RM posting, which is exactly such a change -- see the
+// bumps in the two archive paths below.
+import { bumpTokenGeneration } from '../auth/service.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { OutboxTransport } from '@prisma/client';
 
@@ -387,6 +392,14 @@ export class CrmService extends BaseService {
           where: { hotel_id: hotelId, manager_user_id: hotel.manager_user_id, unassigned_at: null },
           data: { unassigned_at: now, unassigned_by_id: actorId, reason: 'TERMINATED' },
         });
+        // Their scope came FROM this pointer (auth/service.ts resolveScope
+        // reads Hotel.manager_user_id), so nulling it changes what they are
+        // authorized to do -- while their already-issued access token still
+        // carries the old `scope` claim, which authMiddleware takes from the
+        // JWT rather than re-deriving. Without this the manager keeps acting
+        // on the archived hotel until that token expires. ADR-031 D-4 is the
+        // convention every other authorization change here follows.
+        await bumpTokenGeneration(tx, hotel.manager_user_id);
       }
       await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL', hotelId, { name: hotel.name }, ip, undefined, undefined, tx);
       return updated;
@@ -697,6 +710,11 @@ export class CrmService extends BaseService {
           },
           data: { unassigned_at: now, unassigned_by_id: actorId, reason: 'TERMINATED' },
         });
+        // Same reasoning as the hotel path: resolveScope derives an RM's
+        // scope from THIS pointer, and note that member hotels keep their
+        // hotel_group_id when a group is archived -- so a stale scope claim
+        // would still reach real, live hotels until the token expired.
+        await bumpTokenGeneration(tx, group.regional_manager_user_id);
       }
       await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL_GROUP', hotelGroupId, { name: group.name }, ip, undefined, undefined, tx);
       return updated;

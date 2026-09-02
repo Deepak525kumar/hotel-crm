@@ -501,6 +501,59 @@ describe('CrmService - Hotels', () => {
       expect(data.data.deleted_at).toBeInstanceOf(Date);
     });
 
+    // Mirror of the hotel-group case reported live: an archived group kept
+    // holding its Regional Manager, and because that column is unique the
+    // person could not be posted anywhere else -- while their own profile
+    // read as unassigned, since the thing holding them was archived out of
+    // every list. Hotel.manager_user_id has the same shape, so it had the
+    // same defect.
+    //
+    // Deliberately NOT reversed by restoreHotel: months on, whoever ran the
+    // hotel may be gone or posted elsewhere, so the slot comes back open.
+    it('delete releases the manager so they can be posted elsewhere', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({ ...active, manager_user_id: 'mgr_1' });
+
+      await service.deleteHotel('h1', 'a1', 'admin');
+
+      const [{ data }] = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      expect(data.manager_user_id).toBeNull();
+      expect(data.manager_vacated_at).toBeInstanceOf(Date);
+      expect(data.manager_vacancy_reason).toBe('TERMINATED');
+
+      expect(mockPrisma.hotelManagerAssignmentHistory.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            hotel_id: 'h1',
+            manager_user_id: 'mgr_1',
+            unassigned_at: null,
+          }),
+        })
+      );
+
+      // resolveScope derives a manager's scope from this pointer, and
+      // authMiddleware reads `scope` off the JWT -- so the token must be
+      // invalidated with the change (ADR-031 D-4) or they keep the old scope
+      // until it expires.
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'mgr_1' },
+          data: { token_generation: { increment: 1 } },
+        })
+      );
+    });
+
+    it('archives a vacant hotel without touching assignment history', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({ ...active, manager_user_id: null });
+
+      await service.deleteHotel('h1', 'a1', 'admin');
+
+      expect(mockPrisma.hotelManagerAssignmentHistory.updateMany).not.toHaveBeenCalled();
+      // Nobody lost a posting, so nobody is signed out.
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
     it('delete never removes the row (PURGE is a separate operation)', async () => {
       mockPrisma.hotel.findUnique.mockResolvedValue(active);
       await service.deleteHotel('h1', 'a1', 'admin');

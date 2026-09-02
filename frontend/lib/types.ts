@@ -178,17 +178,6 @@ export interface CreateUserInput {
   phone?: string;
   /** Defaults to "worker" backend-side. */
   role?: Role;
-  job_title?: string;
-  start_date?: string;
-  employment_type?: EmploymentType;
-  /**
-   * Whether this person must supply a WORK_PERMIT document. Omitting it
-   * defaults to false server-side, which is what silently disabled the
-   * work-permit requirement for every account created through the UI
-   * (2026-08-13 audit). ADR-065 §6 item 8: set explicitly by the creating
-   * actor, never inferred from nationality.
-   */
-  work_permit_required?: boolean;
   /**
    * The assignment intended for this account — a hotel for a Manager, a group
    * for a Regional Manager. These are recorded as the employment record's
@@ -205,6 +194,18 @@ export interface CreateUserInput {
    * set from the profile later.
    */
   skills?: SkillTag[];
+  // job_title / start_date / employment_type / work_permit_required were
+  // REMOVED here 2026-09-02. #615 took them off both the form and
+  // CreateUserSchema (they are defaulted server-side now), but they stayed in
+  // this interface -- and CreateUserSchema is not .strict(), so Zod silently
+  // strips anything it does not know. A caller setting them would have
+  // compiled, sent them, and had them dropped without a word: the exact
+  // failure mode that lost every worker's skills. Declaring only what the
+  // server actually accepts makes that a compile error instead.
+  //
+  // The schema is deliberately left lenient rather than made .strict():
+  // during a deploy an older bundle may still be sending those keys, and
+  // rejecting them would break account creation until every client reloaded.
 }
 
 /**

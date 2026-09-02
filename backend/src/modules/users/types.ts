@@ -59,8 +59,18 @@ export const CreateUserSchema = z
           // schema entry used to.
           return val;
         }
-      }, z.array(z.nativeEnum(SkillTag)))
-      .optional(),
+      }, z.array(z.nativeEnum(SkillTag)).optional())
+      // De-duplicated at the boundary. assertValidSkills checks each tag
+      // against the enum but does not dedupe, and EmploymentRecord.skills is
+      // a plain array -- so ["CLEANER","CLEANER"] from any client that is not
+      // this form (the checkboxes cannot produce it) would be stored twice.
+      //
+      // `.optional()` sits INSIDE the preprocess, not after it: an untouched
+      // multipart text field arrives as "" rather than absent, the preprocess
+      // above maps that to undefined, and an outer .optional() would never
+      // see it -- it tests the INPUT, which was "". The array check then got
+      // undefined and rejected a field the caller never filled.
+      .transform((skills) => (skills ? [...new Set(skills)] : undefined)),
   });
 
 // LEGACY — used only while FEATURE_GD02_MATRIX is off (rollback path). This
