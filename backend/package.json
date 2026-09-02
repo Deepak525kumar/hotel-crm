@@ -17,6 +17,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "test": "jest --forceExit",
+    "test:ci": "jest --runInBand --forceExit",
     "test:coverage": "jest --coverage --forceExit"
   },
   "keywords": [
