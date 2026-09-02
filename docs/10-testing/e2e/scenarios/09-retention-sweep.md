@@ -1,23 +1,53 @@
 # Scenario 09 — Retention Sweep Job
 
 ## Objective
-Verify that `retention/sweep-job.ts` correctly processes hard-deletions of eligible data across modules without orphaned records, logs immutable audit entries accurately in a single transaction, correctly pages through large datasets, and avoids phantom deletions during concurrent sweep executions.
+Verify that `retention/sweep-job.ts` correctly hard-deletes eligible `RetentionLog` rows, logs
+immutable audit entries accurately in a single transaction, correctly pages through large
+datasets, and avoids phantom deletions during concurrent sweep executions.
+
+**Corrected 2026-09-02, verified against a real Postgres run.** "Across modules" above is
+aspirational, not current behavior — `sweep-job.ts`'s own header comment states the scope
+boundary explicitly: this job hard-deletes only its **own** module's state (`RetentionLog` +
+`RetentionAuditEntry`). Deleting the underlying record in a *consuming* module (e.g. an
+actual `WorkerDocument`) requires a cross-module delegated-execution mechanism that does not
+exist yet (`OD-RETENTION-10`, explicitly open/deferred) — no consuming module has registered a
+real category. 9.1's step 3 ("verify the `WorkerDocument` is hard-deleted") cannot pass today;
+delete that assertion until `OD-RETENTION-10` lands. What the job actually does — hard-delete
+the `RetentionLog` row and write one audit entry containing no personal data — is real and was
+re-verified 2026-09-02 against a live database (see run log
+`docs/10-testing/e2e/runs/2026-09-02-post-deploy-onboarding-and-rooms.md`).
 
 ## Prerequisites
-- Feature flag `FEATURE_RETENTION_SWEEP=true` must be set in `.env`.
+- **No feature flag gates this job.** `FEATURE_RETENTION_SWEEP` does not exist anywhere in
+  `config/env.ts` or `.env` — this was never wired up as a flag. `RetentionSweepJob` is
+  registered directly and unconditionally in `worker.ts`'s Scheduler; it runs in every
+  environment the Platform Worker runs in.
 - Access to the `hotelcrm` database to manually inspect `RetentionLog` and `RetentionAuditEntry` tables.
-- Node.js script to simulate the cron trigger for `retention-sweep-job`.
+- To run it directly against a local DB rather than waiting for the Scheduler's interval:
+  ```ts
+  import { loadEnv } from './src/config/env.js'; loadEnv();
+  import { PrismaClient } from '@prisma/client';
+  import { RetentionSweepJob } from './src/modules/retention/sweep-job.js';
+  const p = new PrismaClient();
+  await new RetentionSweepJob(p, { intervalMs: 999999999, batchSize: 50 }).run();
+  ```
 
 ## Test Cases
 
-### 9.1 Basic Data Retention Purge
-**Context:** A record exceeds its retention window and is eligible for deletion.
+### 9.1 Basic Data Retention Purge — **PASS, re-verified 2026-09-02 against real Postgres**
+**Context:** A `RetentionLog` row exceeds its category's retention window.
 **Steps:**
-1. Seed `RetentionLog` with an entry mapped to a dummy `WorkerDocument` where `tagged_at` is older than its `RetentionTier` (e.g., 36 months for `EMPLOYMENT_RECORDS`).
-2. Run the `retention-sweep-job.ts`.
-3. Verify the `WorkerDocument` is hard-deleted from the database.
-4. Verify the `RetentionLog` row is deleted.
-5. Verify exactly one `RetentionAuditEntry` is created with the correct `category_id`, `tier`, and `deleted_at`, but containing zero personal data from the deleted record.
+1. Seed a real `RetentionCategory` (any `module_id`/`category_id`, `tier: TIER_1` = 6 months
+   is fastest to test) and a `RetentionLog` row referencing it with `tagged_at` 7+ months in
+   the past.
+2. Run the job (see Prerequisites for the direct-invocation snippet).
+3. ~~Verify the underlying record (e.g. `WorkerDocument`) is hard-deleted~~ — **removed**, see
+   the Objective correction above; this job does not reach consuming-module data yet.
+4. Verify the `RetentionLog` row is deleted — confirmed: `findUnique` on the seeded id returned
+   `null` after the run.
+5. Verify exactly one `RetentionAuditEntry` is created with the correct `category_id`, `tier`,
+   and `deleted_at` — confirmed, and the model has no field structurally capable of holding
+   personal data (schema-verified, not just observed absence in one run).
 
 ### 9.2 Batched Deletions for Large Workloads (OD-RETENTION-07)
 **Context:** The sweep job is designed to delete records in batches using `findMany.take()` and `deleteMany`.

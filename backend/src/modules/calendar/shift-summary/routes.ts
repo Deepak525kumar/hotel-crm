@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authMiddleware } from '../../../middleware/auth.js';
 import { checkHotelAccess, requireRole } from '../../../middleware/permissions.js';
-import { ShiftSummaryService, dailyShiftSummarySchema } from './service.js';
+import { validateBody } from '../../../middleware/validation.js';
+import { ShiftSummaryService, dailyShiftSummarySchema, type DailyShiftSummaryPayload } from './service.js';
 import { UnauthorizedError, ValidationError } from '../../../lib/errors.js';
 
 export const router = Router({ mergeParams: true });
@@ -55,6 +56,18 @@ router.put(
   authMiddleware,
   requireRole(['admin', 'regional_manager', 'manager']),
   checkHotelAccess(),
+  // Found 2026-09-02 by real E2E probing: this route called
+  // dailyShiftSummarySchema.parse(req.body) inline instead of the
+  // validateBody() middleware every other route in this codebase uses to
+  // turn a ZodError into a proper 422 ValidationError (middleware/
+  // validation.ts). The global error handler has no ZodError branch of its
+  // own, so a malformed body (e.g. a missing total_people_working) fell
+  // through to a generic 500 "An unexpected error occurred" -- no
+  // field-level detail, and the wrong status-code class entirely (a client
+  // cannot tell "your request was bad" from "we broke"). No internal detail
+  // leaked to the client (the 500 body was already generic), so this was a
+  // usability/correctness bug, not a disclosure one.
+  validateBody(dailyShiftSummarySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { hotel_id, date } = req.params;
@@ -64,7 +77,7 @@ router.put(
         throw new ValidationError('Invalid date format');
       }
 
-      const payload = dailyShiftSummarySchema.parse(req.body);
+      const payload = req.body as DailyShiftSummaryPayload;
       const actorId = req.auth?.userId;
       if (!actorId) {
         throw new UnauthorizedError();

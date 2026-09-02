@@ -143,3 +143,30 @@ had **zero** automated coverage for any role. Pins `resolveHotelAccess` for RM i
 group / nonexistent hotel / **no scope claim (unassigned RM)** / missing hotel_id, plus the
 manager and admin branches. The service layer does not re-check scope, so this middleware decision
 is the feature's only authorization boundary.
+
+## Run results — 2026-09-02 (third pass: malformed-body error class fixed)
+
+The 08-12 passes above never exercised an invalid request body — this pass did, and found a
+real, independently-fixable defect.
+
+**PUT `/calendar/hotels/:hotel_id/shift-summaries/:date` with a missing/malformed field
+returned a raw `500 INTERNAL_ERROR`, not the `422 VALIDATION_ERROR` every other endpoint in
+this API returns.** `shift-summary/routes.ts` called `dailyShiftSummarySchema.parse(req.body)`
+inline instead of using `validateBody()` (`middleware/validation.ts`) — the established
+pattern that catches `ZodError` and converts it to a proper `ValidationError` with field-level
+detail. The global error handler has no `ZodError` branch of its own, so the raw Zod throw fell
+through to the generic 500 case. No internal detail leaked to the client (the 500 body was
+already generic — `{"code":"INTERNAL_ERROR","message":"An unexpected error occurred"}`), so
+this was a correctness/usability bug, not a disclosure one: a manager who mistypes or omits a
+field on this form got no indication of what was wrong.
+
+Reproduced and fixed live: `PUT .../shift-summaries/2026-09-02` with `total_people_working`
+omitted now returns
+`422 {"code":"VALIDATION_ERROR","details":[{"field":"total_people_working","message":"Required"}]}`.
+The happy path (all required fields) still succeeds unchanged.
+
+Also re-confirmed Step 2 (RM read + edit another role's summary) live against this session's
+own fixtures — `updated_by_id` correctly recorded the RM after their edit — consistent with the
+08-12 browser-verified result above. Step 2b (cross-group isolation) was not independently
+re-run this pass; the 08-12 result plus this session's exhaustive re-verification of the same
+`checkHotelAccess()` gate elsewhere (scenario 03 Step 5/6) stand as current evidence.
