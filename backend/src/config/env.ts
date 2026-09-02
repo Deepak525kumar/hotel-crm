@@ -392,6 +392,34 @@ const envSchema = z.object({
   // out for an unreasonable stretch.
   AUTH_LOGIN_THROTTLE_DURATION_MS: z.coerce.number().int().positive().default(900000),
 
+  // IP-keyed rate limiting on /auth/login and /auth/password-reset*
+  // (2026-09-03, closing security-audit item #6: "no rate limiting anywhere
+  // in app.ts"). ADR-070's own comment above assumes this layer already
+  // exists at the Nginx edge -- verified directly against the production
+  // host that it does not: nginx there serves only the daiwi/version-control
+  // app, and the hotel-crm API (this backend) is reached directly by both
+  // the web proxy rewrite and every mobile client, with nothing in front of
+  // it. ADR-070's per-account throttle has a stated blind spot -- "a
+  // distributed, many-IPs-one-account attacker bypasses" it -- but the
+  // inverse gap was equally real and had NO defense at all: many accounts
+  // sprayed from ONE ip, and password-reset (which ADR-070 never covers)
+  // hit at any rate. Same 15-minute window as ADR-070 for one shared mental
+  // model of "how long does a violation cost you here."
+  AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
+  // Deliberately more generous than the reset limit below: ADR-070's
+  // per-account lock already bounds a single-account attack tightly (10
+  // attempts). This layer's job is the pattern ADR-070 cannot see --
+  // many different accounts from one IP -- so it can afford to be generous
+  // enough that a shared office/NAT IP with several people logging in
+  // within the same 15 minutes is never caught by accident.
+  AUTH_LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  // Tighter: password-reset has no per-account throttle at all (nothing
+  // else bounds it), and a cheap, unauthenticated request is also an
+  // email-bombing vector against whichever address is supplied -- the
+  // request succeeds (200) regardless of whether the account exists, per
+  // the same account-enumeration-avoidance posture login() uses.
+  AUTH_PASSWORD_RESET_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+
   // Default 15 minutes sweep for expired assignments to NO_SHOW.
   ASSIGNMENT_NO_SHOW_INTERVAL_MS: z.coerce.number().int().positive().default(900000), // 15 mins
   // Grace period before marking a shift as NO_SHOW (default 2 hours past shift end time)
