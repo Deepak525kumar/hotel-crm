@@ -70,10 +70,25 @@ const mockPrisma: any = {
   hotel: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+    update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotelGroup: {
     // findUnique, not findFirst — see auth.test.ts's identical note.
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
+  // vacateManagedScopes() (deactivate()/delete()) and assign()/reactivate()'s
+  // own cross-entity writes all touch these -- default to a no-op resolve so
+  // tests that don't care about the assignment-history side effect aren't
+  // forced to mock it explicitly, same convention as workerAssignment above.
+  hotelManagerAssignmentHistory: {
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 0 }),
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+  },
+  regionalManagerAssignmentHistory: {
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 0 }),
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
   },
   attendance: {
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -910,6 +925,105 @@ describe('EmployeeManagementService', () => {
       expect(result.status).toBe(EmploymentStatus.ACTIVE);
     });
 
+    // Regression tests (found by real E2E probing, 2026-09-02): reactivate()
+    // flipped status back to ACTIVE but never restored the cross-entity
+    // pointer (Hotel.manager_user_id / HotelGroup.regional_manager_user_id)
+    // that deactivate()'s vacateManagedScopes() call cleared -- even though
+    // EmploymentRecord.primary_hotel_id/hotel_group_id were never cleared in
+    // the first place, so the record LOOKED fully restored. resolveScope()
+    // derives the JWT scope from the Hotel/HotelGroup pointer, not the
+    // employment record's own fields, so a reactivated Manager was ACTIVE
+    // with a fully-populated record and yet had zero operational authority
+    // until an admin made a second, undocumented assign() call.
+    it('reactivate restores Hotel.manager_user_id when the hotel is unclaimed', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({
+          status: EmploymentStatus.DEACTIVATED,
+          deactivation_reason: DeactivationReason.TEMPORARY_LEAVE,
+          primary_hotel_id: 'hotel_1',
+          hotel_group_id: 'group_1',
+        })
+      );
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.ACTIVE, deactivation_reason: null, primary_hotel_id: 'hotel_1' })
+      );
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockPrisma.user.findUnique.mockResolvedValue({ role: 'MANAGER' });
+      mockPrisma.hotel.findUnique.mockResolvedValue({ manager_user_id: null });
+
+      const result = await service.reactivate(admin as any, 'E-001');
+
+      expect(result.status).toBe(EmploymentStatus.ACTIVE);
+      expect(mockPrisma.hotel.update).toHaveBeenCalledWith({
+        where: { id: 'hotel_1' },
+        data: expect.objectContaining({
+          manager_user_id: 'user_1',
+          manager_vacated_at: null,
+          manager_vacancy_reason: null,
+        }),
+      });
+      expect(mockPrisma.hotelManagerAssignmentHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ hotel_id: 'hotel_1', manager_user_id: 'user_1' }),
+        })
+      );
+    });
+
+    it('reactivate does NOT evict an interim Manager assigned while the original was away', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({
+          status: EmploymentStatus.DEACTIVATED,
+          deactivation_reason: DeactivationReason.TEMPORARY_LEAVE,
+          primary_hotel_id: 'hotel_1',
+          hotel_group_id: 'group_1',
+        })
+      );
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.ACTIVE, deactivation_reason: null, primary_hotel_id: 'hotel_1' })
+      );
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockPrisma.user.findUnique.mockResolvedValue({ role: 'MANAGER' });
+      // An interim manager already covers this hotel.
+      mockPrisma.hotel.findUnique.mockResolvedValue({ manager_user_id: 'interim_mgr' });
+
+      const result = await service.reactivate(admin as any, 'E-001');
+
+      expect(result.status).toBe(EmploymentStatus.ACTIVE);
+      expect(mockPrisma.hotel.update).not.toHaveBeenCalled();
+      expect(mockPrisma.hotelManagerAssignmentHistory.create).not.toHaveBeenCalled();
+    });
+
+    it('reactivate restores HotelGroup.regional_manager_user_id when the group is unclaimed', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({
+          status: EmploymentStatus.DEACTIVATED,
+          deactivation_reason: DeactivationReason.TEMPORARY_LEAVE,
+          hotel_group_id: 'group_1',
+        })
+      );
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.ACTIVE, deactivation_reason: null, hotel_group_id: 'group_1' })
+      );
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockPrisma.user.findUnique.mockResolvedValue({ role: 'REGIONAL_MANAGER' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ regional_manager_user_id: null });
+
+      const result = await service.reactivate(admin as any, 'E-001');
+
+      expect(result.status).toBe(EmploymentStatus.ACTIVE);
+      expect(mockPrisma.hotelGroup.update).toHaveBeenCalledWith({
+        where: { id: 'group_1' },
+        data: expect.objectContaining({
+          regional_manager_user_id: 'user_1',
+          regional_manager_vacated_at: null,
+          regional_manager_vacancy_reason: null,
+        }),
+      });
+    });
+
     it('rehire moves REJECTED -> ACTIVE directly, employment_cycle unchanged', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.REJECTED, employment_cycle: 1 })
@@ -1614,6 +1728,45 @@ describe('EmployeeManagementService', () => {
 
       const adminQueue = await service.getReviewQueue(admin as any);
       expect(adminQueue.map((r: any) => r.employee_id)).toEqual(['E-001']);
+    });
+  });
+
+  // Regression test (found by real E2E probing, 2026-09-02): the review-queue
+  // guard existed for Manager at ADR-065 Phase 2 (0e6841cf), was dropped in
+  // the 2026-08-13 resolveReviewerRecipients rewrite above, and only
+  // Regional Manager's equivalent survived. An unscoped Manager silently got
+  // `{ data: [] }` instead of an explicit refusal -- no data leaked, but a
+  // deactivated Manager (whose Hotel.manager_user_id is cleared, per
+  // deactivate()'s vacateManagedScopes call) got no explanation for their
+  // now-empty queue, unlike the identical RM complaint that d3319faf already
+  // fixed ("tell a Regional Manager why their review queue is empty").
+  describe('Manager review-queue requires hotel scope', () => {
+    it('refuses a Manager with no scope', async () => {
+      await expect(
+        service.getReviewQueue({ userId: 'mgr_1', role: 'manager', scope: null } as never)
+      ).rejects.toThrow('Manager must be scoped to a hotel');
+    });
+
+    it('refuses a Manager scoped to a hotel group instead of a hotel', async () => {
+      await expect(
+        service.getReviewQueue({
+          userId: 'mgr_1',
+          role: 'manager',
+          scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+        } as never)
+      ).rejects.toThrow('Manager must be scoped to a hotel');
+    });
+
+    it('serves the queue for a Manager correctly scoped to a hotel', async () => {
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.getReviewQueue({
+          userId: 'mgr_1',
+          role: 'manager',
+          scope: { type: 'hotel', hotel_id: 'hotel_1' },
+        } as never)
+      ).resolves.toEqual([]);
     });
   });
 
