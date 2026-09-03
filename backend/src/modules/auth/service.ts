@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import crypto from 'node:crypto';
 import { Prisma, PrismaClient, UserRole, OutboxTransport, NotificationType, OutboxSourceModule } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';

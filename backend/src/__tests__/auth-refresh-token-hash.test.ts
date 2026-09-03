@@ -85,7 +85,7 @@ describe('AuthService refresh-token hash-at-rest (OQ-AUTH-15)', () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       id: 'user_1',
       email: 'user@test.com',
-      password_hash: await (await import('bcryptjs')).default.hash('password123', 4),
+      password_hash: await (await import('bcrypt')).default.hash('password123', 4),
       first_name: 'A',
       last_name: 'B',
       role: 'WORKER',

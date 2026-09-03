@@ -244,6 +244,16 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
   ]) as string[],
 });
 
+// Stays at 12 deliberately, even after the 2026-09-03 switch from `bcryptjs`
+// to native `bcrypt`. Lowering it (12 -> 10 would be ~4x faster) was
+// considered and rejected: the capacity problem that prompted the switch was
+// never raw hash cost, it was that `bcryptjs` is pure JavaScript and blocks
+// the event loop, so every login stalled every other in-flight request.
+// Native bcrypt runs on libuv's threadpool instead -- measured on the
+// production host: per-hash cost is essentially unchanged (~300ms either
+// way), but event-loop lag during a compare dropped from ~182ms to ~2ms.
+// That fixes the concurrency problem without spending any of the offline-
+// brute-force resistance that rounds actually buys.
 export const BCRYPT_ROUNDS = 12;
 
 // HOTFIX-AUTH-002: password-reset tokens are single-use and expire quickly to
