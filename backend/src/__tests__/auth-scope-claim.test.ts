@@ -109,7 +109,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
   // token-issuance code path deterministically.
   let realPasswordHash: string;
   beforeAll(async () => {
-    const bcrypt = await import('bcryptjs');
+    const bcrypt = await import('bcrypt');
     realPasswordHash = await bcrypt.hash('password123', 4);
   });
 

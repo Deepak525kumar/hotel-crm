@@ -175,8 +175,14 @@ export const CompleteReworkSchema = z.object({
 });
 
 /** An uploaded image, already read into memory by multer. */
+// Staged on disk by multer.diskStorage (2026-09-03), not held in memory as a
+// Buffer -- see quality/routes.ts for why (one inspection could pin 60 MB of
+// heap). The service streams from `path` and is responsible for unlinking it.
 export interface UploadedPhoto {
-  buffer: Buffer;
+  /** Absolute path to multer's temp file. The service MUST unlink this. */
+  path: string;
+  /** Bytes multer actually wrote. Used for the size check and as S3's ContentLength. */
+  size: number;
   mimeType: string;
   originalName: string;
 }

@@ -22,6 +22,7 @@ jest.mock('../modules/documents/storage.js', () => ({
   getStorageClient: async () => ({
     getPresignedUrl: (k: string) => mockGetPresignedUrl(k),
     upload: jest.fn(),
+    uploadFile: jest.fn(),
     delete: jest.fn(),
   }),
   generateQualityPhotoKey: () => 'quality/a/inspection/u/p.jpg',

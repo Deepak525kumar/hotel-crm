@@ -97,7 +97,7 @@ through the real API.
 
 ```ts
 // backend/scratch-bootstrap-admin.ts  — delete after running
-import bcrypt from 'bcryptjs';                 // NOTE: bcryptjs, not bcrypt
+import bcrypt from 'bcrypt';                   // native bcrypt as of 2026-09-03 (was bcryptjs)
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const password_hash = await bcrypt.hash('AdminPass123!', 10);

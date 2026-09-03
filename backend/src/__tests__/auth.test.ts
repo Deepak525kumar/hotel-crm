@@ -1,6 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import crypto from 'node:crypto';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 
 // TREQ-AUTH-007: backs the `user.update` mock's simulated running counter
 // (see its comment below) -- reset in `beforeEach` so tests don't leak state.

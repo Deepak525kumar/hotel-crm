@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { EmploymentStatus, OutboxTransport, NotificationType, OutboxSourceModule } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../../lib/errors.js';

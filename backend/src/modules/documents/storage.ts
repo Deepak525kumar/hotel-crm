@@ -15,6 +15,7 @@
 // and MUST include a cryptographically-random UUIDv4 component.
 
 import crypto from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { logger } from '../../lib/logger.js';
 
 // RULE-DOC-09: server-generated key with a UUIDv4 segment for unpredictability.
@@ -77,6 +78,32 @@ export interface StorageClient {
   upload(key: string, body: Buffer, mimeType: string): Promise<void>;
 
   /**
+   * Upload from a file ALREADY ON DISK, streaming it rather than reading it
+   * into memory first (2026-09-03).
+   *
+   * Why this exists as its own method rather than `upload()` taking a
+   * Readable: the caller must not create the stream. Every upload route used
+   * multer.memoryStorage(), costing a 1.9 GB host 10 MB per document and
+   * 60 MB per quality inspection (10 MB x 6 photos) -- ~600 MB for ten
+   * concurrent checker submissions, of ~1.1 GB actually free. The quality
+   * route now stages to disk, and its temp file is unlinked by the
+   * controller as soon as the request finishes.
+   *
+   * That unlink is exactly why the stream is opened HERE. An earlier version
+   * had the service call createReadStream() and pass the stream in; when
+   * anything did not consume it -- the no-op stub client, or a mocked
+   * upload in a test -- the file was unlinked underneath an unread stream
+   * and threw ENOENT asynchronously, outside any request's try/catch. Opening
+   * the file at the point of use makes creation and consumption inseparable,
+   * so an unconsumed stream is not representable.
+   *
+   * `size` must be exact: S3's PutObject needs ContentLength up front for a
+   * non-multipart PUT and cannot infer it from a stream. Callers pass
+   * multer's own `file.size` -- the byte count it actually wrote.
+   */
+  uploadFile(key: string, filePath: string, mimeType: string, size: number): Promise<void>;
+
+  /**
    * Download a file from S3 (EU) and return it as a Buffer.
    */
   download(key: string): Promise<Buffer>;
@@ -134,6 +161,21 @@ async function buildS3Client(bucket: string, region: string): Promise<StorageCli
       );
     },
 
+    async uploadFile(key: string, filePath: string, mimeType: string, size: number): Promise<void> {
+      // Stream opened here, immediately before the send that consumes it --
+      // see the interface's note for why the caller must not open it.
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: createReadStream(filePath),
+          ContentType: mimeType,
+          ContentLength: size,
+          ServerSideEncryption: 'AES256',
+        })
+      );
+    },
+
     async download(key: string): Promise<Buffer> {
       const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
       if (!response.Body) {
@@ -158,6 +200,12 @@ async function buildS3Client(bucket: string, region: string): Promise<StorageCli
 const stubStorageClient: StorageClient = {
   async upload(_key, _body, _mimeType): Promise<void> {
     logger.warn('documents_storage_stub: S3_BUCKET not configured; upload is a no-op', { _key });
+  },
+  // Deliberately does NOT open the file: this stub is a no-op, and opening a
+  // stream it never reads is what caused the ENOENT-after-unlink race the
+  // interface note describes.
+  async uploadFile(_key, _filePath, _mimeType, _size): Promise<void> {
+    logger.warn('documents_storage_stub: S3_BUCKET not configured; uploadFile is a no-op', { _key });
   },
   async download(_key: string): Promise<Buffer> {
     logger.warn('documents_storage_stub: S3_BUCKET not configured; download returns empty buffer', { _key });
