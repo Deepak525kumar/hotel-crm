@@ -1,6 +1,10 @@
 # ADR-073: The Chatbot Acts Only Within the User's Own Authorization Scope
 
-- **Status:** Proposed — awaiting ratification by the commissioning human. Drafted from their
+- **Status:** **Accepted** — ratified by the commissioning human on 2026-09-04, after the rule, its
+  enforcement layers and its risks were put to them in plain terms. They specifically accepted the
+  consequence recorded in §4: that admitting writes makes a successful prompt injection able to
+  *perform* an action the user could perform, not merely read what they could read — bounded, always,
+  by that user's own scope. Drafted from their
   instruction on 2026-09-04: *"the user should be able to do anything with the chatbot that he can
   do manually, but strictly inside of a scope. If a manager can do anything on his system, he
   should be able to do it with our AI, but inside of his scope only. And same goes for every user

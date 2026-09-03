@@ -44,7 +44,7 @@ Each of these is a deliberate refusal, not an oversight. Re-deciding them is fin
 - **No LLM provider.** No Bedrock or Anthropic client. Provider selection (Bedrock `eu-central-1` vs. the Anthropic API direct) is live and has a GDPR data-residency dimension — the platform holds German workforce data (`SOCIAL_SECURITY_NUMBER`, `TAX_NUMBER`) already in `eu-central-1`.
 - **No L1 router, no L3 planner, no prompts.** The L1 branch is reached and logged but **deliberately not stubbed**. An unrun API-shape guess is exactly how a defect ships unnoticed — this already happened once in the throwaway prototype, where an empty `messages: []` array on the opening turn would have failed on the very first real call.
 - **No conversation transcript is stored.** `session_state` is structured; `ChatbotToolCall` stores an args **hash**, never argument values or results. This sidesteps `OD-CHAT-008` (transcript retention), `OD-CHAT-018` (encryption at rest) and `OD-CHAT-019` (transcript tier) rather than foreclosing them.
-- **No write tool, and no tool touching another person's record.** Was blocked on `OD-CHAT-005`; `ADR-073` answers it (a user may do through the assistant exactly what they can do by hand, within their own scope) but is **Proposed, not Accepted**. The hygiene test still fails the build on a write tool, and should stay that way until that record is ratified AND the confirmation flow exists — `ADR-053` item 5 makes confirmation mandatory for high-risk writes, and `CHATBOT_CONFIRM_TOKEN_SECRET` is still configured-but-unused.
+- **No write tool, and no tool touching another person's record.** Was blocked on `OD-CHAT-005`; `ADR-073` (Accepted 2026-09-04) answers it: a user may do through the assistant exactly what they can do by hand, within their own scope. The hygiene test still fails the build on a write tool, and MUST stay that way until the confirmation flow exists — `ADR-053` item 5 makes confirmation mandatory for high-risk writes, and `CHATBOT_CONFIRM_TOKEN_SECRET` is still configured-but-unused.
 - **No analytics tool.** Blocked on `OQ-ANALYTICS-01` — `API_INDEX.yaml` records the leaderboard routes as missing `requireRole`/`checkHotelAccess`. Wrapping a broken route in a tool would industrialize the breakage.
 - **No confirmation-token flow.** `CHATBOT_CONFIRM_TOKEN_SECRET` is configured but unused, because no `HIGH_RISK_WRITE` tool exists to need it.
 
@@ -56,7 +56,7 @@ The last two constraints are enforced **mechanically** by `chatbot-tool-registry
 
 | Blocker | Status |
 |---|---|
-| `OD-CHAT-005` | Scope beyond the owning worker — **answered by `ADR-073`, awaiting ratification.** The owner's rule (2026-09-04): the assistant's authority is the user's own authority, never more. Until that record is Accepted, treat this as still open. |
+| `OD-CHAT-005` | **CLOSED 2026-09-04** by `ADR-073` (Accepted). The assistant's authority is the user's own authority, never more — a Manager may act on a worker inside their own scope precisely because they can already do so by hand. |
 | `OD-CHAT-006` | Prompt-injection resistance — open; interim posture only |
 | `OD-CHAT-013` | **CLOSED 2026-09-04** — owner is the commissioning human / account owner, assigned directly |
 
