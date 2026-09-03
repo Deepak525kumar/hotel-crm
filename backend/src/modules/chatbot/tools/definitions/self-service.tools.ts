@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { assignmentService } from '../../../assignments/service.js';
+import { notificationService } from '../../../notifications/service.js';
 import type { AssignmentDto } from '../../../assignments/types.js';
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
@@ -128,4 +129,122 @@ export const listMyAssignments = registerTool<ListMineArgs>({
 
   compress: compressAssignments,
   maxResultTokens: 400,
+});
+
+
+/**
+ * "Do I have any messages?" -- the authenticated user's own notifications.
+ *
+ * Registered for every role, not just workers: a manager asking what they
+ * have been notified about is the same question with the same self-scope.
+ * The service takes a userId and filters on it, so there is no role branch
+ * to get wrong.
+ */
+const MyNotificationsArgs = z
+  .object({
+    // No user id, no role, no scope -- "mine" is resolved from the
+    // authenticated actor, never supplied. `.strict()` so an unexpected key
+    // invented by the model is a validation failure rather than a silently
+    // ignored field.
+    //
+    // Deliberately no `unread_only` filter: getNotifications() exposes no
+    // such parameter, and offering one here would be an argument the model
+    // can set that silently does nothing -- an answer that looks filtered
+    // but is not. Adding it is a change to the owning module's interface
+    // first (ADR-053 item 2), not something this tool may fake.
+    limit: z.number().int().min(1).max(25).default(10),
+  })
+  .strict();
+
+type MyNotificationsArgs = z.infer<typeof MyNotificationsArgs>;
+
+interface NotificationRow {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read_at: Date | null;
+  created_at: Date;
+}
+
+/**
+ * Compression is mandatory (§10) and does real work here.
+ *
+ * `message` is free text written elsewhere in the platform, and it is the
+ * one field in this result a hostile string could travel in. It is truncated
+ * hard and, critically, is only ever RENDERED -- templates.ts formats the
+ * CompactResult deterministically and no second model call sees it, so
+ * notification text cannot re-enter a prompt as instructions.
+ *
+ * `data` (the notification's JSON payload) is dropped entirely: it carries
+ * internal ids for client deep-linking and nothing a person needs read back
+ * to them.
+ */
+function compressNotifications(raw: unknown): CompactResult {
+  const rows = (raw as NotificationRow[]) ?? [];
+  const data = rows.map((row) => ({
+    type: row.type,
+    title: row.title,
+    // Bounded: one long notification must not consume the result budget that
+    // the other nine share.
+    message: row.message.length > 160 ? `${row.message.slice(0, 157)}...` : row.message,
+    unread: row.read_at === null,
+    day: row.created_at.toISOString().slice(0, 10),
+  }));
+
+  const unread = data.filter((row) => row.unread).length;
+
+  return {
+    summary:
+      data.length === 0
+        ? 'No notifications.'
+        : `${data.length} notification${data.length === 1 ? '' : 's'}, ${unread} unread.`,
+    data,
+  };
+}
+
+export const listMyNotifications = registerTool<MyNotificationsArgs>({
+  name: 'notifications.list_mine',
+  description:
+    "List the authenticated user's own notifications, newest first. Use for questions " +
+    'like "do I have any messages", "any updates for me", "was I notified about anything".',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef: 'IF-NOTIF-GetNotifications (notifications/service.ts getNotifications())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 approves the registry architecture only, never a ' +
+    'specific tool. This one is self-scoped + READ_ONLY, the same envelope as ' +
+    'assignments.list_mine, and still requires its own explicit approval before ' +
+    'FEATURE_CHATBOT is enabled outside development.',
+
+  args: MyNotificationsArgs,
+
+  // `GET /notifications` (notifications/routes.ts:25) carries NO
+  // requirePermission -- the router-level authMiddleware is the whole gate,
+  // and getNotifications() filters `where: { user_id: userId }` itself.
+  //
+  // Modelled as null rather than borrowing `notifications:read`, even though
+  // WORKER and CHECKER both happen to hold that token. Declaring a token the
+  // route does not enforce is the documented trap in CHATBOT_HANDOFF §6: it
+  // is either a lie about the real gate, or a lockout for some future role
+  // that legitimately reads its own notifications without holding it.
+  permission: null,
+  permissionRationale:
+    'GET /notifications enforces no permission token; authentication plus ' +
+    'getNotifications() filtering on user_id IS the control. READ_ONLY and ' +
+    'self-scoped, as assertValidRegistration requires of any token-less tool.',
+  scopeCheck: 'self',
+
+  invoke: async (args, actor) => {
+    // actor.userId, never an argument. The service takes the id it filters
+    // on, so passing anything else here would be the whole vulnerability.
+    const rows = await notificationService.getNotifications(toServiceActor(actor).userId);
+    // getNotifications() has a fixed take:50 and no limit parameter, so the
+    // caller's limit is applied here rather than pretended at the service.
+    return rows.slice(0, args.limit);
+  },
+
+  compress: compressNotifications,
+  maxResultTokens: 700,
 });
