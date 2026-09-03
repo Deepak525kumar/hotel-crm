@@ -9,7 +9,7 @@
 | Governing decisions | `ADR-013` (AI-execution ownership), `ADR-053` (orchestration layer + tool registry) |
 | Specification | `SPEC-CHATBOT-001@0.2.0` — **`REVIEW`, not `FROZEN`** |
 | Completion | ~40% of the backend module. **0% of the AI itself.** |
-| Tests | 109 chatbot tests across 7 suites; full backend suite 3163 passing |
+| Tests | 121 chatbot tests across 8 suites; full backend suite 3603 passing (2026-09-04) |
 
 ---
 
@@ -94,6 +94,18 @@ Steps 2–4 are redundant on purpose. Layer 4 exists because `assignments/servic
 
 **Every migration needs a paired `down.sql`.** The CI job *Forward · Rollback · Recovery* fails the build without one. Check an existing migration for the convention before writing a new one — enum changes in particular are delicate, since PostgreSQL has no `ALTER TYPE ... DROP VALUE` and a mis-ordered rebuild silently relabels existing rows.
 
+**Unicode normalization can split a word in half, and an ASCII-only test will not notice.**
+`normalize()` ran `NFKD` and then replaced every non-letter/non-digit with a **space**. `NFKD`
+decomposes `ä` into `a` + U+0308 COMBINING DIAERESIS, which is Unicode category `Mn` (Mark),
+**not** `L` — so the mark became a separator and `"nächste schicht"` normalized to
+`"na chste schicht"`, matching no phrase at all. Every German worker typing the natural
+spelling of an umlaut word fell straight through to L1, which is not built. It survived review
+and a green suite because the single German phrase under test, `'Meine Schichten'`, happens to
+contain no umlaut. Fixed 2026-09-04: umlauts fold to `ae`/`oe`/`ue`/`ss` before decomposition,
+and residual combining marks are **removed** rather than replaced with a separator.
+**This platform's workforce is German-speaking — treat German input as the common case and
+test it with real umlauts, not ASCII stand-ins.**
+
 **Verify your base branch is current before concluding anything about the repo.** A stale working branch made `prisma migrate dev` report drift for columns that a migration on `origin/main` already created, which was briefly mistaken for a missing-migration defect. Confirm against `origin/main`, not whatever branch happens to be checked out.
 
 ## 7. Next steps, in order
@@ -101,4 +113,5 @@ Steps 2–4 are redundant on purpose. Layer 4 exists because `assignments/servic
 1. **Close the three G2 blockers** (§4). `OD-CHAT-013` needs a human owner, not an ADR.
 2. **Step 5 — wire the provider.** One Bedrock implementation behind `LlmProvider`, plus the L1 router. Needs the API key and the provider decision. Nothing else changes: the budget gate, redaction, executor, tool-call log and templates are all in place and tested. **Spend the first real key on a smoke test** — mock mode cannot validate real request/response shapes.
 3. **Expand the L0 command set.** It is the cheapest capability in the system: every phrase added there is a question that never costs a token. Expect this to dominate the cost model; instrument the L0 hit rate.
+   *Progress 2026-09-04:* phrase coverage for the two existing commands widened from 15 to 39 (English + German, both umlaut and `ae` spellings), and the lookup now **throws at module load** if two commands claim the same normalized phrase — a collision would otherwise be won silently by whichever command is declared last and route a worker to the wrong tool. **Further L0 expansion is now gated on tools, not phrases:** `assignments.list_mine` is still the only registered tool, so any new command (documents status, attendance, contract status) needs its tool first, and each tool is its own approval under `ADR-053` item 4.
 4. **Add read-only self-scoped tools** one at a time (documents status, attendance, contract status), each with its own registry entry, its own authz matrix test, and its own approval per `ADR-053` item 4.
