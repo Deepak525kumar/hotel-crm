@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { assignmentService } from '../../../assignments/service.js';
+import { hrService } from '../../../hr/service.js';
+import { qualityService } from '../../../quality/service.js';
 import { notificationService } from '../../../notifications/service.js';
 import type { AssignmentDto } from '../../../assignments/types.js';
 import { toServiceActor } from '../actor.js';
@@ -247,4 +249,329 @@ export const listMyNotifications = registerTool<MyNotificationsArgs>({
 
   compress: compressNotifications,
   maxResultTokens: 700,
+});
+
+/**
+ * "When does my contract end?" -- the caller's own contract status.
+ *
+ * A REGISTRY LIMITATION IS VISIBLE HERE, and it is modelled honestly rather
+ * than papered over.
+ *
+ * `GET /workers/:worker_id/contract-status` gates with
+ * `requireContractReadAccess()`, which is ROLE-CONDITIONAL (hr/routes.ts):
+ *
+ *     worker | checker        -> hr:contract:read-own
+ *     admin | manager | RM    -> hr:read
+ *
+ * The registry's `permission` field cannot express that. Its array form is
+ * an AND (`every()` in permissions.ts), so `['hr:read',
+ * 'hr:contract:read-own']` would demand BOTH and deny everyone -- no role
+ * holds both. Declaring either token alone locks out the other half of the
+ * platform: `hr:contract:read-own` denies every manager asking about their
+ * own contract, and `hr:read` denies every worker and checker, who are the
+ * population this question mostly comes from.
+ *
+ * Verified against the real ROLE_PERMISSIONS, not assumed:
+ *   ADMIN/MANAGER/RM   hr:read = yes, hr:contract:read-own = no
+ *   CHECKER/WORKER     hr:read = no,  hr:contract:read-own = yes
+ * Every role can read its OWN contract; none can do it through one token.
+ *
+ * So `permission: null` is the honest modelling, and it is safe here rather
+ * than permissive: the tool is self-scoped (the executor enforces that), the
+ * worker id is the actor's own and is not expressible as an argument, and
+ * hrService.getContractStatus applies its own self-scope check on top. The
+ * admitted population is exactly the population the route admits.
+ *
+ * FOLLOW-UP: this pattern recurs -- `requirePayslipReadAccess()` has the
+ * identical shape -- so the registry should eventually express
+ * role-conditional permissions rather than have each tool restate this. That
+ * is a registry change, not something to keep working around per tool.
+ */
+const MyContractArgs = z.object({}).strict();
+
+type MyContractArgs = z.infer<typeof MyContractArgs>;
+
+interface ContractLike {
+  position: string;
+  start_date: string;
+  end_date: string | null;
+  status: string;
+  employment_type: string;
+  signed_scan_uploaded?: boolean;
+}
+
+/**
+ * Compression drops every identifier. A person asking about their own
+ * contract needs the dates and the state, never `id`, `worker_id`,
+ * `template_id` or `scanned_document_id` -- internal references that would
+ * cost tokens on every turn and give the model strings it might repeat back.
+ */
+function compressContract(raw: unknown): CompactResult {
+  const contract = raw as ContractLike | null;
+
+  if (!contract) {
+    // A genuine, common state: an applicant partway through onboarding has
+    // no contract yet. Saying so plainly beats an empty object the model
+    // would have to interpret.
+    return { summary: 'No contract on file yet.', data: null };
+  }
+
+  const data = {
+    position: contract.position,
+    start_date: contract.start_date,
+    end_date: contract.end_date,
+    status: contract.status,
+    employment_type: contract.employment_type,
+    signed_copy_received: contract.signed_scan_uploaded ?? false,
+  };
+
+  const ends = contract.end_date ? `ends ${contract.end_date}` : 'no end date (permanent)';
+  return {
+    summary: `Contract ${contract.status.toLowerCase()}, ${ends}.`,
+    data,
+  };
+}
+
+export const getMyContract = registerTool<MyContractArgs>({
+  name: 'hr.my_contract',
+  description:
+    "Get the authenticated user's OWN employment contract status: position, start and end " +
+    'dates, whether a signed copy is on file. Use for questions like "when does my contract ' +
+    'end", "what is my contract status", "am I permanent".',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef: 'IF-HR-GetContractStatus (hr/service.ts getContractStatus())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 approves the registry architecture only, never a ' +
+    'specific tool. Self-scoped + READ_ONLY, the same envelope as ' +
+    'assignments.list_mine and notifications.list_mine.',
+
+  args: MyContractArgs,
+  permission: null,
+  permissionRationale:
+    'The wrapped route gates role-conditionally (worker/checker: ' +
+    'hr:contract:read-own; admin/manager/RM: hr:read) and the registry cannot ' +
+    'express an OR -- its array form is an AND, so naming both tokens would deny ' +
+    'everyone, and naming either alone locks out the other half of the platform. ' +
+    'Self-scope is the control instead: the worker id is the actor\'s own, is not ' +
+    'expressible as an argument, and getContractStatus re-checks it.',
+  scopeCheck: 'self',
+
+  invoke: async (_args, actor) => {
+    const serviceActor = toServiceActor(actor);
+    // The actor id is passed as BOTH the subject and the caller. That is what
+    // makes this "my contract" and nothing else -- getContractStatus's own
+    // guard (worker/checker may only view their own) is then satisfied by
+    // construction rather than by trusting this call site.
+    return hrService.getContractStatus(serviceActor.userId, serviceActor.userId, serviceActor.role);
+  },
+
+  compress: compressContract,
+  maxResultTokens: 300,
+});
+
+/**
+ * "Have I got my payslip yet?" -- the caller's OWN payslip requests.
+ *
+ * SELF-SCOPE IS FORCED HERE, and that is not belt-and-braces -- it is the
+ * whole correctness of the tool.
+ *
+ * hrService.listPayroll self-scopes worker and checker callers itself
+ * (OD-HR-10 / FIND-SEC-HR-03: it overwrites filters.worker_id with the
+ * actor's id regardless of what was passed). But for a MANAGER, RM or ADMIN
+ * it does the opposite: with no worker_id filter it returns everything in
+ * that caller's scope -- their whole team's payslip requests.
+ *
+ * So a tool that simply called listPayroll and called itself "my payslips"
+ * would be correct for workers and quietly wrong for managers, answering a
+ * question about the team when a person asked about themselves. Passing
+ * `worker_id: actor.userId` explicitly makes it genuinely self-scoped for
+ * every role, and for worker/checker it merely agrees with what the service
+ * was going to force anyway.
+ *
+ * A manager reading their TEAM's payslips is a different capability, needs
+ * `ADR-073`'s manager-scope reasoning and its own approval, and is not this
+ * tool.
+ *
+ * Permission modelling is identical to hr.my_contract -- see that tool for
+ * the full reasoning, and CHATBOT_HANDOFF §6 for why it recurs.
+ * requirePayslipReadAccess() gates worker/checker on hr:payslip:read-own and
+ * admin/manager/RM on hr:read, which the registry cannot express as an OR.
+ */
+const MyPayslipsArgs = z
+  .object({
+    // Mirrors ListPayslipRequestsQuerySchema's own enum rather than inventing
+    // one: a status the query rejects would be a filter the model can set
+    // that produces an error instead of an answer.
+    status: z.enum(['REQUESTED', 'FULFILLED']).optional(),
+    limit: z.number().int().min(1).max(20).default(10),
+  })
+  .strict();
+
+type MyPayslipsArgs = z.infer<typeof MyPayslipsArgs>;
+
+interface PayslipRow {
+  period_start: string;
+  period_end: string;
+  status: string;
+  fulfilled_at: string | null;
+  created_at: string;
+}
+
+function compressPayslips(raw: unknown): CompactResult {
+  const rows = ((raw as { data?: PayslipRow[] } | null)?.data ?? []) as PayslipRow[];
+  const data = rows.map((row) => ({
+    period: `${row.period_start} to ${row.period_end}`,
+    status: row.status,
+    fulfilled_on: row.fulfilled_at ? row.fulfilled_at.slice(0, 10) : null,
+    requested_on: row.created_at.slice(0, 10),
+  }));
+
+  const pending = data.filter((row) => row.status === 'REQUESTED').length;
+
+  return {
+    summary:
+      data.length === 0
+        ? 'No payslip requests found.'
+        : `${data.length} payslip request${data.length === 1 ? '' : 's'}, ${pending} still awaiting fulfilment.`,
+    data,
+  };
+}
+
+export const listMyPayslips = registerTool<MyPayslipsArgs>({
+  name: 'hr.my_payslips',
+  description:
+    "List the authenticated user's OWN payslip requests and whether each has been " +
+    'fulfilled. Use for questions like "have I got my payslip", "did they send my ' +
+    'payslip", "my payslip requests".',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef: 'IF-HR-ListPayroll (hr/service.ts listPayroll())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 approves the registry architecture only, never a ' +
+    'specific tool. Self-scoped + READ_ONLY.',
+
+  args: MyPayslipsArgs,
+  permission: null,
+  permissionRationale:
+    'requirePayslipReadAccess() gates role-conditionally (worker/checker: ' +
+    'hr:payslip:read-own; admin/manager/RM: hr:read) and the registry cannot express ' +
+    'an OR -- naming both denies everyone, naming either locks out half the platform. ' +
+    'Self-scope is the control: worker_id is forced to the actor\'s own id in invoke(), ' +
+    'is not expressible as a tool argument (FORBIDDEN_ARG_KEY), and listPayroll ' +
+    're-forces it for worker/checker callers.',
+  scopeCheck: 'self',
+
+  invoke: async (args, actor) => {
+    const serviceActor = toServiceActor(actor);
+    return hrService.listPayroll(
+      {
+        // Forced, not optional. Without this a manager gets their team's
+        // requests back from a tool that says "mine".
+        worker_id: serviceActor.userId,
+        ...(args.status ? { status: args.status } : {}),
+        limit: args.limit,
+        page: 1,
+      },
+      serviceActor
+    );
+  },
+
+  compress: compressPayslips,
+  maxResultTokens: 500,
+});
+
+
+/**
+ * "What did I inspect today?" -- the checker's own inspection history.
+ *
+ * NOTE THE CONTRAST with hr.my_contract and hr.my_payslips above: this route
+ * gates on a SINGLE token, `requirePermission('quality:read')`, with no
+ * role-conditional branch. So the token is declared honestly here rather
+ * than modelled as null. The `null` on those two tools is a workaround for a
+ * registry limitation, not a house style -- where a route enforces one real
+ * token, name it.
+ *
+ * `quality:read` rather than `quality:write`, matching the route: the token
+ * gates a READ, and a role that never inspected anything simply gets an
+ * empty list. Every role holds `quality:read`, so nobody is locked out of
+ * asking; workers and managers just get nothing back, which is the truthful
+ * answer for them.
+ */
+const MyInspectionsArgs = z
+  .object({
+    // Mirrors ListOwnInspectionsQuerySchema: free-text search across room,
+    // notes, worker and hotel name. Capped at the same 120 characters the
+    // route caps at, so a pathological string cannot become an expensive
+    // LIKE across five columns.
+    q: z.string().trim().max(120).optional(),
+    limit: z.number().int().min(1).max(20).default(10),
+  })
+  .strict();
+
+type MyInspectionsArgs = z.infer<typeof MyInspectionsArgs>;
+
+interface InspectionRow {
+  room_number?: string | null;
+  score?: number | null;
+  outcome?: string | null;
+  created_at?: string | Date | null;
+}
+
+function compressInspections(raw: unknown): CompactResult {
+  const rows = ((raw as { data?: InspectionRow[] } | null)?.data ?? []) as InspectionRow[];
+  const data = rows.map((row) => ({
+    room: row.room_number ?? null,
+    score: row.score ?? null,
+    outcome: row.outcome ?? null,
+    day:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString().slice(0, 10)
+        : typeof row.created_at === 'string'
+          ? row.created_at.slice(0, 10)
+          : null,
+  }));
+
+  const rework = data.filter((row) => row.outcome === 'rework').length;
+
+  return {
+    summary:
+      data.length === 0
+        ? 'No inspections recorded.'
+        : `${data.length} inspection${data.length === 1 ? '' : 's'}, ${rework} sent for rework.`,
+    data,
+  };
+}
+
+export const listMyInspections = registerTool<MyInspectionsArgs>({
+  name: 'quality.my_inspections',
+  description:
+    "List the authenticated checker's OWN inspection history -- room, score and whether " +
+    'rework was assigned. Use for questions like "what did I inspect today", "my checks", ' +
+    '"my inspection history".',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef: 'IF-QUAL-ListOwnChecks (quality/service.ts listOwnChecks())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 approves the registry architecture only, never a ' +
+    'specific tool. Self-scoped + READ_ONLY.',
+
+  args: MyInspectionsArgs,
+  // A real single token this time, matching the route exactly.
+  permission: 'quality:read',
+  scopeCheck: 'self',
+
+  invoke: async (args, actor) => {
+    return qualityService.listOwnChecks(toServiceActor(actor), {
+      page: 1,
+      perPage: args.limit,
+      ...(args.q ? { q: args.q } : {}),
+    });
+  },
+
+  compress: compressInspections,
+  maxResultTokens: 600,
 });
