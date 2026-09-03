@@ -36,6 +36,29 @@ export interface L0Command {
 
 export const L0_COMMANDS: readonly L0Command[] = [
   {
+    id: 'my_notifications',
+    label: 'My messages',
+    tool: 'notifications.list_mine',
+    args: {},
+    phrases: [
+      // English
+      'my notifications',
+      'my messages',
+      'do i have any messages',
+      'do i have any notifications',
+      'any updates for me',
+      'any news for me',
+      'show my notifications',
+      'show my messages',
+      // German
+      'meine nachrichten',
+      'meine benachrichtigungen',
+      'habe ich nachrichten',
+      'gibt es neuigkeiten',
+      'zeig meine nachrichten',
+    ],
+  },
+  {
     id: 'my_shifts',
     label: 'My shifts',
     tool: 'assignments.list_mine',
