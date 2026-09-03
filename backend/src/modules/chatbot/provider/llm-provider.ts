@@ -35,6 +35,16 @@ export interface LlmResponse {
   usage: LlmUsage;
 }
 
+/**
+ * Which model answers this turn (owner decision, 2026-09-04).
+ *
+ * `fast` handles chat, routing and reads. `planning` is reserved for
+ * multi-step reasoning and writes -- turning a week of dictated prose into
+ * forty assignments. Optional, defaulting to `fast`, so the cheap path is
+ * what a caller gets by forgetting to choose rather than the expensive one.
+ */
+export type LlmTier = 'fast' | 'planning';
+
 export interface LlmProvider {
   /** Identifies the model actually used, recorded on the conversation. */
   readonly modelId: string;
@@ -42,6 +52,7 @@ export interface LlmProvider {
     system: string;
     messages: LlmMessage[];
     tools: LlmToolSpec[];
+    tier?: LlmTier;
   }): Promise<LlmResponse>;
 }
 

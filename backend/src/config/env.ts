@@ -527,6 +527,24 @@ const envSchema = z.object({
   // CRR §2/§3 login-rate-limiting exclusion (SPEC-CHATBOT-001 is explicit
   // these must not be conflated).
   CHATBOT_USER_DAILY_TOKEN_CAP: z.coerce.number().int().positive().default(60000),
+  // Provider selection. 'none' is the default and a supported runtime state:
+  // L0 answers the highest-frequency questions with no model at all, and the
+  // orchestrator degrades to the confirmed fallback (RULE-CHAT-03) rather
+  // than erroring. Bedrock chosen 2026-09-04 -- see bedrock-provider.ts for
+  // the data-residency and no-stored-secret reasoning.
+  CHATBOT_PROVIDER: z.enum(['none', 'bedrock']).default('none'),
+
+  // Frankfurt: the same region as RDS and S3. Inference must not leave the
+  // jurisdiction the subjects' data already lives in.
+  CHATBOT_BEDROCK_REGION: z.string().default('eu-central-1'),
+
+  // `eu.` prefix = EU-resident inference profile, NOT a plain model id. A
+  // bare `anthropic.claude-*` id routes without that guarantee, and the
+  // service rejects InvokeModel for these profiles entirely -- the Converse
+  // API is the one that accepts them.
+  CHATBOT_MODEL_FAST: z.string().default('eu.anthropic.claude-haiku-4-5-20251001-v1:0'),
+  CHATBOT_MODEL_PLANNING: z.string().default('eu.anthropic.claude-sonnet-4-5-20250929-v1:0'),
+
   CHATBOT_MAX_TOOL_CALLS_PER_TURN: z.coerce.number().int().positive().default(5),
   CHATBOT_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(20000),
   // HMAC secret for high-risk-write confirmation tokens (§6/§9 of the
