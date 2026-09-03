@@ -17,6 +17,7 @@ import { requirePermission } from '../middleware/permissions.js';
 jest.mock('../modules/documents/storage.js', () => ({
   getStorageClient: async () => ({
     upload: async () => undefined,
+    uploadFile: async () => undefined,
     getPresignedUrl: async () => 'https://signed.example/p.jpg',
     delete: async () => undefined,
   }),

@@ -15,7 +15,7 @@
 // and MUST include a cryptographically-random UUIDv4 component.
 
 import crypto from 'node:crypto';
-import type { Readable } from 'node:stream';
+import { createReadStream } from 'node:fs';
 import { logger } from '../../lib/logger.js';
 
 // RULE-DOC-09: server-generated key with a UUIDv4 segment for unpredictability.
@@ -74,26 +74,34 @@ export interface StorageClient {
   /**
    * Upload a file to S3 (EU) and return the storage key.
    * RULE-DOC-05: storage is EU-region only.
-   *
-   * `body` accepts a Readable as well as a Buffer (2026-09-03). Every upload
-   * route used to buffer the whole file in memory via multer.memoryStorage(),
-   * which put a hard per-request RAM cost on a 1.9 GB host: 10 MB for a
-   * document, and 60 MB for one quality inspection (10 MB x 6 photos). Ten
-   * concurrent checker submissions was ~600 MB of the ~1.1 GB actually free.
-   * Routes now stage to disk and pass a read stream instead.
-   *
-   * `contentLength` is REQUIRED when body is a stream and must be exact.
-   * S3's PutObject needs the length up front for a non-multipart PUT; the
-   * SDK cannot infer it from a stream, and getting it wrong fails the
-   * request rather than truncating silently. Callers pass multer's own
-   * `file.size`, which is the byte count it actually wrote to disk.
    */
-  upload(
-    key: string,
-    body: Buffer | Readable,
-    mimeType: string,
-    contentLength?: number
-  ): Promise<void>;
+  upload(key: string, body: Buffer, mimeType: string): Promise<void>;
+
+  /**
+   * Upload from a file ALREADY ON DISK, streaming it rather than reading it
+   * into memory first (2026-09-03).
+   *
+   * Why this exists as its own method rather than `upload()` taking a
+   * Readable: the caller must not create the stream. Every upload route used
+   * multer.memoryStorage(), costing a 1.9 GB host 10 MB per document and
+   * 60 MB per quality inspection (10 MB x 6 photos) -- ~600 MB for ten
+   * concurrent checker submissions, of ~1.1 GB actually free. The quality
+   * route now stages to disk, and its temp file is unlinked by the
+   * controller as soon as the request finishes.
+   *
+   * That unlink is exactly why the stream is opened HERE. An earlier version
+   * had the service call createReadStream() and pass the stream in; when
+   * anything did not consume it -- the no-op stub client, or a mocked
+   * upload in a test -- the file was unlinked underneath an unread stream
+   * and threw ENOENT asynchronously, outside any request's try/catch. Opening
+   * the file at the point of use makes creation and consumption inseparable,
+   * so an unconsumed stream is not representable.
+   *
+   * `size` must be exact: S3's PutObject needs ContentLength up front for a
+   * non-multipart PUT and cannot infer it from a stream. Callers pass
+   * multer's own `file.size` -- the byte count it actually wrote.
+   */
+  uploadFile(key: string, filePath: string, mimeType: string, size: number): Promise<void>;
 
   /**
    * Download a file from S3 (EU) and return it as a Buffer.
@@ -139,30 +147,30 @@ async function buildS3Client(bucket: string, region: string): Promise<StorageCli
   const client = new S3Client({ region });
 
   return {
-    async upload(
-      key: string,
-      body: Buffer | Readable,
-      mimeType: string,
-      contentLength?: number
-    ): Promise<void> {
-      // ContentLength is set only for the stream case. A Buffer body already
-      // carries its own length, and passing an explicit value there would
-      // just be a second source of truth that could disagree with it.
-      // For a stream it is mandatory (see the interface's own note): without
-      // it the SDK has no length to sign and the PUT fails outright.
-      const isStream = !Buffer.isBuffer(body);
-      if (isStream && contentLength === undefined) {
-        throw new StorageError('contentLength is required when uploading a stream');
-      }
+    async upload(key: string, body: Buffer, mimeType: string): Promise<void> {
       await client.send(
         new PutObjectCommand({
           Bucket: bucket,
           Key: key,
           Body: body,
           ContentType: mimeType,
-          ...(isStream ? { ContentLength: contentLength } : {}),
           // OD-DOC-017: SSE-S3 encryption at rest (AWS S3 default since 2023;
           // explicitly set here so the intent is machine-readable).
+          ServerSideEncryption: 'AES256',
+        })
+      );
+    },
+
+    async uploadFile(key: string, filePath: string, mimeType: string, size: number): Promise<void> {
+      // Stream opened here, immediately before the send that consumes it --
+      // see the interface's note for why the caller must not open it.
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: createReadStream(filePath),
+          ContentType: mimeType,
+          ContentLength: size,
           ServerSideEncryption: 'AES256',
         })
       );
@@ -192,6 +200,12 @@ async function buildS3Client(bucket: string, region: string): Promise<StorageCli
 const stubStorageClient: StorageClient = {
   async upload(_key, _body, _mimeType): Promise<void> {
     logger.warn('documents_storage_stub: S3_BUCKET not configured; upload is a no-op', { _key });
+  },
+  // Deliberately does NOT open the file: this stub is a no-op, and opening a
+  // stream it never reads is what caused the ENOENT-after-unlink race the
+  // interface note describes.
+  async uploadFile(_key, _filePath, _mimeType, _size): Promise<void> {
+    logger.warn('documents_storage_stub: S3_BUCKET not configured; uploadFile is a no-op', { _key });
   },
   async download(_key: string): Promise<Buffer> {
     logger.warn('documents_storage_stub: S3_BUCKET not configured; download returns empty buffer', { _key });

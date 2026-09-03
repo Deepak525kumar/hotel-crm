@@ -31,6 +31,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 jest.mock('../modules/documents/storage.js', () => ({
   getStorageClient: async () => ({
     upload: async () => undefined,
+    uploadFile: async () => undefined,
     getPresignedUrl: async () => 'https://signed.example/p.jpg',
     delete: async () => undefined,
   }),

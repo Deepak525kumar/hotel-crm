@@ -7,7 +7,6 @@ import {
   Prisma,
   VerificationStatus,
 } from '@prisma/client';
-import { createReadStream } from 'node:fs';
 import { BaseService } from '../../lib/base-service.js';
 import type { DatabaseTransaction } from '../../lib/db.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
@@ -540,10 +539,11 @@ export class QualityService extends BaseService {
           throw new ValidationError('Image exceeds the maximum size');
         }
         const key = generateQualityPhotoKey(assignmentId, kind, photo.originalName);
-        // Streamed from the staged temp file rather than buffered (2026-09-03).
-        // ContentLength is required for a stream body and must be exact --
-        // `photo.size` is authoritative for both reasons.
-        await storage.upload(key, createReadStream(photo.path), photo.mimeType, photo.size);
+        // uploadFile, not upload: the storage layer opens the staged temp
+        // file itself. The controller unlinks it the moment the request ends,
+        // so a stream created out here could be read after deletion -- see
+        // StorageClient.uploadFile's own note.
+        await storage.uploadFile(key, photo.path, photo.mimeType, photo.size);
         keys.push(key);
       }
     } catch (err) {
