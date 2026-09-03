@@ -70,6 +70,30 @@ const envSchema = z.object({
   // Database
   DATABASE_URL: z.string().url('Invalid DATABASE_URL'),
 
+  // Prisma's connection pool size. NOT a cosmetic tunable: left unset, Prisma
+  // defaults to `physical_cpus * 2 + 1`, which on the 2-vCPU production host
+  // is FIVE. A 600-client load test against production measured exactly that
+  // -- DatabaseConnections peaked at 5 while RDS sat at 8% CPU and 181
+  // max_connections. The pool, not the hardware, was the ceiling: every
+  // request beyond five concurrent queries queued, which is what pushed p99
+  // from 470ms to 3513ms and produced the ECONNRESETs at the tail.
+  //
+  // 15 is deliberately conservative against `max_connections = 181`: three
+  // pm2 processes hold Prisma clients, so the worst case is ~45 connections,
+  // a quarter of the server's limit, leaving room for psql sessions, the
+  // Multi-AZ standby's own overhead, and a second app process during a
+  // rolling restart. Raising this trades RDS memory (each backend connection
+  // costs ~10MB there) for query concurrency -- measure FreeableMemory before
+  // going higher.
+  DATABASE_POOL_SIZE: z.coerce.number().int().positive().max(100).default(15),
+
+  // How long a request waits for a free pool slot before Prisma throws
+  // P2024. Prisma's own default is 10s; kept explicit because this value and
+  // DATABASE_POOL_SIZE are only meaningful as a pair -- a large pool with a
+  // short timeout and a small pool with a long one fail in different ways,
+  // and a reader changing one needs to see the other.
+  DATABASE_POOL_TIMEOUT_S: z.coerce.number().int().positive().default(10),
+
   // Redis (optional for MVP)
   REDIS_URL: z.string().optional(),
 
