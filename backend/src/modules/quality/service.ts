@@ -7,6 +7,7 @@ import {
   Prisma,
   VerificationStatus,
 } from '@prisma/client';
+import { createReadStream } from 'node:fs';
 import { BaseService } from '../../lib/base-service.js';
 import type { DatabaseTransaction } from '../../lib/db.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
@@ -530,11 +531,19 @@ export class QualityService extends BaseService {
         if (!(ALLOWED_PHOTO_MIME_TYPES as readonly string[]).includes(photo.mimeType)) {
           throw new ValidationError(`Unsupported image type: ${photo.mimeType}`);
         }
-        if (photo.buffer.byteLength > MAX_PHOTO_BYTES) {
+        // `size` is what multer actually wrote to disk, so this is the same
+        // check as before against the same authority -- multer's own byte
+        // count -- just without the file being resident in the heap to
+        // measure. multer also aborts mid-write at this limit; this is the
+        // belt-and-braces half, kept deliberately.
+        if (photo.size > MAX_PHOTO_BYTES) {
           throw new ValidationError('Image exceeds the maximum size');
         }
         const key = generateQualityPhotoKey(assignmentId, kind, photo.originalName);
-        await storage.upload(key, photo.buffer, photo.mimeType);
+        // Streamed from the staged temp file rather than buffered (2026-09-03).
+        // ContentLength is required for a stream body and must be exact --
+        // `photo.size` is authoritative for both reasons.
+        await storage.upload(key, createReadStream(photo.path), photo.mimeType, photo.size);
         keys.push(key);
       }
     } catch (err) {

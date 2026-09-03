@@ -1,3 +1,8 @@
+// Photos are staged temp files since 2026-09-03 (multer.diskStorage),
+// so the service opens them with createReadStream. Point the fixtures at a
+// file that genuinely exists -- storage.upload is mocked and never reads it,
+// but constructing the read stream must not throw.
+const FIXTURE_PHOTO_PATH = __filename;
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 /**
@@ -100,7 +105,7 @@ jest.mock('../config/env.js', () => ({
 import { QualityService } from '../modules/quality/service.js';
 
 const service = new QualityService();
-const PHOTO = [{ buffer: Buffer.from('x'), mimeType: 'image/jpeg', originalName: 'e.jpg' }] as any;
+const PHOTO = [{ path: FIXTURE_PHOTO_PATH, size: 1, mimeType: 'image/jpeg', originalName: 'e.jpg' }] as any;
 const CHECKER = { userId: 'c1', role: 'admin' as const, scope: { type: 'global' as const } };
 
 const BASE_INSPECTION = {

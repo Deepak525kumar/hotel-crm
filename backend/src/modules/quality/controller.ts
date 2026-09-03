@@ -9,24 +9,48 @@ import {
   ListOwnInspectionsQuerySchema,
   RecordInspectionSchema,
 } from './types.js';
+import { unlink } from 'node:fs/promises';
 import type { UploadedPhoto } from './types.js';
 
 /**
- * Files arrive via multer's memory storage, so each is already a Buffer.
+ * Files arrive staged on disk by multer.diskStorage (2026-09-03; was
+ * memoryStorage, see quality/routes.ts for the 60-MB-per-request reason).
  * Normalised here rather than in the service so the service stays
  * transport-agnostic and unit-testable without Express.
+ *
+ * Callers own the temp files' lifetime and MUST pass them to cleanupPhotos()
+ * in a `finally`.
  */
 function photosFrom(req: Request): UploadedPhoto[] {
   const files = (req.files as Express.Multer.File[] | undefined) ?? [];
   return files.map((f) => ({
-    buffer: f.buffer,
+    path: f.path,
+    size: f.size,
     mimeType: f.mimetype,
     originalName: f.originalname,
   }));
 }
 
+/**
+ * Unlink multer's staged temp files. Nothing else does this -- multer's
+ * diskStorage leaves them behind on success AND on failure -- so every
+ * handler that calls photosFrom() must call this in a `finally`.
+ *
+ * Deliberately at the controller boundary rather than inside the service:
+ * a `finally` here runs for EVERY request path, including one that throws in
+ * validation before the service ever reaches its upload helper. Errors are
+ * swallowed per-file: a failed unlink must not turn a successful inspection
+ * into a 500, and the files land in the OS temp dir, which is also cleared
+ * on reboot.
+ */
+async function cleanupPhotos(photos: UploadedPhoto[]): Promise<void> {
+  await Promise.all(photos.map((p) => unlink(p.path).catch(() => {})));
+}
+
 export class QualityController {
   async createVerification(req: Request, res: Response, next: NextFunction) {
+    // Outside the try so `finally` can always reach it, even if parsing throws.
+    const photos = photosFrom(req);
     try {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');
       const parsed = CreateQualityVerificationSchema.safeParse(req.body);
@@ -34,7 +58,7 @@ export class QualityController {
       const result = await qualityService.createVerification(
         parsed.data,
         { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null },
-        photosFrom(req)
+        photos
       );
       res.status(201).json({
         status: 'success',
@@ -43,6 +67,8 @@ export class QualityController {
       });
     } catch (error) {
       next(error);
+    } finally {
+      await cleanupPhotos(photos);
     }
   }
 
@@ -69,13 +95,14 @@ export class QualityController {
 
   // CRR §14: worker uploads a photo and marks the rework done.
   async completeRework(req: Request, res: Response, next: NextFunction) {
+    const photos = photosFrom(req);
     try {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');
       const parsed = CompleteReworkSchema.safeParse({ assignment_id: req.params.assignment_id });
       if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message);
       const result = await qualityService.completeRework(
         parsed.data.assignment_id,
-        photosFrom(req),
+        photos,
         { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null }
       );
       res.status(200).json({
@@ -85,6 +112,8 @@ export class QualityController {
       });
     } catch (error) {
       next(error);
+    } finally {
+      await cleanupPhotos(photos);
     }
   }
 
@@ -136,17 +165,14 @@ export class QualityController {
   // rework assignment and exactly one notification, in a single transaction
   // from a single photo upload.
   async recordInspection(req: Request, res: Response, next: NextFunction) {
+    // Was an inline duplicate of photosFrom(); consolidated 2026-09-03 while
+    // converting to disk staging, so the two upload entrypoints cannot drift
+    // on how a file is normalised. Outside the try so `finally` can reach it.
+    const photos = photosFrom(req);
     try {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');
       const parsed = RecordInspectionSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message);
-
-      const files = (req.files as Express.Multer.File[] | undefined) ?? [];
-      const photos: UploadedPhoto[] = files.map((f) => ({
-        buffer: f.buffer,
-        mimeType: f.mimetype,
-        originalName: f.originalname,
-      }));
 
       const result = await qualityService.recordInspection(
         parsed.data as never,
@@ -160,6 +186,8 @@ export class QualityController {
       });
     } catch (error) {
       next(error);
+    } finally {
+      await cleanupPhotos(photos);
     }
   }
 

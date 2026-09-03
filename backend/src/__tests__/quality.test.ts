@@ -1,3 +1,8 @@
+// Photos are staged temp files since 2026-09-03 (multer.diskStorage),
+// so the service opens them with createReadStream. Point the fixtures at a
+// file that genuinely exists -- storage.upload is mocked and never reads it,
+// but constructing the read stream must not throw.
+const FIXTURE_PHOTO_PATH = __filename;
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 import { requirePermission } from '../middleware/permissions.js';
@@ -21,7 +26,7 @@ jest.mock('../modules/documents/storage.js', () => ({
 
 // CRR §15 enforced 2026-08-24: createRating rejects an empty photos array.
 const RATING_PHOTO = [
-  { buffer: Buffer.from('x'), mimeType: 'image/jpeg', originalName: 'e.jpg' },
+  { path: FIXTURE_PHOTO_PATH, size: 1, mimeType: 'image/jpeg', originalName: 'e.jpg' },
 ] as any;
 
 // CRR §15 is enforced as of 2026-08-24: createVerification() rejects an empty
@@ -29,7 +34,7 @@ const RATING_PHOTO = [
 // enqueue, not the photo rule, so they pass a minimal valid photo rather than
 // asserting on it.
 const PHOTO_FIXTURE = [
-  { buffer: Buffer.from('x'), mimeType: 'image/jpeg', originalName: 'e.jpg' },
+  { path: FIXTURE_PHOTO_PATH, size: 1, mimeType: 'image/jpeg', originalName: 'e.jpg' },
 ] as any;
 
 // refreshWorkerOverallRating()'s 2026-08-13 due-date fix reads "today" via

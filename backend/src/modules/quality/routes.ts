@@ -12,12 +12,27 @@ import {
 const router = Router();
 router.use(authMiddleware);
 
-// Memory storage, same convention as documents/routes.ts and hr/routes.ts.
-// Limits are enforced here AND in the service: multer rejects an oversized
-// file before it is fully buffered, the service check runs once the bytes are
-// already in memory.
+// DISK storage, not memoryStorage (changed 2026-09-03).
+//
+// This was the worst of the four upload routes for memory: one inspection
+// can carry MAX_PHOTOS_PER_VERIFICATION (6) files at MAX_PHOTO_BYTES (10 MB)
+// each, so a SINGLE request could hold 60 MB of photo bytes in the heap at
+// once. On the production t3.small (1906 MB total, ~1.1 GB actually free
+// after the three pm2 processes) ten concurrent checker submissions at
+// end-of-shift came to ~600 MB -- over half the remaining headroom, for a
+// request pattern that is entirely normal.
+//
+// Staging to disk trades that for temp files on a host with 17 GB free, and
+// the service streams each file to S3 rather than reading it back into a
+// buffer. The service is responsible for unlinking them -- multer does NOT
+// clean up diskStorage files itself, on success or on failure. See
+// quality/service.ts's own `finally` for that.
+//
+// Limits are still enforced here AND in the service: multer aborts an
+// oversized file mid-write, and the service re-checks `size` (what multer
+// actually wrote) before uploading.
 const photoUpload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({}),
   limits: { fileSize: MAX_PHOTO_BYTES, files: MAX_PHOTOS_PER_VERIFICATION },
   fileFilter: (_req, file, cb) => {
     if (!(ALLOWED_PHOTO_MIME_TYPES as readonly string[]).includes(file.mimetype)) {

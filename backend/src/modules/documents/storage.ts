@@ -15,6 +15,7 @@
 // and MUST include a cryptographically-random UUIDv4 component.
 
 import crypto from 'node:crypto';
+import type { Readable } from 'node:stream';
 import { logger } from '../../lib/logger.js';
 
 // RULE-DOC-09: server-generated key with a UUIDv4 segment for unpredictability.
@@ -73,8 +74,26 @@ export interface StorageClient {
   /**
    * Upload a file to S3 (EU) and return the storage key.
    * RULE-DOC-05: storage is EU-region only.
+   *
+   * `body` accepts a Readable as well as a Buffer (2026-09-03). Every upload
+   * route used to buffer the whole file in memory via multer.memoryStorage(),
+   * which put a hard per-request RAM cost on a 1.9 GB host: 10 MB for a
+   * document, and 60 MB for one quality inspection (10 MB x 6 photos). Ten
+   * concurrent checker submissions was ~600 MB of the ~1.1 GB actually free.
+   * Routes now stage to disk and pass a read stream instead.
+   *
+   * `contentLength` is REQUIRED when body is a stream and must be exact.
+   * S3's PutObject needs the length up front for a non-multipart PUT; the
+   * SDK cannot infer it from a stream, and getting it wrong fails the
+   * request rather than truncating silently. Callers pass multer's own
+   * `file.size`, which is the byte count it actually wrote to disk.
    */
-  upload(key: string, body: Buffer, mimeType: string): Promise<void>;
+  upload(
+    key: string,
+    body: Buffer | Readable,
+    mimeType: string,
+    contentLength?: number
+  ): Promise<void>;
 
   /**
    * Download a file from S3 (EU) and return it as a Buffer.
@@ -120,13 +139,28 @@ async function buildS3Client(bucket: string, region: string): Promise<StorageCli
   const client = new S3Client({ region });
 
   return {
-    async upload(key: string, body: Buffer, mimeType: string): Promise<void> {
+    async upload(
+      key: string,
+      body: Buffer | Readable,
+      mimeType: string,
+      contentLength?: number
+    ): Promise<void> {
+      // ContentLength is set only for the stream case. A Buffer body already
+      // carries its own length, and passing an explicit value there would
+      // just be a second source of truth that could disagree with it.
+      // For a stream it is mandatory (see the interface's own note): without
+      // it the SDK has no length to sign and the PUT fails outright.
+      const isStream = !Buffer.isBuffer(body);
+      if (isStream && contentLength === undefined) {
+        throw new StorageError('contentLength is required when uploading a stream');
+      }
       await client.send(
         new PutObjectCommand({
           Bucket: bucket,
           Key: key,
           Body: body,
           ContentType: mimeType,
+          ...(isStream ? { ContentLength: contentLength } : {}),
           // OD-DOC-017: SSE-S3 encryption at rest (AWS S3 default since 2023;
           // explicitly set here so the intent is machine-readable).
           ServerSideEncryption: 'AES256',
