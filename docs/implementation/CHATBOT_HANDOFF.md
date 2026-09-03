@@ -58,7 +58,7 @@ The last two constraints are enforced **mechanically** by `chatbot-tool-registry
 |---|---|
 | `OD-CHAT-005` | Scope beyond the owning worker — **answered by `ADR-073`, awaiting ratification.** The owner's rule (2026-09-04): the assistant's authority is the user's own authority, never more. Until that record is Accepted, treat this as still open. |
 | `OD-CHAT-006` | Prompt-injection resistance — open; interim posture only |
-| `OD-CHAT-013` | Module owner unassigned — organizational, no ADR can close it |
+| `OD-CHAT-013` | **CLOSED 2026-09-04** — owner is the commissioning human / account owner, assigned directly |
 
 Everything registered today is self-scoped, so the scaffold is correct under **either** resolution of `OD-CHAT-005`. Also note `ADR-053` item 4: it approves the tool-registry *architecture*, not any specific tool — `assignments.list_mine` carries `approvalRef: PENDING` for exactly this reason.
 
@@ -110,7 +110,12 @@ test it with real umlauts, not ASCII stand-ins.**
 
 ## 7. Next steps, in order
 
-1. **Close the three G2 blockers** (§4). `OD-CHAT-013` needs a human owner, not an ADR.
+1. **Close the remaining G2 blockers** (§4). `OD-CHAT-013` is CLOSED (owner assigned 2026-09-04) and
+   `OD-CHAT-005` is answered by `ADR-073`. **`OD-CHAT-006` (prompt-injection) is the last one**, and it
+   is now the harder of the two it used to sit beside: `ADR-073` admits writes, so a successful injection
+   moves from "reads data the user could already see" to "performs an action the user could already
+   perform". Still bounded by the user's own scope -- that containment is the design's most valuable
+   property -- but no longer harmless.
 2. **Step 5 — wire the provider.** One Bedrock implementation behind `LlmProvider`, plus the L1 router. Needs the API key and the provider decision. Nothing else changes: the budget gate, redaction, executor, tool-call log and templates are all in place and tested. **Spend the first real key on a smoke test** — mock mode cannot validate real request/response shapes.
 3. **Expand the L0 command set.** It is the cheapest capability in the system: every phrase added there is a question that never costs a token. Expect this to dominate the cost model; instrument the L0 hit rate.
    *Progress 2026-09-04:* phrase coverage for the two existing commands widened from 15 to 39 (English + German, both umlaut and `ae` spellings), and the lookup now **throws at module load** if two commands claim the same normalized phrase — a collision would otherwise be won silently by whichever command is declared last and route a worker to the wrong tool. **Further L0 expansion is now gated on tools, not phrases:** `assignments.list_mine` is still the only registered tool, so any new command (documents status, attendance, contract status) needs its tool first, and each tool is its own approval under `ADR-053` item 4.
