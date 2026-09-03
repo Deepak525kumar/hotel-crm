@@ -7,6 +7,11 @@ import { executeTool } from '../tools/executor.js';
 import { findPriorCall, recordToolCall } from '../tools/tool-call-log.js';
 import { resolveTool } from '../tools/registry.js';
 import { checkBudget, recordSpend } from '../guardrails/budget.js';
+import {
+  ConfirmTokenError,
+  issueConfirmToken,
+  verifyConfirmToken,
+} from '../guardrails/confirm-token.js';
 import { redact } from '../guardrails/redaction.js';
 import { getProvider, ProviderUnavailableError } from '../provider/llm-provider.js';
 import { matchL0, resolveCommandId } from './router-l0.js';
@@ -17,6 +22,7 @@ import {
   renderProviderUnavailable,
   renderToolResult,
   renderUnrecognized,
+  renderConfirmationRequest,
 } from './templates.js';
 
 /**
@@ -39,6 +45,19 @@ export interface TurnResult {
   status: ChatbotConversationStatus;
   /** Which rung answered — for the L0-hit-rate metric that drives cost. */
   route: 'L0' | 'L1' | 'L3' | 'none';
+  /**
+   * Set when a high-risk write is proposed and awaiting the user's approval
+   * (ADR-053 item 5). The client renders `summary` and, if the user accepts,
+   * sends `token` straight back as the next turn's only input.
+   *
+   * NOTHING HAS BEEN WRITTEN at this point -- the tool has not run.
+   */
+  pendingConfirmation?: {
+    token: string;
+    /** Exactly what will happen, rendered from the same args the token hashes. */
+    summary: string;
+    toolName: string;
+  };
   toolInvoked?: string;
   fallbackReason?: string;
 }
@@ -50,6 +69,8 @@ export async function runTurn(params: {
   text?: string;
   /** Chip tap / slash command — resolved by id, no text parsing. */
   commandId?: string;
+  /** The user approving a previously-proposed high-risk write. */
+  confirmToken?: string;
   requestId?: string;
 }): Promise<TurnResult> {
   const prisma = getPrisma();
@@ -77,6 +98,154 @@ export async function runTurn(params: {
   // a token cap. Distinct from the budget check below, deliberately.
   if (conversation.turn_count >= env.CHATBOT_MAX_TOOL_CALLS_PER_TURN * 10) {
     return closeWithFallback(params.conversationId, 'turn-limit', 'none');
+  }
+
+  // ---- Confirmation: the user approving a previously-proposed write --------
+  //
+  // The call being confirmed is read from session_state, NEVER from the
+  // request. A client sends only the token, so there are no arguments to
+  // tamper with on the way back -- the token then proves this actor, in this
+  // conversation, on this turn, approved this exact call.
+  if (params.confirmToken) {
+    const pending = readPendingConfirmation(conversation.session_state);
+    if (!pending) {
+      return {
+        reply: 'There is nothing waiting to be confirmed.',
+        status: conversation.status,
+        route: 'none',
+      };
+    }
+
+    try {
+      verifyConfirmToken(params.confirmToken, {
+        actorId: params.actor.userId,
+        conversationId: params.conversationId,
+        turnIndex: pending.turnIndex,
+        toolName: pending.toolName,
+        args: pending.args,
+      });
+    } catch (error) {
+      // The reason is logged, never shown. "Expired" is safe to say and
+      // useful; the rest would tell someone probing exactly which claim
+      // failed.
+      const code = error instanceof ConfirmTokenError ? error.code : 'unknown';
+      logger.warn('chatbot_confirmation_rejected', {
+        code,
+        tool: pending.toolName,
+        requestId: params.requestId,
+      });
+      await clearPendingConfirmation(params.conversationId);
+      return {
+        reply:
+          code === 'EXPIRED'
+            ? 'That confirmation has expired. Please ask again.'
+            : 'That confirmation could not be verified, so nothing was done.',
+        status: conversation.status,
+        route: 'none',
+      };
+    }
+
+    // Cleared BEFORE executing: a token must not survive to be replayed if
+    // the write itself throws partway through.
+    await clearPendingConfirmation(params.conversationId);
+
+    // Idempotency, the same guard L0 applies to its non-READ_ONLY calls.
+    // Clearing the pending row above closes the ordinary double-tap, but it
+    // is a read-then-write and two truly concurrent confirmations can both
+    // pass it. `idempotencyKey` exists precisely so "a retry or double-tap
+    // cannot execute a write twice"; without this the unique constraint only
+    // stops the second LOG row, after the second write has already happened.
+    // (Full concurrency safety for simultaneous turns is OD-CHAT-016, still
+    // open. This narrows the window rather than closing it, and must not be
+    // read as having closed it.)
+    const alreadyRun = await findPriorCall({
+      conversationId: params.conversationId,
+      turnIndex: pending.turnIndex,
+      toolName: pending.toolName,
+      args: pending.args,
+    });
+    if (alreadyRun) {
+      logger.info('chatbot_confirmed_tool_skipped_as_duplicate', {
+        tool: pending.toolName,
+        conversationId: params.conversationId,
+        requestId: params.requestId,
+      });
+      return {
+        reply: 'That is already done.',
+        status: conversation.status,
+        route: 'L1',
+        toolInvoked: pending.toolName,
+      };
+    }
+
+    // Wrapped HERE rather than inside executeTool, whose contract is that
+    // invoke() errors propagate unchanged so a service's own ForbiddenError
+    // surfaces as itself -- changing that would alter behaviour for every
+    // caller, including the HTTP tool-invoke route.
+    //
+    // But on a CONFIRMED HIGH-RISK WRITE, an uncaught throw meant
+    // recordToolCall was never reached, so a write the user explicitly
+    // approved could fail leaving no audit row whatsoever. The attempt is
+    // recorded, then the error is re-raised so callers and the HTTP layer
+    // still see it -- the record is added, nothing is swallowed.
+    let confirmedOutcome;
+    try {
+      confirmedOutcome = await executeTool({
+        toolName: pending.toolName,
+        rawArgs: pending.args,
+        actor: params.actor,
+        requestId: params.requestId,
+        confirmed: true,
+      });
+    } catch (error) {
+      logger.error('chatbot_confirmed_write_threw', {
+        tool: pending.toolName,
+        conversationId: params.conversationId,
+        requestId: params.requestId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      await recordToolCall({
+        conversationId: params.conversationId,
+        turnIndex: pending.turnIndex,
+        toolName: pending.toolName,
+        tier: resolveTool(pending.toolName)?.tier ?? 'HIGH_RISK_WRITE',
+        args: pending.args as Record<string, unknown>,
+        confirmed: true,
+        outcome: {
+          status: 'DENIED',
+          reason: error instanceof Error ? error.message : 'tool execution failed',
+          denialCode: 'EXECUTION_FAILED',
+        },
+      });
+      throw error;
+    }
+
+    const registeredTool = resolveTool(pending.toolName);
+    await recordToolCall({
+      conversationId: params.conversationId,
+      turnIndex: pending.turnIndex,
+      toolName: pending.toolName,
+      tier: registeredTool?.tier ?? 'HIGH_RISK_WRITE',
+      args: pending.args as Record<string, unknown>,
+      confirmed: true,
+      outcome: confirmedOutcome,
+    });
+
+    if (confirmedOutcome.status === 'DENIED') {
+      logger.info('chatbot_confirmed_tool_denied', {
+        tool: pending.toolName,
+        denial_code: confirmedOutcome.denialCode,
+        requestId: params.requestId,
+      });
+      return { reply: renderDenied(), status: conversation.status, route: 'L1', toolInvoked: pending.toolName };
+    }
+
+    return {
+      reply: renderToolResult(redact(confirmedOutcome.result)),
+      status: conversation.status,
+      route: 'L1',
+      toolInvoked: pending.toolName,
+    };
   }
 
   // ---- L0: deterministic, zero-cost ---------------------------------------
@@ -244,6 +413,69 @@ export async function runTurn(params: {
     };
   }
 
+  // ---- Confirmation gate: propose, do not execute --------------------------
+  //
+  // ADR-053 item 5 makes confirmation MANDATORY for high-risk writes,
+  // regardless of what a tool registered as its preference. So this branch
+  // sits before execution and cannot be opted out of by a tool definition.
+  //
+  // Nothing is written here. The call is parked in session_state, the user
+  // is shown exactly what would happen, and the turn ends.
+  const proposed = resolveTool(completion.toolUse.name);
+  if (proposed?.confirm) {
+    const proposedArgs = (completion.toolUse.input ?? {}) as Record<string, unknown>;
+
+    // The args are parsed FIRST. Showing a summary built from unvalidated
+    // model output would let the model describe a call that could never run,
+    // and the user would be approving a fiction.
+    const parsedArgs = proposed.args.safeParse(proposedArgs);
+    if (!parsedArgs.success) {
+      logger.info('chatbot_confirmation_args_invalid', {
+        tool: proposed.name,
+        requestId: params.requestId,
+      });
+      return {
+        reply: renderUnrecognized(),
+        status: ChatbotConversationStatus.IN_PROGRESS,
+        route: 'L1',
+      };
+    }
+
+    await writePendingConfirmation(params.conversationId, {
+      toolName: proposed.name,
+      args: parsedArgs.data,
+      turnIndex,
+    });
+
+    const token = issueConfirmToken({
+      actorId: params.actor.userId,
+      conversationId: params.conversationId,
+      turnIndex,
+      toolName: proposed.name,
+      args: parsedArgs.data,
+    });
+
+    await prisma.chatbotConversation.update({
+      where: { id: params.conversationId },
+      data: {
+        turn_count: { increment: 1 },
+        tokens_input: { increment: completion.usage.promptTokens },
+        tokens_output: { increment: completion.usage.completionTokens },
+      },
+    });
+
+    return {
+      reply: renderConfirmationRequest(proposed.name, parsedArgs.data),
+      status: ChatbotConversationStatus.IN_PROGRESS,
+      route: 'L1',
+      pendingConfirmation: {
+        token,
+        summary: renderConfirmationRequest(proposed.name, parsedArgs.data),
+        toolName: proposed.name,
+      },
+    };
+  }
+
   // ---- L2: the model asked for a tool -------------------------------------
   //
   // `completion.toolUse.input` is raw model output and is treated as hostile:
@@ -251,6 +483,35 @@ export async function runTurn(params: {
   // strict Zod schema and rejects forbidden keys. Nothing here inspects or
   // repairs it first -- a "helpful" fixup in this file would be a second,
   // weaker validator sitting in front of the real one.
+  // Same idempotency rule L0 applies, for the same reason: re-running a read
+  // is harmless and re-running a write is not. A LOW_RISK_WRITE reaching L1
+  // without this would execute twice on a retry.
+  const l1Tool = resolveTool(completion.toolUse.name);
+  if (l1Tool && l1Tool.tier !== 'READ_ONLY') {
+    const priorL1 = await findPriorCall({
+      conversationId: params.conversationId,
+      turnIndex,
+      toolName: completion.toolUse.name,
+      args: completion.toolUse.input,
+    });
+    if (priorL1) {
+      await prisma.chatbotConversation.update({
+        where: { id: params.conversationId },
+        data: {
+          turn_count: { increment: 1 },
+          tokens_input: { increment: completion.usage.promptTokens },
+          tokens_output: { increment: completion.usage.completionTokens },
+        },
+      });
+      return {
+        reply: 'That is already done.',
+        status: ChatbotConversationStatus.IN_PROGRESS,
+        route: 'L1',
+        toolInvoked: completion.toolUse.name,
+      };
+    }
+  }
+
   const outcome = await executeTool({
     toolName: completion.toolUse.name,
     rawArgs: completion.toolUse.input,
@@ -258,7 +519,7 @@ export async function runTurn(params: {
     requestId: params.requestId,
   });
 
-  const registered = resolveTool(completion.toolUse.name);
+  const registered = l1Tool;
   await recordToolCall({
     conversationId: params.conversationId,
     turnIndex,
@@ -331,3 +592,71 @@ async function closeWithFallback(
 }
 
 export { recordSpend };
+
+
+interface PendingConfirmation {
+  toolName: string;
+  args: unknown;
+  turnIndex: number;
+}
+
+/**
+ * Read the pending call from `session_state`.
+ *
+ * Structured state, never a transcript -- this holds a tool name and its
+ * arguments, which is exactly what §12 permits there. Storing it server-side
+ * rather than round-tripping it through the client is the point: there is
+ * nothing for a client to alter between "here is what I will do" and "do it".
+ */
+function readPendingConfirmation(sessionState: unknown): PendingConfirmation | null {
+  const state = sessionState as Record<string, unknown> | null;
+  const pending = state?.['pending_confirmation'] as Record<string, unknown> | undefined;
+  if (!pending) return null;
+  const toolName = pending['tool_name'];
+  const turnIndex = pending['turn_index'];
+  if (typeof toolName !== 'string' || typeof turnIndex !== 'number') return null;
+  return { toolName, args: pending['args'], turnIndex };
+}
+
+async function writePendingConfirmation(
+  conversationId: string,
+  pending: PendingConfirmation
+): Promise<void> {
+  // Re-read rather than using the row fetched at the start of the turn.
+  // That row is already stale by the time a provider call has completed, and
+  // spreading it back would silently revert any other session_state key
+  // written meanwhile.
+  const prisma = getPrisma();
+  const fresh = await prisma.chatbotConversation.findUnique({
+    where: { id: conversationId },
+    select: { session_state: true },
+  });
+  const state = (fresh?.session_state as Record<string, unknown> | null) ?? {};
+  await prisma.chatbotConversation.update({
+    where: { id: conversationId },
+    data: {
+      session_state: {
+        ...state,
+        pending_confirmation: {
+          tool_name: pending.toolName,
+          args: pending.args,
+          turn_index: pending.turnIndex,
+        },
+      } as never,
+    },
+  });
+}
+
+async function clearPendingConfirmation(conversationId: string): Promise<void> {
+  const prisma = getPrisma();
+  const row = await prisma.chatbotConversation.findUnique({
+    where: { id: conversationId },
+    select: { session_state: true },
+  });
+  const state = { ...((row?.session_state as Record<string, unknown> | null) ?? {}) };
+  delete state['pending_confirmation'];
+  await prisma.chatbotConversation.update({
+    where: { id: conversationId },
+    data: { session_state: state as never },
+  });
+}

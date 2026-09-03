@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ActorContext } from '../tools/actor.js';
 import { listTools, type ToolRegistration } from '../tools/registry.js';
+import { actorHasPermission } from '../tools/executor.js';
 import type { LlmMessage, LlmToolSpec } from '../provider/llm-provider.js';
 
 /**
@@ -37,14 +38,19 @@ import type { LlmMessage, LlmToolSpec } from '../provider/llm-provider.js';
  * the control, and every role legitimately holds it for their own record.
  */
 export function visibleTools(actor: ActorContext): ToolRegistration<any>[] {
-  const held = new Set(actor.permissions);
-
   return listTools().filter((tool) => {
     if (tool.permission === null) return true;
-    const required = Array.isArray(tool.permission) ? tool.permission : [tool.permission];
-    // EVERY token, not some: a tool declaring two permissions needs both, and
-    // `some` would show an Admin-only tool to anyone holding either half.
-    return required.every((token) => held.has(token) || held.has('admin:*'));
+    // Delegated to the executor's OWN predicate rather than reimplemented.
+    //
+    // A copy of this logic drifts, and it already had: the first version
+    // checked exact membership plus `admin:*` and missed the executor's
+    // resource-wildcard rule (holding `hr:*` satisfies `hr:read`). Nothing
+    // holds such a token today, so it was latent -- but the effect would be
+    // a tool INVISIBLE to someone who can actually execute it, which reads
+    // as the assistant being broken rather than as a permission problem.
+    // actorHasPermission's own comment demands lock-step with the route
+    // middleware; the same applies here.
+    return actorHasPermission(actor, tool.permission);
   });
 }
 

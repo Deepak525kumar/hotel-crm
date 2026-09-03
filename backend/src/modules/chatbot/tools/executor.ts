@@ -41,7 +41,14 @@ export type DenialCode =
   | 'FORBIDDEN_ARG'
   | 'MISSING_PERMISSION'
   | 'OUT_OF_SCOPE'
-  | 'CONFIRMATION_REQUIRED';
+  | 'CONFIRMATION_REQUIRED'
+  // The tool ran and threw. executeTool deliberately lets invoke() errors
+  // propagate (so a service's own ForbiddenError surfaces as itself), so
+  // this is never produced HERE -- it is the code a caller uses when it
+  // catches such an error and records the attempt. A confirmed high-risk
+  // write that fails must leave an audit row; before this existed it left
+  // none, because recordToolCall was never reached.
+  | 'EXECUTION_FAILED';
 
 export interface ExecuteRequest {
   toolName: string;

@@ -106,7 +106,7 @@ export async function exchangeMessage(
     const result = await chatbotService.exchangeMessage(
       req.params.id,
       actor,
-      { text: parsed.data.text, commandId: parsed.data.command_id },
+      { text: parsed.data.text, commandId: parsed.data.command_id, confirmToken: parsed.data.confirm_token },
       { requestId: req.requestId }
     );
     sendSuccess(res, result, { requestId: req.requestId });
