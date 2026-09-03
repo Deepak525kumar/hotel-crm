@@ -311,6 +311,25 @@ const envSchema = z.object({
   // convention as the sweep jobs above. Default interval: daily, same
   // rationale as GEO_RETENTION_SWEEP -- this data ages out over months/
   // years, not hours.
+  // Age-based pruning for Notification and AuditLog (2026-09-04). Nothing
+  // deleted from either table before this: both are written on essentially
+  // every user action, so at 500 daily workers they were the two
+  // fastest-growing tables with no ceiling. See
+  // retention/platform-table-sweep-job.ts for why this is NOT the deferred
+  // OD-RETENTION-10 cross-module mechanism.
+  //
+  // Daily by default: this is a slow-moving policy, and a table that has
+  // never been pruned should not be swept aggressively on a 1.9 GB host.
+  PLATFORM_TABLE_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
+  PLATFORM_TABLE_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
+  PLATFORM_TABLE_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
+  // Notifications are a UI convenience with no evidential value once old.
+  PLATFORM_NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  // The audit trail outlives operational data -- it is the evidential record
+  // for employment and payroll-adjacent actions -- but stays bounded, since
+  // an unbounded audit table is an availability risk, not a compliance win.
+  PLATFORM_AUDIT_LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+
   RETENTION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
   RETENTION_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
   RETENTION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),

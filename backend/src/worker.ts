@@ -17,6 +17,7 @@ import {
 import { SessionSweepJob } from './modules/auth/session-sweep-job.js';
 import { GeoRetentionSweepJob } from './modules/geo/retention-sweep-job.js';
 import { RetentionSweepJob } from './modules/retention/sweep-job.js';
+import { PlatformTableSweepJob } from './modules/retention/platform-table-sweep-job.js';
 import { JobRequestAutoCloseJob } from './modules/job-requests/auto-close-job.js';
 import { HrContractExpiryReminderJob } from './modules/hr/expiry-reminder-job.js';
 import { AssignmentNoShowJob } from './modules/assignments/no-show-job.js';
@@ -132,6 +133,15 @@ async function main() {
           intervalMs: env.RETENTION_SWEEP_INTERVAL_MS,
           batchSize: env.RETENTION_SWEEP_BATCH_SIZE,
           maxBatchesPerRun: env.RETENTION_SWEEP_MAX_BATCHES_PER_RUN,
+        })
+      )
+      .register(
+        new PlatformTableSweepJob(prisma, {
+          intervalMs: env.PLATFORM_TABLE_SWEEP_INTERVAL_MS,
+          batchSize: env.PLATFORM_TABLE_SWEEP_BATCH_SIZE,
+          maxBatchesPerRun: env.PLATFORM_TABLE_SWEEP_MAX_BATCHES_PER_RUN,
+          notificationRetentionDays: env.PLATFORM_NOTIFICATION_RETENTION_DAYS,
+          auditLogRetentionDays: env.PLATFORM_AUDIT_LOG_RETENTION_DAYS,
         })
       )
       .register(
