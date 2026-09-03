@@ -12,6 +12,12 @@ E2E tests", or anything similar: read this file first, then execute the scenario
 encode defects that were expensive to find and are easy to regress. Add to them rather than
 replace them.
 
+> **Capacity, not correctness?** This suite verifies that behaviour is *right*. For "can the
+> server handle N users", instance sizing, or benchmarking, see
+> [`../performance/README.md`](../performance/README.md) instead — load testing production has
+> its own safety constraints (real welcome emails, account lockouts, burstable CPU credits)
+> that these scenarios do not cover.
+
 ---
 
 ## How to use this suite
