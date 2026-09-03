@@ -520,13 +520,56 @@ const envSchema = z.object({
   // REQ-CHAT-004: hard monthly token budget cap, config-stored. Not read
   // anywhere yet (no provider is wired) — present now so ChatbotBudgetCounter
   // and its guard can be exercised in tests ahead of Step 5.
-  CHATBOT_MONTHLY_TOKEN_CAP: z.coerce.number().int().positive().default(2000000),
+  // REQ-CHAT-004: hard monthly ceiling on spend across the whole platform.
+  //
+  // SIZED FROM A COST, NOT A ROUND NUMBER. Verified Bedrock rates for
+  // eu-central-1 (from the model's own agreement rate card, 2026-09-04) are
+  // $1.10 per million input tokens and $5.50 per million output for
+  // Haiku 4.5 via the EU-resident `eu.` profile. At the ~5:1 input:output
+  // ratio a tool-calling assistant produces, a mixed million tokens costs
+  // roughly $1.83, so 25M/month is about $46 -- a deliberate, statable
+  // monthly ceiling rather than a number nobody can price. It also sits
+  // ~40% above the ~18M/month projected for ADR-035's workload assumption
+  // (500 workers asking, plus managers planning), so the cap is headroom
+  // rather than a limit normal use runs into.
+  //
+  // The previous 2,000,000 was a pilot budget worth roughly $3.70/month. At
+  // ADR-035's workload assumption it bought about two model answers per
+  // worker per month and would have been exhausted in around four days,
+  // after which every user gets the fallback for the rest of the month.
+  // That is not a safety limit, it is an outage on a schedule.
+  CHATBOT_MONTHLY_TOKEN_CAP: z.coerce.number().int().positive().default(25000000),
+
   // REQ-CHAT-005: per-conversation token limit.
-  CHATBOT_CONVERSATION_TOKEN_CAP: z.coerce.number().int().positive().default(25000),
+  //
+  // Raised from 25,000 because that was smaller than a single realistic
+  // planning turn. A manager dictating a week's plan sends long prose, the
+  // tool schemas ride along on every turn, and the confirmation round-trip
+  // repeats much of it -- one such conversation was estimated at 20,000+
+  // tokens on its own, so the old ceiling could end a conversation midway
+  // through the task it was opened for.
+  CHATBOT_CONVERSATION_TOKEN_CAP: z.coerce.number().int().positive().default(120000),
+
   // OD-CHAT-010 abuse-prevention: per-worker daily cap, distinct from the
   // CRR §2/§3 login-rate-limiting exclusion (SPEC-CHATBOT-001 is explicit
   // these must not be conflated).
-  CHATBOT_USER_DAILY_TOKEN_CAP: z.coerce.number().int().positive().default(60000),
+  //
+  // This cap protects the SHARED monthly budget from a single heavy user, so
+  // it is only meaningful relative to it. At the old pairing (60,000 daily
+  // against a 2,000,000 month) roughly 33 worker-days drained the entire
+  // platform's month, so the per-user cap could never bind first and was
+  // effectively decorative. 40,000/day against 20M/month means it takes
+  // ~500 worker-days to exhaust the month -- the per-user limit now catches
+  // a runaway user well before the platform-wide one fires, which is the
+  // only ordering in which having both is useful.
+  //
+  // 250,000/day is 1% of the monthly cap: one user would need 100 days of
+  // maximum consumption to drain the platform, while normal use (a handful
+  // of turns) never approaches it. It must also exceed
+  // CHATBOT_CONVERSATION_TOKEN_CAP, or a single permitted conversation could
+  // not complete inside one user's daily allowance -- enforced below rather
+  // than left to whoever edits these next.
+  CHATBOT_USER_DAILY_TOKEN_CAP: z.coerce.number().int().positive().default(250000),
   // Provider selection. 'none' is the default and a supported runtime state:
   // L0 answers the highest-frequency questions with no model at all, and the
   // orchestrator degrades to the confirmed fallback (RULE-CHAT-03) rather
@@ -577,6 +620,40 @@ const envSchema = z.object({
   // `UPLOAD_RETURNED_OK` while writing nothing), which is what prompted this
   // guard.
   .superRefine((env, ctx) => {
+    // The three chatbot caps are only useful in a specific ORDER, and the
+    // ordering is easy to break by adjusting one number in isolation.
+    //
+    // A per-conversation cap at or above the per-user daily cap can never
+    // fire: the daily cap would always stop the user first, leaving a single
+    // runaway conversation bounded only by that user's whole day.
+    if (env.CHATBOT_CONVERSATION_TOKEN_CAP >= env.CHATBOT_USER_DAILY_TOKEN_CAP) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CHATBOT_CONVERSATION_TOKEN_CAP'],
+        message:
+          `CHATBOT_CONVERSATION_TOKEN_CAP (${env.CHATBOT_CONVERSATION_TOKEN_CAP}) must be ` +
+          `below CHATBOT_USER_DAILY_TOKEN_CAP (${env.CHATBOT_USER_DAILY_TOKEN_CAP}); ` +
+          'otherwise the per-conversation limit can never fire, because the daily ' +
+          'cap always stops the user first.',
+      });
+    }
+
+    // A daily per-user cap at or above the platform's monthly cap means one
+    // user can exhaust everyone's budget in a day, which is the failure the
+    // per-user cap exists to prevent. This pairing WAS wrong: 60,000/day
+    // against 2,000,000/month let roughly 33 worker-days drain the month, so
+    // the per-user cap was decorative.
+    if (env.CHATBOT_USER_DAILY_TOKEN_CAP >= env.CHATBOT_MONTHLY_TOKEN_CAP) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CHATBOT_USER_DAILY_TOKEN_CAP'],
+        message:
+          `CHATBOT_USER_DAILY_TOKEN_CAP (${env.CHATBOT_USER_DAILY_TOKEN_CAP}) must be ` +
+          `below CHATBOT_MONTHLY_TOKEN_CAP (${env.CHATBOT_MONTHLY_TOKEN_CAP}); a single ` +
+          'user must not be able to exhaust the whole platform budget.',
+      });
+    }
+
     const requiresRealStorage = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';
     if (requiresRealStorage && !env.S3_BUCKET?.trim()) {
       ctx.addIssue({
