@@ -85,7 +85,34 @@ const envSchema = z.object({
   // defense-in-depth rather than the platform's only expiry guarantee, so
   // it can be shortened without weakening the previous behavior.
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
-  JWT_REFRESH_EXPIRY: z.string().default('7d'),
+  // Sessions are intended to persist like a consumer app's: a worker who uses
+  // the app stays signed in indefinitely, and is signed out only by an event
+  // that MEANS "sign out", never by the calendar.
+  //
+  // This is the single knob controlling all three places a refresh lifetime
+  // appears -- the signed refresh JWT (lib/jwt.ts), the browser cookie's
+  // maxAge (lib/cookies.ts) and the Session row's `expires_at`
+  // (auth/service.ts's sessionLifetimeMs). Those had drifted: the row was
+  // hardcoded to 7 days regardless of this value.
+  //
+  // The window SLIDES -- refreshToken() reissues and re-dates the row on
+  // every refresh, and the apps refresh on launch -- so this is an
+  // INACTIVITY timeout, not a session cap. At 365d it takes a full year of
+  // never opening the app to be logged out.
+  //
+  // Deliberately finite rather than infinite. Revocation does not depend on
+  // it (see below), but a bound means an abandoned device's token stops
+  // working eventually, and SessionSweepJob can still reclaim dead rows --
+  // with no expiry the Session table would grow forever, the exact unbounded
+  // -growth problem PlatformTableSweepJob was written to fix elsewhere.
+  //
+  // What signs a user out, all independent of this value and all immediate:
+  // password reset (deletes every Session row + bumps token_generation),
+  // logout (one session, or all), account soft-delete, deactivation, archive,
+  // role change and employment termination (all bump token_generation, which
+  // middleware/auth.ts verifies on EVERY request per ADR-031 D-2/D-4), and
+  // refreshToken()'s own live `is_active`/`deleted_at` check.
+  JWT_REFRESH_EXPIRY: z.string().default('365d'),
 
   // APNs (PATCH-05: base64 encoded private key)
   APNS_PRIVATE_KEY_BASE64: z.string().optional(),

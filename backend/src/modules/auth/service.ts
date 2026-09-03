@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'node:crypto';
 import { Prisma, PrismaClient, UserRole, OutboxTransport, NotificationType, OutboxSourceModule } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
-import { signTokens, verifyRefreshToken, UserScope } from '../../lib/jwt.js';
+import { signTokens, verifyRefreshToken, parseExpiryToSeconds, UserScope } from '../../lib/jwt.js';
 import {
   ConflictError,
   UnauthorizedError,
@@ -34,6 +34,25 @@ export async function bumpTokenGeneration(
     where: { id: userId },
     data: { token_generation: { increment: 1 } },
   });
+}
+
+
+/**
+ * How far out a Session row's `expires_at` is set, derived from the SAME
+ * setting that signs the refresh JWT.
+ *
+ * Derived, never a literal. Three call sites (signup, login, refresh) each
+ * hardcoded `7 * 24 * 60 * 60 * 1000` while the JWT was signed from
+ * JWT_REFRESH_EXPIRY, so the row and the token it stores had independent
+ * lifetimes. Raising JWT_REFRESH_EXPIRY alone would therefore have changed
+ * nothing a user can feel: the refresh JWT would live longer, but
+ * refreshToken() rejects on `session.expires_at < new Date()` first, so
+ * everyone would still have been logged out at day 7 with no failing test
+ * and no error to explain it. One knob now moves the JWT, the cookie
+ * (lib/cookies.ts already derived its maxAge this way) and the row together.
+ */
+function sessionLifetimeMs(): number {
+  return parseExpiryToSeconds(getEnv().JWT_REFRESH_EXPIRY) * 1000;
 }
 
 export class AuthService extends BaseService {
@@ -346,7 +365,7 @@ export class AuthService extends BaseService {
       data: {
         user_id: user.id,
         refresh_token: this.hashRefreshToken(tokens.refresh_token),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expires_at: new Date(Date.now() + sessionLifetimeMs()),
       },
     });
 
@@ -474,7 +493,7 @@ export class AuthService extends BaseService {
       data: {
         user_id: user.id,
         refresh_token: this.hashRefreshToken(tokens.refresh_token),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expires_at: new Date(Date.now() + sessionLifetimeMs()),
       },
     });
 
@@ -589,7 +608,7 @@ export class AuthService extends BaseService {
       where: { id: session.id },
       data: {
         refresh_token: this.hashRefreshToken(tokens.refresh_token),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expires_at: new Date(Date.now() + sessionLifetimeMs()),
       },
     });
 
