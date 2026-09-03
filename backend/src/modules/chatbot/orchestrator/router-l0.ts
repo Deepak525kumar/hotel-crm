@@ -41,15 +41,34 @@ export const L0_COMMANDS: readonly L0Command[] = [
     tool: 'assignments.list_mine',
     args: {},
     phrases: [
+      // English
       'my shifts',
       'my shift',
       'show my shifts',
+      'show me my shifts',
       'what are my shifts',
       'when do i work',
+      'when am i working',
+      'what am i working',
       'my schedule',
       'show my schedule',
+      'my work schedule',
+      'my roster',
+      'my assignments',
+      'show my assignments',
+      // German. Umlaut and ae/oe/ue spellings fold to the same key in
+      // normalize(), so only ONE spelling of each phrase belongs here --
+      // listing both would be dead weight, not extra coverage.
       'meine schichten',
+      'meine schicht',
+      'zeig meine schichten',
+      'zeige meine schichten',
+      'meine dienste',
       'mein dienstplan',
+      'mein schichtplan',
+      'schichtplan',
+      'arbeitsplan',
+      'wann arbeite ich',
     ],
   },
   {
@@ -58,21 +77,66 @@ export const L0_COMMANDS: readonly L0Command[] = [
     tool: 'assignments.list_mine',
     args: { status: 'CONFIRMED' },
     phrases: [
+      // English
       'upcoming shifts',
       'my upcoming shifts',
       'next shift',
       'my next shift',
       'what is my next shift',
+      'when is my next shift',
+      'confirmed shifts',
+      'my confirmed shifts',
+      // German
       'naechste schicht',
+      'meine naechste schicht',
+      'wann ist meine naechste schicht',
+      'naechster dienst',
+      'kommende schichten',
+      'bestaetigte schichten',
     ],
   },
 ];
 
-/** Lowercase, strip punctuation, collapse whitespace. */
+/**
+ * German transliteration, applied BEFORE decomposition.
+ *
+ * The platform's workforce is German-speaking, so this is the common case,
+ * not an edge case. `ae`/`oe`/`ue`/`ss` is the standard convention a German
+ * typist falls back to without an umlaut key, so folding both spellings to
+ * the same key makes "nächste" and "naechste" one phrase rather than two.
+ */
+const GERMAN_FOLDING: ReadonlyArray<readonly [RegExp, string]> = [
+  [/ä/g, 'ae'],
+  [/ö/g, 'oe'],
+  [/ü/g, 'ue'],
+  [/ß/g, 'ss'],
+];
+
+/**
+ * Lowercase, fold German umlauts, strip diacritics, strip punctuation,
+ * collapse whitespace.
+ *
+ * The combining-mark step is NOT cosmetic. This previously ran `NFKD` and
+ * then replaced every non-letter/non-digit with a SPACE -- and `NFKD` splits
+ * "ä" into "a" plus U+0308 COMBINING DIAERESIS, which is Unicode category
+ * Mn (Mark), not L. So the mark became a space and "nächste schicht"
+ * normalized to "na chste schicht", matching no phrase at all. Every German
+ * worker typing the natural spelling of an umlaut word fell through to L1 --
+ * which is not built -- while `'Meine Schichten'`, the one German phrase
+ * under test, has no umlaut and passed.
+ *
+ * Marks are therefore REMOVED rather than replaced with a separator, so a
+ * decomposed character collapses back to one word instead of two.
+ */
 export function normalize(input: string): string {
-  return input
-    .toLowerCase()
+  let text = input.toLowerCase();
+  for (const [pattern, replacement] of GERMAN_FOLDING) {
+    text = text.replace(pattern, replacement);
+  }
+  return text
     .normalize('NFKD')
+    // Combining marks first, and dropped -- not turned into a separator.
+    .replace(/\p{M}+/gu, '')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -81,9 +145,29 @@ export function normalize(input: string): string {
 const BY_PHRASE = new Map<string, L0Command>();
 const BY_ID = new Map<string, L0Command>();
 for (const command of L0_COMMANDS) {
+  if (BY_ID.has(command.id)) {
+    throw new Error(`L0: duplicate command id "${command.id}"`);
+  }
   BY_ID.set(command.id, command);
+
   for (const phrase of command.phrases) {
-    BY_PHRASE.set(normalize(phrase), command);
+    const key = normalize(phrase);
+    const existing = BY_PHRASE.get(key);
+    // A phrase claimed by two commands is silently won by whichever is
+    // declared last, which would route a worker's question to the wrong tool
+    // with no error anywhere -- the exact "confidently answer the question
+    // nobody asked" failure this router is built to avoid. Two spellings of
+    // one phrase (umlaut vs. ae) now normalize to ONE key, so this also
+    // catches a redundant entry added out of habit.
+    if (existing && existing.id !== command.id) {
+      throw new Error(
+        `L0: phrase "${phrase}" (normalized "${key}") is claimed by both "${existing.id}" and "${command.id}"`
+      );
+    }
+    if (existing) {
+      throw new Error(`L0: duplicate phrase "${phrase}" (normalized "${key}") in "${command.id}"`);
+    }
+    BY_PHRASE.set(key, command);
   }
 }
 
