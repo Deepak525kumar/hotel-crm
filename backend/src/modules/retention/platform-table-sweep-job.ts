@@ -8,54 +8,43 @@ export interface PlatformTableSweepJobConfig {
   /** Safety bound on batches deleted per table per run, mirroring SessionSweepJob. */
   maxBatchesPerRun?: number;
   notificationRetentionDays: number;
-  auditLogRetentionDays: number;
 }
 
 /**
- * Age-based pruning for the two platform tables that grew without bound.
+ * Age-based pruning for `Notification`, on the retention tier `ADR-033`
+ * assigns it.
  *
- * WHY THIS EXISTS: nothing deleted from `Notification` or `AuditLog`. Both
- * are written on essentially every user action -- several notifications per
- * worker per day, and an audit row from every `logAudit()` call in every
- * module -- so at 500 daily workers they were the two fastest-growing tables
- * in the database, with no ceiling. `OutboxEvent` already had its own
- * `deleteMany` path (outbox-repository.ts) and `Session`/`PasswordResetToken`
- * have SessionSweepJob; these two had nothing.
+ * WHY THIS EXISTS: nothing deleted from `Notification`. It is written on
+ * essentially every user action -- several per worker per day -- so at 500
+ * daily workers it grows continuously with no ceiling.
  *
- * WHAT THIS IS NOT: this is deliberately NOT the deferred cross-module
- * delegation mechanism (`OD-RETENTION-10`), and does not depend on it. That
- * open decision is about the central sweep being *authorized* to delete
- * another module's business records through a registered mechanism -- a real
- * architecture question that is still open, and which `SPEC-RETENTION-001`
- * (@0.2.0, REVIEW, not FROZEN) cannot be implemented against.
+ * RETENTION IS SET BY POLICY, NOT BY CAPACITY. `ADR-033` (ratified
+ * 2026-07-28) assigns `Notification` to **Tier 2, the 5-year general
+ * personal/profile tier** of CRR §25's framework. The window below is that
+ * decision expressed in days; it is not a number chosen to keep the table
+ * small, and it must not be shortened for that reason.
  *
- * This job sidesteps it entirely by following the precedent already set by
- * `auth/session-sweep-job.ts` and `geo/retention-sweep-job.ts`: a fixed,
- * code-declared policy over specific named tables, with no registration
- * mechanism, no dynamic dispatch, and no authorization surface. Adding a
- * table here is a code change and a code review, not a runtime grant.
+ * `AuditLog` IS DELIBERATELY NOT SWEPT HERE, and this file previously got
+ * that wrong. It pruned `AuditLog` at 365 days, which directly contradicted
+ * `ADR-033`: the audit log is "explicitly excluded from all three tiers and
+ * retained indefinitely -- it is the platform's own accountability record
+ * (CRR §30's 'every important action is logged' mandate), and deleting audit
+ * history on the same clock as the data it describes would defeat its
+ * purpose." Notification was likewise pruned at 90 days against a 5-year
+ * tier. Both were introduced by treating unbounded growth as a defect to fix
+ * without first checking whether a retention policy already existed. It did.
  *
- * WHY BOTH TABLES IN ONE JOB: `Notification` is owned by the notifications
- * module, but `AuditLog` has no owning business module at all -- it is
- * written from `BaseService.logAudit()` by every module. Splitting them
- * would double the config surface and the scheduler registrations for no
- * behavioural difference, since they share an identical policy shape
- * (age out by a single timestamp column) and interval. Retention is the
- * module that owns data-lifecycle policy, so it hosts both.
+ * No production data was lost -- the oldest row in either table was ~25 days
+ * old when this was caught, so nothing had yet become eligible -- but
+ * notifications would have begun being deleted around 2026-11-09.
  *
- * RETENTION WINDOWS are configurable and deliberately different:
- *   - notifications: short. They are a UI convenience; once read (or long
- *     unread) they have no evidential value.
- *   - audit log: much longer. This is the evidential trail for employment
- *     and payroll-adjacent actions, so it outlives operational data. It is
- *     still bounded -- an unbounded audit table is an availability risk, not
- *     a compliance win.
+ * The capacity concern for `AuditLog` is real and remains unsolved. It must
+ * be solved by something that does not destroy the record: archival to cold
+ * storage, or table partitioning. Not deletion.
  *
- * Both sweeps are batched -- select a bounded page of ids, delete exactly
- * those ids, repeat -- so a large first run over a table that has never been
- * pruned cannot lock it. Both target columns are already indexed
- * (`Notification.created_at`, `AuditLog.timestamp`), so the selects are
- * index scans rather than sequential ones.
+ * Batched -- select a bounded page of ids, delete exactly those ids, repeat --
+ * so a large first run cannot lock the table. `Notification.created_at` is
+ * indexed, so the select is an index scan rather than a sequential one.
  */
 export class PlatformTableSweepJob implements ScheduledJob {
   readonly name = 'platform-table-sweep';
@@ -63,7 +52,6 @@ export class PlatformTableSweepJob implements ScheduledJob {
   private readonly batchSize: number;
   private readonly maxBatchesPerRun: number;
   private readonly notificationRetentionDays: number;
-  private readonly auditLogRetentionDays: number;
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -73,18 +61,14 @@ export class PlatformTableSweepJob implements ScheduledJob {
     this.batchSize = config.batchSize;
     this.maxBatchesPerRun = config.maxBatchesPerRun ?? 50;
     this.notificationRetentionDays = config.notificationRetentionDays;
-    this.auditLogRetentionDays = config.auditLogRetentionDays;
   }
 
   async run(): Promise<void> {
     const notificationsDeleted = await this.sweepNotifications();
-    const auditLogsDeleted = await this.sweepAuditLogs();
 
     logger.info('platform_table_sweep_completed', {
       notifications_deleted: notificationsDeleted,
-      audit_logs_deleted: auditLogsDeleted,
       notification_retention_days: this.notificationRetentionDays,
-      audit_log_retention_days: this.auditLogRetentionDays,
     });
   }
 
@@ -105,29 +89,6 @@ export class PlatformTableSweepJob implements ScheduledJob {
       if (stale.length === 0) break;
 
       const { count } = await this.prisma.notification.deleteMany({
-        where: { id: { in: stale.map((row) => row.id) } },
-      });
-      total += count;
-
-      if (stale.length < this.batchSize) break;
-    }
-
-    return total;
-  }
-
-  private async sweepAuditLogs(): Promise<number> {
-    const cutoff = this.cutoff(this.auditLogRetentionDays);
-    let total = 0;
-
-    for (let batch = 0; batch < this.maxBatchesPerRun; batch++) {
-      const stale = await this.prisma.auditLog.findMany({
-        where: { timestamp: { lt: cutoff } },
-        select: { id: true },
-        take: this.batchSize,
-      });
-      if (stale.length === 0) break;
-
-      const { count } = await this.prisma.auditLog.deleteMany({
         where: { id: { in: stale.map((row) => row.id) } },
       });
       total += count;
