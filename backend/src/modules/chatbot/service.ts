@@ -104,7 +104,7 @@ export class ChatbotService extends BaseService {
   async exchangeMessage(
     conversationId: string,
     actor: ActorContext,
-    input: { text?: string; commandId?: string },
+    input: { text?: string; commandId?: string; confirmToken?: string },
     options?: { requestId?: string }
   ): Promise<TurnResult> {
     return runTurn({
@@ -112,6 +112,7 @@ export class ChatbotService extends BaseService {
       actor,
       text: input.text,
       commandId: input.commandId,
+      confirmToken: input.confirmToken,
       requestId: options?.requestId,
     });
   }

@@ -46,10 +46,17 @@ export const ExchangeMessageSchema = z
   .object({
     text: z.string().min(1).max(4000).optional(),
     command_id: z.string().min(1).max(64).optional(),
+    // A confirmation turn carries ONLY this: no text to re-parse and no
+    // arguments to re-supply. The call being confirmed is held server-side
+    // in session_state, so a client cannot alter what it is confirming --
+    // the token merely proves this person saw and approved that exact call.
+    confirm_token: z.string().min(1).max(2048).optional(),
   })
   .strict()
-  .refine((d) => Boolean(d.text) !== Boolean(d.command_id), {
-    message: 'exactly one of text or command_id is required',
+  .refine(
+    (d) => [d.text, d.command_id, d.confirm_token].filter(Boolean).length === 1,
+    {
+    message: 'exactly one of text, command_id or confirm_token is required',
   });
 
 export type StartConversationInput = z.infer<typeof StartConversationSchema>;

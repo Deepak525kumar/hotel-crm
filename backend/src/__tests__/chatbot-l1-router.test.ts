@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from '@jest/globals';
 import { z } from 'zod';
-import { registerTool } from '../modules/chatbot/tools/registry.js';
+import { registerTool, listTools } from '../modules/chatbot/tools/registry.js';
+import { actorHasPermission } from '../modules/chatbot/tools/executor.js';
 import {
   visibleTools,
   toolSpec,
@@ -101,6 +102,41 @@ describe('visibleTools', () => {
     // The registry only admits null for READ_ONLY + self-scoped tools with a
     // written rationale, so the owning service's self-scoping is the control.
     expect(names(actor('worker', []))).toContain(NEEDS_NONE);
+  });
+
+  it('REGRESSION: honours a resource wildcard, exactly as the executor does', () => {
+    // Found in review. visibleTools originally reimplemented the permission
+    // check as "exact match OR admin:*", which silently omitted the
+    // executor's resource-wildcard rule (holding `hr:*` satisfies
+    // `hr:read`). Nothing holds such a token today, so it was latent -- but
+    // the effect is a tool INVISIBLE to someone who can actually execute it,
+    // which reads as the assistant being broken rather than as a permission
+    // problem. It now delegates to actorHasPermission, so the two cannot
+    // drift again.
+    const wildcardHolder = actor('manager', ['staffing:*']);
+    expect(names(wildcardHolder)).toContain(NEEDS_ONE);
+
+    // And the wildcard must not leak across resources.
+    expect(names(actor('manager', ['quality:*']))).not.toContain(NEEDS_ONE);
+  });
+
+  it('agrees with the executor for every actor shape tested here', () => {
+    // The invariant, stated directly: visibility and execution must never
+    // disagree about a tool, in either direction.
+    const actors = [
+      actor('worker', []),
+      actor('manager', ['staffing:read']),
+      actor('manager', ['staffing:read', 'analytics:read']),
+      actor('manager', ['staffing:*']),
+      actor('admin', ['admin:*']),
+    ];
+    for (const a of actors) {
+      const visible = new Set(visibleTools(a).map((t) => t.name));
+      for (const tool of listTools()) {
+        const executable = tool.permission === null || actorHasPermission(a, tool.permission);
+        expect(visible.has(tool.name)).toBe(executable);
+      }
+    }
   });
 
   it("treats admin:* as satisfying any token", () => {

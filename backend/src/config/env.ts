@@ -698,16 +698,36 @@ const envSchema = z.object({
       });
     }
 
-    // Only require the confirmation-token secret once the flag that could
-    // ever mount a HIGH_RISK_WRITE tool is on — the scaffold today registers
-    // none, so requiring this unconditionally would block booting a
-    // read-only-only deployment for a secret nothing yet uses.
-    if (env.FEATURE_CHATBOT && env.CHATBOT_CONFIRM_TOKEN_SECRET !== undefined) {
-      if (env.CHATBOT_CONFIRM_TOKEN_SECRET.length < 32) {
+    // The confirmation-token secret is REQUIRED whenever the chatbot flag is
+    // on, not merely validated if present.
+    //
+    // This tightened when the confirmation flow was built. Previously the
+    // secret was optional because no HIGH_RISK_WRITE tool existed and
+    // requiring it would have blocked booting a read-only deployment for a
+    // secret nothing used. The flow now exists, so a deployment with the
+    // flag on and no secret is a misconfiguration that fails on the first
+    // confirmation attempt -- guardrails/confirm-token.ts refuses to issue or
+    // verify unsigned, which is correct but is a RUNTIME failure in front of
+    // a user mid-task.
+    //
+    // Same fail-closed-at-boot pattern as the S3_BUCKET guard above: a
+    // misconfiguration should be a startup crash, not a discovery made when
+    // someone tries to approve a change to a worker's schedule.
+    if (env.FEATURE_CHATBOT) {
+      if (!env.CHATBOT_CONFIRM_TOKEN_SECRET) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['CHATBOT_CONFIRM_TOKEN_SECRET'],
-          message: 'CHATBOT_CONFIRM_TOKEN_SECRET must be at least 32 characters when set',
+          message:
+            'CHATBOT_CONFIRM_TOKEN_SECRET is required when FEATURE_CHATBOT is enabled: ' +
+            'high-risk writes cannot be confirmed without it, and an unsigned ' +
+            'confirmation flow would accept forged tokens.',
+        });
+      } else if (env.CHATBOT_CONFIRM_TOKEN_SECRET.length < 32) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CHATBOT_CONFIRM_TOKEN_SECRET'],
+          message: 'CHATBOT_CONFIRM_TOKEN_SECRET must be at least 32 characters',
         });
       }
     }

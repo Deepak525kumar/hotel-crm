@@ -41,3 +41,35 @@ export function renderDenied(): string {
 export function renderUnrecognized(): string {
   return 'I did not understand that. Try one of the quick commands.';
 }
+
+
+/**
+ * What the user is asked to approve.
+ *
+ * Rendered DETERMINISTICALLY from the same parsed arguments the confirmation
+ * token hashes -- never phrased by a second model call. That equality is
+ * what makes the confirmation meaningful: whatever a person reads here is
+ * exactly what the token authorises, so an argument cannot change between
+ * the sentence they approved and the call that runs.
+ *
+ * Arguments are listed rather than summarised in prose. A prose summary
+ * would have to omit something to stay readable, and the omitted field is
+ * precisely where a substituted value would hide.
+ */
+export function renderConfirmationRequest(toolName: string, args: unknown): string {
+  const entries =
+    args && typeof args === 'object' && !Array.isArray(args)
+      ? Object.entries(args as Record<string, unknown>)
+      : [];
+
+  const lines = entries
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => `  ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
+
+  return [
+    `This will run: ${toolName}`,
+    ...(lines.length > 0 ? lines : ['  (no arguments)']),
+    '',
+    'Nothing has been changed yet. Confirm to go ahead, or cancel.',
+  ].join('\n');
+}
