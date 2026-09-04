@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.js';
-import { requireRole } from '../../middleware/permissions.js';
+import { requirePermission, requireRole } from '../../middleware/permissions.js';
 import { notificationController } from './controller.js';
 import {
   discardDeadLetter,
@@ -23,7 +23,12 @@ router.post('/outbox/dead-letters/:outbox_id/requeue', requireRole('admin'), req
 router.delete('/outbox/dead-letters/:outbox_id', requireRole('admin'), discardDeadLetter);
 
 router.get('/', (req, res, next) => notificationController.getNotifications(req, res, next));
-router.post('/:notification_id/read', (req, res, next) =>
+// `notifications:mark-read-own` (2026-09-04) — held by EVERY role, so this
+// denies nobody who could call it before. Enforced so the capability is
+// nameable for the tool registry; markAsRead's own user_id comparison
+// remains the substantive control, and returns ForbiddenError for another
+// person's notification.
+router.post('/:notification_id/read', requirePermission('notifications:mark-read-own'), (req, res, next) =>
   notificationController.markAsRead(req, res, next)
 );
 router.post('/push-tokens', (req, res, next) => notificationController.registerPushToken(req, res, next));

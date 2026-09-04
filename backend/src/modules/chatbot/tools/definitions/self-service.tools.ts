@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { assignmentService } from '../../../assignments/service.js';
 import { hrService } from '../../../hr/service.js';
 import { qualityService } from '../../../quality/service.js';
+import { calendarService } from '../../../calendar/service.js';
 import { notificationService } from '../../../notifications/service.js';
 import type { AssignmentDto } from '../../../assignments/types.js';
 import { toServiceActor } from '../actor.js';
@@ -574,4 +575,218 @@ export const listMyInspections = registerTool<MyInspectionsArgs>({
 
   compress: compressInspections,
   maxResultTokens: 600,
+});
+
+
+// ---------------------------------------------------------------------------
+// WRITE TOOLS
+//
+// The first tool that changes state. ADR-053 item 5 fixes the tiers and the
+// registry enforces them: HIGH_RISK_WRITE forces `confirm: true` at
+// registration, so confirmation cannot be opted out of by a tool definition.
+//
+// WHY THE PLATFORM GAINED TWO PERMISSION TOKENS FOR THIS.
+// `assertValidRegistration` requires every non-READ_ONLY tool to declare a
+// real permission, and rightly refuses the `null` escape hatch for writes --
+// letting it widen would make `null` the way writes get registered. But the
+// two SAFEST writes here (a person marking their own message read, or
+// declaring their own sick day) run through routes that enforced no token at
+// all, with the owning service's ownership check as the whole gate. Sound for
+// HTTP, but it meant the safest writes were the ones that could not be
+// exposed, while a write touching someone else's record could.
+//
+// Owner decision, 2026-09-04: name the capability rather than loosen the
+// guard. `notifications:mark-read-own` and `calendar:absence:write-own` were
+// added, granted to EVERY role so nobody who could call those routes lost
+// access, and the routes now enforce them -- "satisfied by construction",
+// exactly as ADR-042/OD-HR-10 describes `hr:contract:read-own`. Self-scope
+// remains the substantive control in both services.
+// ---------------------------------------------------------------------------
+
+/**
+ * A checker sends a room back for rework.
+ *
+ * HIGH_RISK_WRITE, so confirmation is MANDATORY -- forced by
+ * assertValidRegistration, not a preference expressed here. It earns the
+ * tier: rework creates a linked assignment for another person (ADR-069),
+ * changes what that worker is expected to do, and is visible to them
+ * immediately as a notification. It is not something to do by accident.
+ *
+ * FIRST TOOL TO TOUCH ANOTHER PERSON'S RECORD, which is exactly the class
+ * ADR-073 authorises and nothing before it could do. The authority is still
+ * the caller's own: assignRework applies isScopedManagerRole/isHotelInScope
+ * itself, so a checker can only send back work at a hotel they already cover
+ * -- the same boundary they operate under by hand.
+ *
+ * `quality:write` is declared honestly here: POST /quality/rework enforces
+ * exactly that token, and CHECKER holds it. No `null`, no rationale needed.
+ */
+const AssignReworkArgs = z
+  .object({
+    // Mirrors AssignReworkSchema. `verification_id` says WHICH inspection --
+    // semantic, not authorization. The service loads it, finds its
+    // assignment and re-checks hotel scope, so an invented id is refused
+    // rather than acted on.
+    verification_id: z.string().min(1).max(64),
+    // Required by the service too. The worker is told why their room is
+    // coming back, so an empty note would be a notification that explains
+    // nothing.
+    notes: z.string().trim().min(1).max(1000),
+  })
+  .strict();
+
+type AssignReworkArgs = z.infer<typeof AssignReworkArgs>;
+
+export const assignReworkTool = registerTool<AssignReworkArgs>({
+  name: 'quality.assign_rework',
+  description:
+    'Send an inspected room back to the worker for rework, with a note explaining what ' +
+    'needs redoing. Use when a checker says a room must be done again.',
+  tier: 'HIGH_RISK_WRITE',
+  confirm: true,
+
+  interfaceRef: 'IF-QUAL-AssignRework (quality/service.ts assignRework())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It is ' +
+    'the FIRST HIGH_RISK_WRITE in the registry and the first to touch another ' +
+    "person's record, so it is also the first real exercise of the confirmation flow.",
+
+  args: AssignReworkArgs,
+  permission: 'quality:write',
+  scopeCheck: 'hotel',
+
+  invoke: async (args, actor) => {
+    return qualityService.assignRework(args, toServiceActor(actor));
+  },
+
+  compress: (raw: unknown) => {
+    const result = raw as { id?: string; room_number?: string | null } | null;
+    return {
+      summary: result?.room_number
+        ? `Room ${result.room_number} sent back for rework.`
+        : 'Rework assigned.',
+      data: null,
+    };
+  },
+  maxResultTokens: 60,
+});
+
+/**
+ * Mark one of the caller's own notifications as read.
+ *
+ * LOW_RISK_WRITE with `confirm: false`, and that judgement is what the tier
+ * is for: asking "are you sure?" before marking a message read would train
+ * people to click through confirmations without reading them, which is
+ * exactly what makes the confirmation on a real write worthless. Reserve the
+ * interruption for changes that matter.
+ *
+ * Declares a real token. `notifications:mark-read-own` was added to the
+ * platform on 2026-09-04 and the route now enforces it -- previously this
+ * route gated on nothing, which made this tool impossible to register at all
+ * (the registry rightly refuses `permission: null` for a write).
+ */
+const MarkNotificationReadArgs = z
+  .object({
+    // Semantic, not authorization: WHICH notification, never WHOSE.
+    // markAsRead compares notification.user_id against the caller and throws
+    // ForbiddenError otherwise, so a guessed or hallucinated id cannot read
+    // across users.
+    notification_id: z.string().min(1).max(64),
+  })
+  .strict();
+
+type MarkNotificationReadArgs = z.infer<typeof MarkNotificationReadArgs>;
+
+export const markMyNotificationRead = registerTool<MarkNotificationReadArgs>({
+  name: 'notifications.mark_read',
+  description:
+    "Mark one of the authenticated user's own notifications as read. Use when they say " +
+    'they have read a message, or ask to clear or dismiss one.',
+  tier: 'LOW_RISK_WRITE',
+  confirm: false,
+
+  interfaceRef: 'IF-NOTIF-MarkAsRead (notifications/service.ts markAsRead())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    'Self-scoped, reversible, LOW_RISK_WRITE.',
+
+  args: MarkNotificationReadArgs,
+  permission: 'notifications:mark-read-own',
+  scopeCheck: 'self',
+
+  invoke: async (args, actor) => {
+    return notificationService.markAsRead(args.notification_id, toServiceActor(actor).userId);
+  },
+
+  compress: () => ({ summary: 'Marked as read.', data: null }),
+  maxResultTokens: 40,
+});
+
+/**
+ * Declare one of the caller's own sick or vacation days.
+ *
+ * HIGH_RISK_WRITE, so confirmation is MANDATORY -- forced at registration,
+ * not a preference expressed here. ADR-053 item 5 names "submit a leave
+ * request" as high-risk, and it earns that for a reason specific to this
+ * codebase: a self-marked absence is a PROTECTED record. Per the owner
+ * decision of 2026-08-29 a manager cannot afterwards move, re-kind or delete
+ * an absence the worker marked themselves. So this writes a row its own
+ * author cannot later have corrected on their behalf -- precisely the kind of
+ * thing a person should see spelled out before it happens.
+ *
+ * Self-scoped: markAbsence() is the /my-absences path and supplies its own
+ * `{ userId: workerId, role: 'worker' }` actor. The manager-on-behalf path is
+ * markAbsenceForWorker, deliberately NOT wrapped here.
+ */
+const MarkMyAbsenceArgs = z
+  .object({
+    // Mirrors MarkAbsenceSchema rather than approximating it. A looser shape
+    // would let the model produce a call the service then rejects -- after
+    // the user had already confirmed it.
+    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+    kind: z.enum(['SICK', 'VACATION']),
+    reason: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict()
+  // The service's own rule, restated so it fails at PROPOSAL time. Without
+  // it a VACATION with no reason would be summarised, confirmed, and only
+  // then refused -- the confirmation flow parses arguments before rendering a
+  // summary precisely so nobody approves a call that cannot run.
+  .refine((d) => d.kind !== 'VACATION' || Boolean(d.reason), {
+    message: 'reason is required for a VACATION absence',
+    path: ['reason'],
+  });
+
+type MarkMyAbsenceArgs = z.infer<typeof MarkMyAbsenceArgs>;
+
+export const markMyAbsence = registerTool<MarkMyAbsenceArgs>({
+  name: 'calendar.mark_my_absence',
+  description:
+    "Record one of the authenticated user's OWN sick or vacation days. Use for " +
+    '"I am sick today", "ich bin krank", "book me off on the 12th". A vacation day ' +
+    'requires a reason; a sick day does not.',
+  tier: 'HIGH_RISK_WRITE',
+  confirm: true,
+
+  interfaceRef: 'IF-CAL-MarkAbsence (calendar/service.ts markAbsence())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval.',
+
+  args: MarkMyAbsenceArgs,
+  permission: 'calendar:absence:write-own',
+  scopeCheck: 'self',
+
+  invoke: async (args, actor) => {
+    return calendarService.markAbsence(toServiceActor(actor).userId, args);
+  },
+
+  compress: (raw: unknown) => {
+    const absence = raw as { day?: string; kind?: string } | null;
+    if (!absence) return { summary: 'Absence recorded.', data: null };
+    return {
+      summary: `Recorded ${String(absence.kind ?? '').toLowerCase()} leave for ${absence.day}.`,
+      data: { day: absence.day, kind: absence.kind },
+    };
+  },
+  maxResultTokens: 80,
 });

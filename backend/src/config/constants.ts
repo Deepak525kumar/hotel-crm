@@ -149,6 +149,24 @@ const MANAGER_PERMISSIONS = Object.freeze([
   // Manager may view/blocklist within scope; creation stays Admin-only
   // (enforced service-side, OD-EMP-08).
   'employees:read', 'employees:write',
+    // Self-scoped WRITE tokens (2026-09-04, owner decision). Held by EVERY
+    // role, deliberately: `POST /calendar/my-absences` and
+    // `POST /notifications/:id/read` are open to any authenticated user and
+    // must stay that way, so these are "satisfied by construction" exactly as
+    // ADR-042/OD-HR-10 describes `hr:contract:read-own`. They do not exist to
+    // deny anyone.
+    //
+    // They exist so the capability is NAMEABLE. Both routes previously
+    // enforced no token at all, with the owning service's ownership check as
+    // the whole gate. That is sound for HTTP, but it left the two safest
+    // writes on the platform -- a person marking their own message read, or
+    // declaring their own sick day -- impossible to expose as chatbot tools,
+    // because the tool registry requires every non-READ_ONLY tool to declare
+    // a real permission and rightly refuses the `null` escape hatch for
+    // writes. Naming the capability is the honest fix; loosening that guard
+    // was the alternative and was rejected.
+    'calendar:absence:write-own',
+    'notifications:mark-read-own',
 ]) as string[];
 
 // ADR-031 D-1 (PR-3): ROLE_PERMISSIONS is now consulted on the request path
@@ -179,6 +197,24 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     'audit:read',
     // Epic 5 PR 5.6 (SPEC-EMP-001): employee-management permissions.
     'employees:read', 'employees:write', 'employees:delete', 'employees:special_category:read',
+    // Self-scoped WRITE tokens (2026-09-04, owner decision). Held by EVERY
+    // role, deliberately: `POST /calendar/my-absences` and
+    // `POST /notifications/:id/read` are open to any authenticated user and
+    // must stay that way, so these are "satisfied by construction" exactly as
+    // ADR-042/OD-HR-10 describes `hr:contract:read-own`. They do not exist to
+    // deny anyone.
+    //
+    // They exist so the capability is NAMEABLE. Both routes previously
+    // enforced no token at all, with the owning service's ownership check as
+    // the whole gate. That is sound for HTTP, but it left the two safest
+    // writes on the platform -- a person marking their own message read, or
+    // declaring their own sick day -- impossible to expose as chatbot tools,
+    // because the tool registry requires every non-READ_ONLY tool to declare
+    // a real permission and rightly refuses the `null` escape hatch for
+    // writes. Naming the capability is the honest fix; loosening that guard
+    // was the alternative and was rejected.
+    'calendar:absence:write-own',
+    'notifications:mark-read-own',
   ]) as string[],
   MANAGER: MANAGER_PERMISSIONS,
   // ADR-060 / ADR-030 §3 C-33: RM = Manager's operational set plus
@@ -205,6 +241,24 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     'hr:contract:read-own',
     'hr:payslip:read-own',
     'hr:payslip:request',
+    // Self-scoped WRITE tokens (2026-09-04, owner decision). Held by EVERY
+    // role, deliberately: `POST /calendar/my-absences` and
+    // `POST /notifications/:id/read` are open to any authenticated user and
+    // must stay that way, so these are "satisfied by construction" exactly as
+    // ADR-042/OD-HR-10 describes `hr:contract:read-own`. They do not exist to
+    // deny anyone.
+    //
+    // They exist so the capability is NAMEABLE. Both routes previously
+    // enforced no token at all, with the owning service's ownership check as
+    // the whole gate. That is sound for HTTP, but it left the two safest
+    // writes on the platform -- a person marking their own message read, or
+    // declaring their own sick day -- impossible to expose as chatbot tools,
+    // because the tool registry requires every non-READ_ONLY tool to declare
+    // a real permission and rightly refuses the `null` escape hatch for
+    // writes. Naming the capability is the honest fix; loosening that guard
+    // was the alternative and was rejected.
+    'calendar:absence:write-own',
+    'notifications:mark-read-own',
   ]) as string[],
   WORKER: Object.freeze([
     'hotels:read',
@@ -241,6 +295,24 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // hr:read (held by admin/manager) is the broader token for the same route;
     // requirePayslipReadAccess() in hr/routes.ts enforces the role-specific split.
     'hr:payslip:read-own',
+    // Self-scoped WRITE tokens (2026-09-04, owner decision). Held by EVERY
+    // role, deliberately: `POST /calendar/my-absences` and
+    // `POST /notifications/:id/read` are open to any authenticated user and
+    // must stay that way, so these are "satisfied by construction" exactly as
+    // ADR-042/OD-HR-10 describes `hr:contract:read-own`. They do not exist to
+    // deny anyone.
+    //
+    // They exist so the capability is NAMEABLE. Both routes previously
+    // enforced no token at all, with the owning service's ownership check as
+    // the whole gate. That is sound for HTTP, but it left the two safest
+    // writes on the platform -- a person marking their own message read, or
+    // declaring their own sick day -- impossible to expose as chatbot tools,
+    // because the tool registry requires every non-READ_ONLY tool to declare
+    // a real permission and rightly refuses the `null` escape hatch for
+    // writes. Naming the capability is the honest fix; loosening that guard
+    // was the alternative and was rejected.
+    'calendar:absence:write-own',
+    'notifications:mark-read-own',
   ]) as string[],
 });
 

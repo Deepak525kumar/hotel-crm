@@ -9,7 +9,7 @@
 | Governing decisions | `ADR-013` (AI-execution ownership), `ADR-053` (orchestration layer + tool registry) |
 | Specification | `SPEC-CHATBOT-001@0.2.0` — **`REVIEW`, not `FROZEN`** |
 | Completion | ~40% of the backend module. **0% of the AI itself.** |
-| Tests | 121 chatbot tests across 8 suites; full backend suite 3603 passing (2026-09-04) |
+| Tests | 232 chatbot tests across 18 suites; full backend suite 3714 passing (2026-09-04) |
 
 ---
 
@@ -105,6 +105,21 @@ contain no umlaut. Fixed 2026-09-04: umlauts fold to `ae`/`oe`/`ue`/`ss` before 
 and residual combining marks are **removed** rather than replaced with a separator.
 **This platform's workforce is German-speaking — treat German input as the common case and
 test it with real umlauts, not ASCII stand-ins.**
+
+**A write tool needs a real permission token — and two self-service routes had none, so the
+platform gained two.** `assertValidRegistration` admits `permission: null` only for READ_ONLY
+self-scoped tools, which is right: letting it widen to writes would make `null` the way writes get
+registered. But `POST /notifications/:id/read` and `POST /calendar/my-absences` enforced no token
+at all, so the two SAFEST writes on the platform were the ones that could not be exposed, while a
+write touching someone else's record could. Owner decision, 2026-09-04: **name the capability
+rather than loosen the guard.** `notifications:mark-read-own` and `calendar:absence:write-own`
+were added, granted to EVERY role (nobody who could call those routes lost access), and the routes
+now enforce them — "satisfied by construction", as `ADR-042`/`OD-HR-10` describes
+`hr:contract:read-own`. **If you gate a previously-open route, grant the token to every role first
+and assert it**: `calendar-my-absences-scope.test.ts` hardcoded `permissions: []`, so it had never
+exercised a permission gate and went 403 the moment one existed — while real users, whose
+permissions come from `ROLE_PERMISSIONS[user.role]`, were unaffected. Fixtures that fabricate
+permissions hide exactly this.
 
 **The registry cannot express a role-conditional permission, and several routes have one.**
 `requireContractReadAccess()` and `requirePayslipReadAccess()` (hr/routes.ts) gate
