@@ -1,3 +1,4 @@
+import { ROLE_PERMISSIONS } from '../config/constants.js';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -9,6 +10,17 @@ import type { Request, Response, NextFunction } from 'express';
  */
 
 let testAuth: { userId: string; role: string; permissions: string[] } | null = null;
+
+// Derived from the REAL matrix, exactly as middleware/auth.ts does
+// (`ROLE_PERMISSIONS[user.role]`). These fixtures previously hardcoded
+// `permissions: []`, which meant they never exercised a permission gate at
+// all -- so when POST /my-absences gained `calendar:absence:write-own` on
+// 2026-09-04 they failed with 403 while real users were unaffected. Reading
+// the real sets makes this suite fail if that token is ever removed from a
+// role, which is the protection worth having.
+function realPermissions(role: string): string[] {
+  return [...(ROLE_PERMISSIONS[role] ?? [])];
+}
 
 jest.mock('../lib/logger.js', () => ({
   logger: {
@@ -70,7 +82,7 @@ describe('Calendar /my-absences (GD-18 narrow slice) — self-scoped, any authen
   });
 
   it('GET scopes to the caller\'s own userId, ignoring any client-supplied worker id', async () => {
-    testAuth = { userId: 'w1', role: 'worker', permissions: [] };
+    testAuth = { userId: 'w1', role: 'worker', permissions: realPermissions('WORKER') };
     const res = await request(makeApp()).get('/calendar/my-absences?worker_id=w2');
     expect(res.status).toBe(200);
     expect(getOwnAbsences).toHaveBeenCalledWith('w1');
@@ -78,7 +90,7 @@ describe('Calendar /my-absences (GD-18 narrow slice) — self-scoped, any authen
   });
 
   it('POST scopes to the caller\'s own userId, ignoring a worker_id in the body', async () => {
-    testAuth = { userId: 'w1', role: 'worker', permissions: [] };
+    testAuth = { userId: 'w1', role: 'worker', permissions: realPermissions('WORKER') };
     const res = await request(makeApp())
       .post('/calendar/my-absences')
       .send({ day: '2026-08-01', kind: 'SICK', worker_id: 'w2' });
@@ -87,7 +99,7 @@ describe('Calendar /my-absences (GD-18 narrow slice) — self-scoped, any authen
   });
 
   it('rejects an invalid kind with 422 before reaching the service', async () => {
-    testAuth = { userId: 'w1', role: 'worker', permissions: [] };
+    testAuth = { userId: 'w1', role: 'worker', permissions: realPermissions('WORKER') };
     const res = await request(makeApp())
       .post('/calendar/my-absences')
       .send({ day: '2026-08-01', kind: 'PARENTAL_LEAVE' });
@@ -96,7 +108,7 @@ describe('Calendar /my-absences (GD-18 narrow slice) — self-scoped, any authen
   });
 
   it('permits any authenticated role, not just admin/manager', async () => {
-    testAuth = { userId: 'a1', role: 'admin', permissions: [] };
+    testAuth = { userId: 'a1', role: 'admin', permissions: realPermissions('ADMIN') };
     const res = await request(makeApp()).get('/calendar/my-absences');
     expect(res.status).toBe(200);
     expect(getOwnAbsences).toHaveBeenCalledWith('a1');

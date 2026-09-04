@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.js';
-import { requireRole } from '../../middleware/permissions.js';
+import { requirePermission, requireRole } from '../../middleware/permissions.js';
 import { calendarController } from './controller.js';
 import { router as shiftSummaryRoutes } from './shift-summary/routes.js';
 
@@ -11,7 +11,19 @@ router.use(authMiddleware);
 // gate (self-scope is itself the authorization, same pattern as GD-06's
 // /analytics/my-stats).
 router.get('/my-absences', (req, res, next) => calendarController.getOwnAbsences(req, res, next));
-router.post('/my-absences', (req, res, next) => calendarController.markAbsence(req, res, next));
+// `calendar:absence:write-own` (2026-09-04) — held by EVERY role, so this
+// denies nobody who could call it before. It is enforced rather than assumed
+// so the capability is nameable: a chatbot tool must declare a real
+// permission, and until this token existed the safest write on the platform
+// (a person declaring their own sick day) could not be exposed at all.
+// Same "satisfied by construction" pattern as ADR-042/OD-HR-10's
+// hr:contract:read-own. Self-scope remains the substantive control —
+// markAbsence takes the worker id from the caller and supplies its own actor.
+router.post(
+  '/my-absences',
+  requirePermission('calendar:absence:write-own'),
+  (req, res, next) => calendarController.markAbsence(req, res, next)
+);
 
 // New (calendar grid view): manager/regional_manager/admin view of absences
 // across their scoped team, for a bounded date range. Role gate matches the

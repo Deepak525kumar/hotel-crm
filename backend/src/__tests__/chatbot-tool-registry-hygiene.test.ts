@@ -103,13 +103,50 @@ describe('tool registry hygiene — every registered tool', () => {
     }
   });
 
-  it('registers no write tool while OD-CHAT-005 is unresolved', () => {
-    // OD-CHAT-005 (read-scope and initiation-scope beyond the owning worker)
-    // is a standing G2-freeze blocker. Until it is ratified, the registry
-    // stays read-only — this test is the mechanical expression of that, and
-    // is expected to be updated deliberately when the decision lands.
-    const writeTools = listTools().filter((t) => t.tier !== 'READ_ONLY');
-    expect(writeTools.map((t) => t.name)).toEqual([]);
+  // OD-CHAT-005 CLOSED 2026-09-04 by ADR-073 (Accepted): a user may do
+  // through the assistant exactly what they can do by hand, within their own
+  // scope. The blanket "no write tool" assertion that stood here has done its
+  // job and is replaced — deliberately, as its own comment anticipated — by
+  // the invariants that now bound writes. The guard tightens; it does not go
+  // away.
+  it('gives every write tool a REAL permission token, never the null escape hatch', () => {
+    // `permission: null` is admitted only for READ_ONLY self-scoped tools
+    // whose wrapped route enforces nothing. Letting it widen to writes would
+    // turn a narrow, justified exception into the way writes get registered.
+    //
+    // This is not theoretical: it blocked "mark my notification read" and
+    // "record my own sick day", because those self-service routes are
+    // authMiddleware-only. That tension is real and is an owner decision
+    // (give those routes tokens, or relax this rule) — not something to work
+    // around by loosening the guard.
+    for (const tool of listTools()) {
+      if (tool.tier === 'READ_ONLY') continue;
+      expect({ tool: tool.name, permission: tool.permission }).not.toEqual({
+        tool: tool.name,
+        permission: null,
+      });
+    }
+  });
+
+  it('forces confirmation on every HIGH_RISK_WRITE (ADR-053 item 5)', () => {
+    // Enforced at registration too. Asserted here so the guarantee is
+    // visible where someone adding a tool will read it.
+    for (const tool of listTools()) {
+      if (tool.tier !== 'HIGH_RISK_WRITE') continue;
+      expect({ tool: tool.name, confirm: tool.confirm }).toEqual({
+        tool: tool.name,
+        confirm: true,
+      });
+    }
+  });
+
+  it('records an approval reference for every write tool (ADR-053 item 4)', () => {
+    // The architecture is approved; each tool is its own approval. A write
+    // tool with no stated approval status is one nobody signed off.
+    for (const tool of listTools()) {
+      if (tool.tier === 'READ_ONLY') continue;
+      expect(tool.approvalRef.length).toBeGreaterThan(0);
+    }
   });
 
   it('registers no analytics tool while OQ-ANALYTICS-01 is open', () => {
