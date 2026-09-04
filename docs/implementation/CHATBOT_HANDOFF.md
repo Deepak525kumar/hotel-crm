@@ -106,6 +106,17 @@ and residual combining marks are **removed** rather than replaced with a separat
 **This platform's workforce is German-speaking — treat German input as the common case and
 test it with real umlauts, not ASCII stand-ins.**
 
+**The registry cannot express a role-conditional permission, and several routes have one.**
+`requireContractReadAccess()` and `requirePayslipReadAccess()` (hr/routes.ts) gate
+worker/checker on `hr:contract:read-own` / `hr:payslip:read-own` and admin/manager/RM on
+`hr:read`. `ToolRegistration.permission`'s array form is an AND (`every()` in permissions.ts),
+so naming both tokens denies **everyone** (no role holds both) and naming either alone locks out
+half the platform. `hr.my_contract` models this as `permission: null` with a written rationale,
+which is safe there only because the tool is self-scoped, the worker id is the actor's own and is
+not expressible as an argument, and the service re-checks. **Do not copy the `null` without
+copying all three of those conditions** — and prefer fixing the registry to express an OR, rather
+than restating this per tool.
+
 **Verify your base branch is current before concluding anything about the repo.** A stale working branch made `prisma migrate dev` report drift for columns that a migration on `origin/main` already created, which was briefly mistaken for a missing-migration defect. Confirm against `origin/main`, not whatever branch happens to be checked out.
 
 ## 7. Next steps, in order
