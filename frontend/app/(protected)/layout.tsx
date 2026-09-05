@@ -2,6 +2,7 @@ import { AuthGuard } from "@/components/auth/AuthGuard";
 import { OnboardingGuard } from "@/components/auth/OnboardingGuard";
 import { AppShell } from "@/components/layout/AppShell";
 import { ConsentGate } from "@/components/consent/ConsentGate";
+import { ChatWidget } from "@/components/chatbot/ChatWidget";
 
 /**
  * Layout for all authenticated routes. The `(protected)` route group
@@ -28,6 +29,19 @@ export default function ProtectedLayout({
       <AppShell>
         <ConsentGate>
           <OnboardingGuard>{children}</OnboardingGuard>
+          {/* INSIDE ConsentGate, and that placement is the point. The daily
+              data-protection notice gates use of the system itself
+              (RULE-CONSENT-01); an assistant floating over that notice would
+              be a way to use the platform without answering it. Placed as a
+              SIBLING of ConsentGate it would do exactly that.
+
+              OUTSIDE OnboardingGuard, though: a user held on the onboarding
+              surface still gets the normal chrome, and "what do I still need
+              to upload?" is a reasonable thing to ask while held there.
+
+              Renders nothing at all when the backend does not serve the
+              chatbot routes. */}
+          <ChatWidget />
         </ConsentGate>
       </AppShell>
     </AuthGuard>

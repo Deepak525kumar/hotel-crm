@@ -1222,5 +1222,22 @@
     "suggestions": "Suggestions:",
     "goToCheckIn": "Aller au pointage d'arrivée",
     "loggedCount": "{{n}} chambres"
+  },
+  "chatbot": {
+    "title": "Assistant",
+    "subtitle": "Réponses sur vos propres services, votre contrat, vos fiches de paie et vos messages.",
+    "greeting": "Comment puis-je aider ?",
+    "greetingHint": "Posez une question ou choisissez ci-dessous.",
+    "placeholder": "Posez une question sur vos services, votre contrat ou vos messages…",
+    "inputLabel": "Message",
+    "send": "Envoyer",
+    "close": "Fermer",
+    "openFull": "Ouvrir en pleine page",
+    "transcript": "Conversation",
+    "thinking": "Réflexion…",
+    "confirm": "Confirmer",
+    "cancel": "Annuler",
+    "confirmed": "Confirmé",
+    "cancelled": "Annulé"
   }
 }
