@@ -374,13 +374,23 @@ const envSchema = z.object({
   PLATFORM_TABLE_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
   PLATFORM_TABLE_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
   PLATFORM_TABLE_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
-  // Notifications are a UI convenience with no evidential value once old.
-  PLATFORM_NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
-  // The audit trail outlives operational data -- it is the evidential record
-  // for employment and payroll-adjacent actions -- but stays bounded, since
-  // an unbounded audit table is an availability risk, not a compliance win.
-  PLATFORM_AUDIT_LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+  // Tier 2 (CRR §25 / ADR-033): 5 years for general personal/profile data.
+  // 1825 = 5 * 365.
+  //
+  // This is a POLICY figure, not a capacity one. It was previously 90 days,
+  // chosen to keep the table small, which under-retained by a factor of
+  // twenty against a ratified retention tier. Do not shorten it to control
+  // table size -- that is what produced the original defect.
+  PLATFORM_NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().positive().default(1825),
 
+  // PLATFORM_AUDIT_LOG_RETENTION_DAYS was REMOVED (2026-09-04). ADR-033
+  // excludes AuditLog from all three tiers and retains it INDEFINITELY: it is
+  // the platform's own accountability record under CRR §30, and deleting it
+  // on the same clock as the data it describes would defeat its purpose. A
+  // configurable retention window for it should not exist, because no value
+  // is correct -- its presence invited the 365-day default that violated the
+  // ADR.
+  
   RETENTION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
   RETENTION_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
   RETENTION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),

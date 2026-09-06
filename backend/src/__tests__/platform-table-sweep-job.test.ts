@@ -42,7 +42,6 @@ const CONFIG = {
   batchSize: 2,
   maxBatchesPerRun: 3,
   notificationRetentionDays: 90,
-  auditLogRetentionDays: 365,
 };
 
 describe('PlatformTableSweepJob', () => {
@@ -62,17 +61,12 @@ describe('PlatformTableSweepJob', () => {
     const after = Date.now();
 
     const notifCutoff = prisma.notification.findMany.mock.calls[0][0].where.created_at.lt as Date;
-    const auditCutoff = prisma.auditLog.findMany.mock.calls[0][0].where.timestamp.lt as Date;
 
     const day = 24 * 60 * 60 * 1000;
     // Bracketed against the run window rather than an exact equality, which
     // would be a clock race.
-    expect(notifCutoff.getTime()).toBeGreaterThanOrEqual(before - 90 * day - 5000);
-    expect(notifCutoff.getTime()).toBeLessThanOrEqual(after - 90 * day + 5000);
-    expect(auditCutoff.getTime()).toBeGreaterThanOrEqual(before - 365 * day - 5000);
-    expect(auditCutoff.getTime()).toBeLessThanOrEqual(after - 365 * day + 5000);
-    // The whole point of two windows: audit must be pruned less aggressively.
-    expect(auditCutoff.getTime()).toBeLessThan(notifCutoff.getTime());
+    expect(notifCutoff.getTime()).toBeGreaterThanOrEqual(before - CONFIG.notificationRetentionDays * day - 5000);
+    expect(notifCutoff.getTime()).toBeLessThanOrEqual(after - CONFIG.notificationRetentionDays * day + 5000);
   });
 
   it('deletes by explicit id list, never by the date predicate directly', async () => {
@@ -115,7 +109,11 @@ describe('PlatformTableSweepJob', () => {
     expect(prisma.notification.findMany).toHaveBeenCalledTimes(1);
   });
 
-  it('sweeps both tables in one run and reports both counts', async () => {
+  it('sweeps notifications and leaves AuditLog entirely alone', async () => {
+    // This assertion is INVERTED from what it was. It previously required
+    // AuditLog to be swept, which encoded the ADR-033 violation into the test
+    // suite -- so the suite would have defended the defect rather than caught
+    // it. AuditLog is excluded from all tiers and retained indefinitely.
     prisma.notification.findMany.mockResolvedValueOnce([{ id: 'n1' }]).mockResolvedValue([]);
     prisma.notification.deleteMany.mockResolvedValue({ count: 1 });
     prisma.auditLog.findMany.mockResolvedValueOnce([{ id: 'a1' }]).mockResolvedValue([]);
@@ -124,10 +122,12 @@ describe('PlatformTableSweepJob', () => {
     await new PlatformTableSweepJob(prisma as never, CONFIG).run();
 
     expect(prisma.notification.deleteMany).toHaveBeenCalledTimes(1);
-    expect(prisma.auditLog.deleteMany).toHaveBeenCalledTimes(1);
+    // Even with stale rows available and a mock ready to delete them.
+    expect(prisma.auditLog.findMany).not.toHaveBeenCalled();
+    expect(prisma.auditLog.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('does nothing when neither table has stale rows', async () => {
+  it('does nothing when there are no stale notifications', async () => {
     prisma.notification.findMany.mockResolvedValue([]);
     prisma.auditLog.findMany.mockResolvedValue([]);
 
@@ -135,5 +135,67 @@ describe('PlatformTableSweepJob', () => {
 
     expect(prisma.notification.deleteMany).not.toHaveBeenCalled();
     expect(prisma.auditLog.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Compliance regression guards for ADR-033.
+ *
+ * This job originally pruned `AuditLog` at 365 days and `Notification` at 90
+ * days, both in direct contradiction of a retention ADR ratified two months
+ * earlier. No data was lost — the oldest production row in either table was
+ * ~25 days old when it was caught — but notifications would have started
+ * being deleted around 2026-11-09.
+ *
+ * These assert the POLICY, not the implementation, so shortening a window to
+ * control table size fails here rather than silently under-retaining.
+ */
+describe('ADR-033 retention policy', () => {
+  it('NEVER touches AuditLog — it is excluded from all tiers and kept indefinitely', async () => {
+    // CRR §30: the platform's own accountability record. Deleting it on the
+    // same clock as the data it describes would defeat its purpose.
+    const auditDeleteMany = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+    const auditFindMany = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+    const prisma = {
+      notification: {
+        findMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue([]),
+        deleteMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({ count: 0 }),
+      },
+      auditLog: { findMany: auditFindMany, deleteMany: auditDeleteMany },
+    };
+    await new PlatformTableSweepJob(prisma as never, {
+      intervalMs: 1000,
+      batchSize: 10,
+      notificationRetentionDays: 1825,
+    }).run();
+
+    expect(auditFindMany).not.toHaveBeenCalled();
+    expect(auditDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it('has no configurable AuditLog retention window at all', async () => {
+    // No value is correct, so the knob should not exist — its presence is
+    // what invited the 365-day default that violated the ADR.
+    const envSource = (await import('node:fs')).readFileSync('src/config/env.ts', 'utf8');
+    expect(envSource).not.toMatch(/PLATFORM_AUDIT_LOG_RETENTION_DAYS:\s*z\./);
+  });
+
+  it('retains notifications for the full Tier 2 window, not a convenient one', async () => {
+    const { loadEnv } = await import('../config/env.js');
+    const saved = process.env;
+    process.env = {
+      ...saved,
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://u:p@localhost:5432/db?schema=public',
+      JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
+      JWT_REFRESH_SECRET: 'test-refresh-secret-minimum-32-chars-xx',
+    } as NodeJS.ProcessEnv;
+    try {
+      const env = loadEnv();
+      // Tier 2 = 5 years. Anything materially shorter under-retains.
+      expect(env.PLATFORM_NOTIFICATION_RETENTION_DAYS).toBeGreaterThanOrEqual(1825);
+    } finally {
+      process.env = saved;
+    }
   });
 });
