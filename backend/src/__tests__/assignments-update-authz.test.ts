@@ -1,4 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { ROLE_PERMISSIONS } from '../config/constants.js';
 import type { Request, Response, NextFunction } from 'express';
 
 /**
@@ -122,7 +123,20 @@ jest.mock('../lib/db.js', () => {
 // Replace real JWT auth with an injector of the test-controlled context.
 jest.mock('../middleware/auth.js', () => ({
   authMiddleware: (req: Request, _res: Response, next: NextFunction) => {
-    (req as any).auth = testAuth;
+    // Permissions are DERIVED from the real ROLE_PERMISSIONS rather than
+    // omitted, so requirePermission() on this route is exercised against the
+    // sets production actually issues. Omitting them (the original shape)
+    // made every case 403 the moment the route gained a token, which is a
+    // fixture artefact and not a real lockout -- every role holds
+    // `assignments:status-write`. A fabricated permission set proves only
+    // that the test agrees with itself; this one can catch a real lockout.
+    (req as any).auth = testAuth
+      ? {
+          email: `${testAuth.userId}@example.test`,
+          permissions: ROLE_PERMISSIONS[testAuth.role.toUpperCase()] ?? [],
+          ...testAuth,
+        }
+      : null;
     (req as any).requestId = 'req_test';
     next();
   },

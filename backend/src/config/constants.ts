@@ -167,6 +167,19 @@ const MANAGER_PERMISSIONS = Object.freeze([
     // was the alternative and was rejected.
     'calendar:absence:write-own',
     'notifications:mark-read-own',
+    // Changing an assignment's STATUS (start, complete, cancel), added
+    // 2026-09-08. PATCH /assignments/:id carries no requireRole and no token:
+    // the service is the whole gate, refusing a self-scoped caller any
+    // assignment that is not theirs, applying its own eligibility rules to
+    // IN_PROGRESS/COMPLETED, and admitting a scoped manager only within scope.
+    //
+    // Deliberately NOT named `-own`, unlike the two tokens above: the same
+    // route is how a MANAGER cancels somebody else's assignment, so an
+    // "-own" name would misdescribe what it gates. Whose assignment a caller
+    // may touch is the service's decision, not this token's; the token names
+    // the capability, and every role holds it because the route admits every
+    // role. It denies nobody -- it makes the capability nameable.
+    'assignments:status-write',
     // The manager-on-a-worker's-behalf counterpart, added 2026-09-07 for the
     // same reason and by the same argument as the two above: naming the
     // capability rather than loosening the registry.
@@ -232,6 +245,19 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // was the alternative and was rejected.
     'calendar:absence:write-own',
     'notifications:mark-read-own',
+    // Changing an assignment's STATUS (start, complete, cancel), added
+    // 2026-09-08. PATCH /assignments/:id carries no requireRole and no token:
+    // the service is the whole gate, refusing a self-scoped caller any
+    // assignment that is not theirs, applying its own eligibility rules to
+    // IN_PROGRESS/COMPLETED, and admitting a scoped manager only within scope.
+    //
+    // Deliberately NOT named `-own`, unlike the two tokens above: the same
+    // route is how a MANAGER cancels somebody else's assignment, so an
+    // "-own" name would misdescribe what it gates. Whose assignment a caller
+    // may touch is the service's decision, not this token's; the token names
+    // the capability, and every role holds it because the route admits every
+    // role. It denies nobody -- it makes the capability nameable.
+    'assignments:status-write',
     // The manager-on-a-worker's-behalf counterpart, added 2026-09-07 for the
     // same reason and by the same argument as the two above: naming the
     // capability rather than loosening the registry.
@@ -293,6 +319,31 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // was the alternative and was rejected.
     'calendar:absence:write-own',
     'notifications:mark-read-own',
+    // Clocking in and out of your OWN shift, added 2026-09-08. Both routes
+    // enforced no token at all -- POST /attendance gated on
+    // requireRole(worker|checker) and PATCH /attendance/:id on nothing --
+    // and checkIn() refuses any assignment whose worker_id is not the caller,
+    // which is the real boundary either way.
+    //
+    // Named for the same reason as `calendar:absence:write-own`: a write tool
+    // may not use the registry's `null` escape hatch, so an unnamed capability
+    // is one the assistant cannot offer at all. Granted to WORKER and CHECKER
+    // only, matching requireRole on the check-in route -- a manager does not
+    // clock in.
+    'attendance:write-own',
+    // Changing an assignment's STATUS (start, complete, cancel), added
+    // 2026-09-08. PATCH /assignments/:id carries no requireRole and no token:
+    // the service is the whole gate, refusing a self-scoped caller any
+    // assignment that is not theirs, applying its own eligibility rules to
+    // IN_PROGRESS/COMPLETED, and admitting a scoped manager only within scope.
+    //
+    // Deliberately NOT named `-own`, unlike the two tokens above: the same
+    // route is how a MANAGER cancels somebody else's assignment, so an
+    // "-own" name would misdescribe what it gates. Whose assignment a caller
+    // may touch is the service's decision, not this token's; the token names
+    // the capability, and every role holds it because the route admits every
+    // role. It denies nobody -- it makes the capability nameable.
+    'assignments:status-write',
   ]) as string[],
   WORKER: Object.freeze([
     'hotels:read',
@@ -347,6 +398,31 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // was the alternative and was rejected.
     'calendar:absence:write-own',
     'notifications:mark-read-own',
+    // Clocking in and out of your OWN shift, added 2026-09-08. Both routes
+    // enforced no token at all -- POST /attendance gated on
+    // requireRole(worker|checker) and PATCH /attendance/:id on nothing --
+    // and checkIn() refuses any assignment whose worker_id is not the caller,
+    // which is the real boundary either way.
+    //
+    // Named for the same reason as `calendar:absence:write-own`: a write tool
+    // may not use the registry's `null` escape hatch, so an unnamed capability
+    // is one the assistant cannot offer at all. Granted to WORKER and CHECKER
+    // only, matching requireRole on the check-in route -- a manager does not
+    // clock in.
+    'attendance:write-own',
+    // Changing an assignment's STATUS (start, complete, cancel), added
+    // 2026-09-08. PATCH /assignments/:id carries no requireRole and no token:
+    // the service is the whole gate, refusing a self-scoped caller any
+    // assignment that is not theirs, applying its own eligibility rules to
+    // IN_PROGRESS/COMPLETED, and admitting a scoped manager only within scope.
+    //
+    // Deliberately NOT named `-own`, unlike the two tokens above: the same
+    // route is how a MANAGER cancels somebody else's assignment, so an
+    // "-own" name would misdescribe what it gates. Whose assignment a caller
+    // may touch is the service's decision, not this token's; the token names
+    // the capability, and every role holds it because the route admits every
+    // role. It denies nobody -- it makes the capability nameable.
+    'assignments:status-write',
   ]) as string[],
 });
 
