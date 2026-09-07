@@ -57,7 +57,7 @@ The last two constraints are enforced **mechanically** by `chatbot-tool-registry
 | Blocker | Status |
 |---|---|
 | `OD-CHAT-005` | **CLOSED 2026-09-04** by `ADR-073` (Accepted). The assistant's authority is the user's own authority, never more — a Manager may act on a worker inside their own scope precisely because they can already do so by hand. |
-| `OD-CHAT-006` | Prompt-injection resistance — open; interim posture only |
+| `OD-CHAT-006` | **Answered by `ADR-074`, awaiting ratification.** Containment, not detection: a compromised model cannot exceed its user's authority, and irreversible actions need confirmation of the exact call. |
 | `OD-CHAT-013` | **CLOSED 2026-09-04** — owner is the commissioning human / account owner, assigned directly |
 
 Everything registered today is self-scoped, so the scaffold is correct under **either** resolution of `OD-CHAT-005`. Also note `ADR-053` item 4: it approves the tool-registry *architecture*, not any specific tool — `assignments.list_mine` carries `approvalRef: PENDING` for exactly this reason.
