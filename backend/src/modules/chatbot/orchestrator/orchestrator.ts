@@ -12,6 +12,7 @@ import {
   issueConfirmToken,
   verifyConfirmToken,
 } from '../guardrails/confirm-token.js';
+import { recordInjectionAttempt } from '../guardrails/injection-tripwire.js';
 import { redact } from '../guardrails/redaction.js';
 import { getProvider, ProviderUnavailableError } from '../provider/llm-provider.js';
 import { matchL0, resolveCommandId } from './router-l0.js';
@@ -75,6 +76,25 @@ export async function runTurn(params: {
 }): Promise<TurnResult> {
   const prisma = getPrisma();
   const env = getEnv();
+
+  // OBSERVE ONLY. Records that an injection attempt was made; changes nothing
+  // about what happens next, by design (ADR-074, ratified 2026-09-08). The
+  // containment guarantees are what stop an attack -- this exists because
+  // those guarantees were SILENT: a hundred probes produced no signal
+  // anywhere, so nobody could tell the assistant was under attack.
+  //
+  // Placed before every branch so a probe is seen whether it lands on L0, L1
+  // or a confirmation. Deliberately NOT awaited into a decision, and the
+  // function returns void so "block on this" cannot be written without
+  // changing its signature.
+  if (params.text) {
+    recordInjectionAttempt({
+      text: params.text,
+      actorId: params.actor.userId,
+      actorRole: params.actor.role,
+      conversationId: params.conversationId,
+    });
+  }
 
   const conversation = await prisma.chatbotConversation.findUnique({
     where: { id: params.conversationId },
