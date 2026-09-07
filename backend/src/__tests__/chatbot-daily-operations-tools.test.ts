@@ -264,14 +264,19 @@ describe('risk tiers on the shift tools', () => {
     expect(logRoomCleaned.confirm).toBe(false);
   });
 
-  it('registers every new tool as PENDING, not covered by the 2026-09-08 approval', () => {
-    // That approval names the thirteen tools registered on that date and
-    // explicitly does not extend to later ones.
+  it('carries an approval that names a date and the deciding authority', () => {
+    // Was: "registers every new tool as PENDING". That was true the day it
+    // was written and false the day the tools were approved -- a test pinning
+    // a MOMENT rather than a rule, which is the same shape that broke main
+    // once already. What must hold permanently is that an approval, once
+    // stated, is properly stated; whether it is yet granted is the boot
+    // gate's business (chatbot-tool-approval-gate.test.ts).
     for (const tool of [checkInToMyShift, checkOutOfMyShift, logRoomCleaned, listMyRoomsToday]) {
-      expect({ tool: tool.name, pending: /PENDING/.test(tool.approvalRef) }).toEqual({
+      expect({ tool: tool.name, ref: tool.approvalRef }).toEqual({
         tool: tool.name,
-        pending: true,
+        ref: expect.stringMatching(/(APPROVED \d{4}-\d{2}-\d{2}|PENDING)/),
       });
+      expect(tool.approvalRef).toMatch(/ADR-053 item 4/);
     }
   });
 });

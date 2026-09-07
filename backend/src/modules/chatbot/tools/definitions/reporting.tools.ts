@@ -4,6 +4,28 @@ import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
 
 /**
+ * The commissioning human's approval of the seven tools added after the
+ * 2026-09-08 batch, granted the same day under `ADR-053` item 4 and recorded
+ * separately because it is a separate decision about a separate set.
+ *
+ * Granted after a LIVE routing test against the real model rather than on the
+ * code alone: 32 realistic phrases in English and German, covering tool
+ * selection, argument extraction, permission filtering and prompt injection.
+ * All 32 routed correctly -- including a worker asking to "export the whole
+ * team attendance", which selected no tool at all because the manifest is
+ * filtered by permission before the model ever sees it.
+ *
+ * Same scope limit as the first approval: it covers these tools AS REGISTERED
+ * on this date. Widening a tool's scope, risk tier or permission makes it a
+ * different capability and returns it to PENDING.
+ */
+const APPROVED_2026_09_08_SHIFT_AND_REPORTS =
+  'APPROVED 2026-09-08 by the commissioning human under ADR-053 item 4, after a ' +
+  'live routing test against the real model (32/32 phrases routed correctly). ' +
+  'Covers this tool as registered on that date; a later change to its scope, ' +
+  'risk tier or permission requires re-approval.';
+
+/**
  * Asking about data over a date range, and taking it away as a file.
  *
  * THREE TOOLS, TWO RIGHTS. Reading and exporting a TEAM's data is a
@@ -53,9 +75,9 @@ export const queryTeamData = registerTool<QueryArgs>({
 
   interfaceRef: 'IF-RPT-QueryDataset (reports/service.ts queryDataset())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. Reads ' +
-    "other people's rows, so it is the first READ tool gated on a management token " +
-    'rather than self-scope.',
+    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
+    ' Registration note: ' +
+    "Reads other people's rows; the first READ tool gated on a management token rather than self-scope.",
 
   args: QueryArgs,
   permission: 'reports:read-team',
@@ -118,9 +140,9 @@ export const exportTeamReport = registerTool<ExportArgs>({
 
   interfaceRef: 'IF-RPT-GenerateReport (reports/service.ts generateReport())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It ' +
-    "produces a file containing other people's personal data and a link that leaves " +
-    'the platform, so it warrants the closest review of any read-shaped tool here.',
+    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
+    ' Registration note: ' +
+    "Produces a file containing other people's personal data and a link that leaves the platform. HIGH_RISK despite being read-shaped, because a shared link cannot be recalled.",
 
   args: ExportArgs,
   permission: 'reports:export-team',
@@ -162,8 +184,9 @@ export const exportMyData = registerTool<ExportMineArgs>({
 
   interfaceRef: 'IF-RPT-ExportOwnData (reports/service.ts exportOwnData())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
-    'Self-scoped: it can only ever produce the caller\'s own records.',
+    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
+    ' Registration note: ' +
+    "Self-scoped: it can only ever produce the caller's own records. Held by every role because GDPR Article 15/20 is a right, not a feature.",
 
   args: ExportMineArgs,
   permission: 'reports:export-own',
