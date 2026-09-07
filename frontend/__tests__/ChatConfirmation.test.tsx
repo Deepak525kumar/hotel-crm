@@ -33,7 +33,7 @@ import { useChatbotStore } from "@/stores/chatbot";
 const PENDING = {
   token: "tok.abc",
   summary: "This will run: calendar.mark_my_absence\n  day: 2026-09-10\n  kind: SICK",
-  tool_name: "calendar.mark_my_absence",
+  toolName: "calendar.mark_my_absence",
 };
 
 function seedProposal() {
@@ -114,6 +114,30 @@ describe("high-risk write confirmation, in the UI", () => {
 
     await waitFor(() =>
       expect(screen.getByText(/could not answer that just now/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("REGRESSION: reads the confirmation off the API's camelCase field", async () => {
+    // The bug this replaces: the client typed these as snake_case, so
+    // `pendingConfirmation` was always undefined and a high-risk write
+    // rendered its summary with NO buttons — unapprovable, with nothing on
+    // screen explaining why. The other tests here seed the store directly, so
+    // they never crossed the API boundary where the mismatch lived. This one
+    // starts from a real API payload.
+    useChatbotStore.setState({ messages: [], conversationId: "conv_1", sending: false });
+    mockSendMessage.mockResolvedValue({
+      reply: "This will run: calendar.mark_my_absence",
+      status: "IN_PROGRESS",
+      route: "L1",
+      toolInvoked: "calendar.mark_my_absence",
+      pendingConfirmation: { token: "tok.xyz", summary: "…", toolName: "calendar.mark_my_absence" },
+    });
+
+    render(<ChatPanel />);
+    await useChatbotStore.getState().send("I am sick today");
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument(),
     );
   });
 

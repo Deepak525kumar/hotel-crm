@@ -1914,11 +1914,23 @@ export interface ChatbotTurn {
   reply: string;
   status: string;
   route: "L0" | "L1" | "L3" | "none";
-  tool_invoked?: string;
-  pending_confirmation?: {
+  /**
+   * camelCase, NOT snake_case. The backend returns its TurnResult object as
+   *-is, so these arrive exactly as TypeScript names them there.
+   *
+   * This was wrong when first written, and the consequence was severe rather
+   * than cosmetic: `pending_confirmation` was always undefined, so a
+   * high-risk write rendered its summary with NO Confirm/Cancel buttons and
+   * could never be approved. The write would simply never happen, with
+   * nothing on screen explaining why. Unit tests missed it because they
+   * seeded the store directly in the shape the store expects, never crossing
+   * the API boundary where the mismatch lives.
+   */
+  toolInvoked?: string;
+  pendingConfirmation?: {
     token: string;
     summary: string;
-    tool_name: string;
+    toolName: string;
   };
 }
 
@@ -1929,7 +1941,7 @@ export interface ChatMessage {
   text: string;
   /** Which rung answered, so the zero-cost path is visible while developing. */
   route?: ChatbotTurn["route"];
-  pendingConfirmation?: ChatbotTurn["pending_confirmation"];
+  pendingConfirmation?: ChatbotTurn["pendingConfirmation"];
   /** Set once the user has answered a confirmation, so it cannot be re-answered. */
   resolved?: "confirmed" | "cancelled";
   failed?: boolean;

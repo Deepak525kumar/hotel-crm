@@ -212,3 +212,46 @@ describe('buildMessages', () => {
     expect(buildMessages('hallo')[0]).toEqual({ role: 'user', content: 'hallo' });
   });
 });
+
+describe('REGRESSION: schemas derived from a refined Zod object', () => {
+  it('unwraps ZodEffects instead of describing an argument-less tool', async () => {
+    // Found by the first end-to-end run against a live model, not by a unit
+    // test. `.refine()` wraps a ZodObject in a ZodEffects, which fell through
+    // to the permissive `{}` default -- so the model was told
+    // `calendar.mark_my_absence` takes NO ARGUMENTS. It is the only write
+    // tool reachable by natural language, and it could never work: the model
+    // picked the right tool, sent nothing, and the executor rejected the
+    // call. The user saw "I did not understand that", which reads like a
+    // model problem and is not.
+    const { z } = await import('zod');
+    const refined = z
+      .object({
+        day: z.string(),
+        kind: z.enum(['SICK', 'VACATION']),
+        reason: z.string().optional(),
+      })
+      .strict()
+      .refine((d) => d.kind !== 'VACATION' || Boolean(d.reason), { path: ['reason'] });
+
+    const spec = toolSpec({
+      name: 'test.refined',
+      description: 'd',
+      args: refined,
+    } as never);
+    const schema = spec.input_schema as Record<string, unknown>;
+
+    expect(schema.type).toBe('object');
+    expect(Object.keys(schema.properties as object).sort()).toEqual(['day', 'kind', 'reason']);
+    expect(schema.required).toEqual(['day', 'kind']);
+  });
+
+  it('every REGISTERED tool describes a real object schema, not an empty one', () => {
+    // The invariant, over the actual registry rather than a fixture: a tool
+    // whose schema comes out `{}` is invisible to the model as far as
+    // arguments go, and fails at the executor with no useful signal.
+    for (const tool of listTools()) {
+      const schema = toolSpec(tool).input_schema as Record<string, unknown>;
+      expect({ tool: tool.name, type: schema.type }).toEqual({ tool: tool.name, type: 'object' });
+    }
+  });
+});
