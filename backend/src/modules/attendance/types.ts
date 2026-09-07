@@ -45,6 +45,12 @@ export const UpdateAttendanceSchema = z
   });
 
 export const ListAttendanceQuerySchema = z.object({
+  // Optional date range, added 2026-09-08 for reporting. Additive and
+  // backward-compatible: absent means "no date filter", which is exactly the
+  // behaviour every existing caller already gets. Both or neither -- a
+  // half-open range reads as a typo more often than an intention.
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   hotel_id: z.string().optional(),
   worker_id: z.string().optional(),
   assignment_id: z.string().optional(),
@@ -55,6 +61,8 @@ export const ListAttendanceQuerySchema = z.object({
     .transform((v) => (v === 'true' ? true : v === 'false' ? false : undefined)),
   page: z.coerce.number().int().min(1).default(1),
   per_page: z.coerce.number().int().min(1).max(100).default(20),
+}).refine((v) => (v.from == null) === (v.to == null), {
+  message: 'from and to must be provided together',
 });
 
 export type CheckInInput = z.infer<typeof CheckInSchema>;

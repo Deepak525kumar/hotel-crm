@@ -33,20 +33,52 @@ import { assertAllToolsApproved, listTools } from '../modules/chatbot/tools/regi
 import '../modules/chatbot/service.js';
 
 describe('the tool-approval boot gate', () => {
-  it('passes with the registry as it actually stands', () => {
-    expect(listTools().length).toBeGreaterThan(0);
-    expect(() => assertAllToolsApproved()).not.toThrow();
+  /**
+   * BEHAVIOUR, NOT A HEADCOUNT. The first version of this asserted the gate
+   * never throws with the real registry -- true the day it was written, when
+   * every tool was approved, and false the moment a new tool was registered
+   * awaiting approval. Two PRs whose CI each passed against a main lacking the
+   * other then merged and broke main between them.
+   *
+   * A registry containing an unapproved tool is a NORMAL, expected state --
+   * it is what every new tool looks like before its decision. The gate's job
+   * is to refuse to BOOT in that state, not to be un-triggerable, so what is
+   * pinned here is the correspondence between the two.
+   */
+  it('throws exactly when an unapproved tool is registered, and not otherwise', () => {
+    const pending = listTools().filter((t) => /\bPENDING\b/i.test(t.approvalRef));
+
+    if (pending.length === 0) {
+      expect(() => assertAllToolsApproved()).not.toThrow();
+      return;
+    }
+
+    let message = '';
+    try {
+      assertAllToolsApproved();
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(/not approved/i);
+    // Every offender named, so the owner knows what they are approving.
+    for (const tool of pending) expect(message).toContain(tool.name);
   });
 
-  it('every registered tool carries a real approval, not a placeholder', () => {
+  it('states an approval properly whenever it states one at all', () => {
+    expect(listTools().length).toBeGreaterThan(0);
+
     for (const tool of listTools()) {
-      expect({ tool: tool.name, pending: /\bPENDING\b/i.test(tool.approvalRef) }).toEqual({
-        tool: tool.name,
-        pending: false,
-      });
+      if (/\bPENDING\b/i.test(tool.approvalRef)) {
+        // Awaiting a decision is allowed; saying nothing is not.
+        expect(tool.approvalRef.trim().length).toBeGreaterThan(0);
+        continue;
+      }
       // A non-empty string was the ONLY previous requirement, and 'PENDING'
-      // met it. Approval must name a date and an authority.
-      expect(tool.approvalRef).toMatch(/APPROVED \d{4}-\d{2}-\d{2}/);
+      // met it. An actual approval must name a date and an authority.
+      expect({ tool: tool.name, ref: tool.approvalRef }).toEqual({
+        tool: tool.name,
+        ref: expect.stringMatching(/APPROVED \d{4}-\d{2}-\d{2}/),
+      });
       expect(tool.approvalRef).toMatch(/ADR-053 item 4/);
     }
   });

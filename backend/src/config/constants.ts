@@ -180,6 +180,19 @@ const MANAGER_PERMISSIONS = Object.freeze([
     // the capability, and every role holds it because the route admits every
     // role. It denies nobody -- it makes the capability nameable.
     'assignments:status-write',
+    // Reporting and export over arbitrary date ranges, added 2026-09-08.
+    // Manager/RM/admin only: a team report contains other people's hours,
+    // absences and names, so it is a management capability and gated like one.
+    'reports:read-team',
+    'reports:export-team',
+    // Exporting YOUR OWN data as a spreadsheet, added 2026-09-08. Held by
+    // EVERY role including worker and checker, and it denies nobody -- this is
+    // the GDPR Article 15/20 right of access and portability, which the
+    // platform already honours as JSON via Compliance's subject-rights bundle.
+    // Gating it by role would be gating a legal right, so the token exists to
+    // NAME the capability (and let a chatbot tool declare it), never to
+    // withhold it.
+    'reports:export-own',
     // The manager-on-a-worker's-behalf counterpart, added 2026-09-07 for the
     // same reason and by the same argument as the two above: naming the
     // capability rather than loosening the registry.
@@ -258,6 +271,19 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // the capability, and every role holds it because the route admits every
     // role. It denies nobody -- it makes the capability nameable.
     'assignments:status-write',
+    // Reporting and export over arbitrary date ranges, added 2026-09-08.
+    // Manager/RM/admin only: a team report contains other people's hours,
+    // absences and names, so it is a management capability and gated like one.
+    'reports:read-team',
+    'reports:export-team',
+    // Exporting YOUR OWN data as a spreadsheet, added 2026-09-08. Held by
+    // EVERY role including worker and checker, and it denies nobody -- this is
+    // the GDPR Article 15/20 right of access and portability, which the
+    // platform already honours as JSON via Compliance's subject-rights bundle.
+    // Gating it by role would be gating a legal right, so the token exists to
+    // NAME the capability (and let a chatbot tool declare it), never to
+    // withhold it.
+    'reports:export-own',
     // The manager-on-a-worker's-behalf counterpart, added 2026-09-07 for the
     // same reason and by the same argument as the two above: naming the
     // capability rather than loosening the registry.
@@ -344,6 +370,14 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // the capability, and every role holds it because the route admits every
     // role. It denies nobody -- it makes the capability nameable.
     'assignments:status-write',
+    // Exporting YOUR OWN data as a spreadsheet, added 2026-09-08. Held by
+    // EVERY role including worker and checker, and it denies nobody -- this is
+    // the GDPR Article 15/20 right of access and portability, which the
+    // platform already honours as JSON via Compliance's subject-rights bundle.
+    // Gating it by role would be gating a legal right, so the token exists to
+    // NAME the capability (and let a chatbot tool declare it), never to
+    // withhold it.
+    'reports:export-own',
   ]) as string[],
   WORKER: Object.freeze([
     'hotels:read',
@@ -423,6 +457,14 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // the capability, and every role holds it because the route admits every
     // role. It denies nobody -- it makes the capability nameable.
     'assignments:status-write',
+    // Exporting YOUR OWN data as a spreadsheet, added 2026-09-08. Held by
+    // EVERY role including worker and checker, and it denies nobody -- this is
+    // the GDPR Article 15/20 right of access and portability, which the
+    // platform already honours as JSON via Compliance's subject-rights bundle.
+    // Gating it by role would be gating a legal right, so the token exists to
+    // NAME the capability (and let a chatbot tool declare it), never to
+    // withhold it.
+    'reports:export-own',
   ]) as string[],
 });
 

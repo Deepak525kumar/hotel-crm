@@ -327,6 +327,12 @@ export class AttendanceService extends BaseService {
       ...(query.assignment_id ? { assignment_id: query.assignment_id } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.is_verified !== undefined ? { is_verified: query.is_verified } : {}),
+      // Filtered on expected_start, the SHIFT's date, not check_in_at: a
+      // no-show has no check-in at all and must still appear in a month's
+      // attendance report -- that absence is the very thing being reported.
+      ...(query.from && query.to
+        ? { expected_start: { gte: new Date(`${query.from}T00:00:00.000Z`), lte: new Date(`${query.to}T23:59:59.999Z`) } }
+        : {}),
     };
 
     // Regional_manager no longer matches the self-scoped branch: the previous

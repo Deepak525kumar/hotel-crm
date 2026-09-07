@@ -401,6 +401,11 @@ export class AssignmentService extends BaseService {
       ...(query.work_request_id ? { work_request_id: query.work_request_id } : {}),
       ...(query.job_request_id ? { job_request_id: query.job_request_id } : {}),
       ...(query.status ? { status: query.status } : {}),
+      // `day` is the assignment's own calendar date, which is what a report
+      // for "last month" means -- not created_at.
+      ...(query.from && query.to
+        ? { day: { gte: new Date(`${query.from}T00:00:00.000Z`), lte: new Date(`${query.to}T23:59:59.999Z`) } }
+        : {}),
     };
 
     // Workers (and any other self-scoped role) see only their own assignments.

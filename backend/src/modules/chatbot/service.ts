@@ -12,6 +12,7 @@ import type { ToolDescriptorDto } from './types.js';
 // this file rather than scattered across the module.
 import './tools/definitions/self-service.tools.js';
 import './tools/definitions/daily-operations.tools.js';
+import './tools/definitions/reporting.tools.js';
 
 /**
  * SPEC-CHATBOT-001 (ADR-013) — backend-chatbot's service.
