@@ -114,3 +114,30 @@ describe('L0 command table invariants', () => {
     }
   });
 });
+
+describe('the documents command (2026-09-07)', () => {
+  it('matches the onboarding question in English and German', () => {
+    for (const text of [
+      'what documents do i need',
+      'Which documents are missing?',
+      'welche Unterlagen fehlen',
+      'Meine Dokumente',
+    ]) {
+      const hit = matchL0(text);
+      expect({ text, id: hit?.id }).toEqual({ text, id: 'my_documents' });
+    }
+  });
+
+  it('matches through the German folding, umlauts and all', () => {
+    // The stored phrase is 'sind meine unterlagen vollstaendig'; a person
+    // types the umlaut. Folding is the whole reason this works, and it
+    // regressed once before.
+    expect(matchL0('sind meine Unterlagen vollständig')?.id).toBe('my_documents');
+  });
+
+  it('routes to the self-scoped tool with no arguments', () => {
+    const hit = matchL0('my documents');
+    expect(hit?.tool).toBe('documents.my_status');
+    expect(hit?.args).toEqual({});
+  });
+});

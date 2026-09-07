@@ -3,6 +3,8 @@ import { assignmentService } from '../../../assignments/service.js';
 import { hrService } from '../../../hr/service.js';
 import { qualityService } from '../../../quality/service.js';
 import { calendarService } from '../../../calendar/service.js';
+import { documentService } from '../../../documents/service.js';
+import { employeeManagementService } from '../../../employee-management/service.js';
 import {
   describeUnresolved,
   describeUnresolvedHotel,
@@ -1337,4 +1339,167 @@ export const markWorkerAbsence = registerTool<MarkWorkerAbsenceArgs>({
     };
   },
   maxResultTokens: 120,
+});
+
+/**
+ * "Which documents do I still need to upload?"
+ *
+ * The onboarding question the assistant was originally conceived to answer,
+ * and the last read-only gap. An applicant partway through onboarding is
+ * exactly the person least able to navigate a document checklist UI, and most
+ * likely to ask in plain language -- often in German, and often at the point
+ * where the answer decides whether they can start work.
+ *
+ * WHY THE WORK-PERMIT FLAG IS READ FROM THE RECORD, NOT ACCEPTED AS AN INPUT.
+ * `getDocumentCompleteness` takes `isWorkPermitRequired` as a PARAMETER, and
+ * the HTTP route supplies it from a client query string
+ * (`documents/controller.ts`: `req.query.work_permit_required === 'true'`).
+ * That is not a shape to copy here. It is not an authorization input -- so
+ * FORBIDDEN_ARG_KEYS would not have caught it -- but it decides what
+ * "complete" MEANS: a `false` on a worker who genuinely needs a permit
+ * returns "all documents complete" to someone who cannot lawfully start.
+ *
+ * So it is derived server-side from `EmploymentRecord.work_permit_required`,
+ * the field ADR-065 section 6 item 8 makes authoritative and the same one
+ * `submitForReview` gates on (employee-management/service.ts). The assistant's
+ * answer therefore agrees with the actual onboarding gate rather than with
+ * whatever the caller claimed.
+ *
+ * Both calls are existing module interfaces (ADR-053 item 2). `getByUserId`
+ * applies its own visibility rule and `getDocumentCompleteness` re-checks
+ * self-scope for worker/checker callers, so the guarantee holds even though
+ * this tool passes the actor's own id to both.
+ *
+ * WHY `permission: null` IS CORRECT HERE and not a workaround:
+ * `GET /workers/:worker_id/documents/completeness` carries `requireRole` over
+ * all five roles plus a scope middleware, and NO permission token. There is
+ * no token to declare. The registry permits `null` only for a READ_ONLY,
+ * self-scoped tool with a written rationale, which is exactly this. Note the
+ * same route shape (role gate, no token) forces a DIFFERENT answer for a
+ * write: `null` is unavailable to anything above READ_ONLY, so a write tool
+ * wrapping such a route has to have a real token named and enforced first.
+ */
+const MyDocumentsArgs = z.object({}).strict();
+
+type MyDocumentsArgs = z.infer<typeof MyDocumentsArgs>;
+
+/** Human-readable names. The model must never echo a raw enum at a person. */
+const DOCUMENT_LABELS: Record<string, string> = {
+  TAX_NUMBER: 'tax number',
+  SOCIAL_SECURITY_NUMBER: 'social security number',
+  HEALTH_INSURANCE: 'health insurance',
+  ID_CARD: 'ID card',
+  PASSPORT: 'passport',
+  ADDRESS: 'proof of address',
+  WORK_PERMIT: 'work permit',
+  CONTRACT_SCAN: 'signed contract',
+};
+
+/**
+ * Turns `missing_categories` into something true when read aloud.
+ *
+ * THE ID_CARD/PASSPORT PAIR IS THE WHOLE REASON THIS EXISTS. When neither is
+ * on file the service pushes BOTH onto `missing` (documents/service.ts), but
+ * only ONE is required -- they are alternatives. Listing them flatly would
+ * tell an applicant to produce two identity documents when either will do,
+ * which is a wrong answer that costs somebody a trip to an office. Rendered
+ * as one "ID card or passport" item instead.
+ */
+export function describeMissingDocuments(missing: string[]): string[] {
+  const set = new Set(missing);
+  const bothIdFormsMissing = set.has('ID_CARD') && set.has('PASSPORT');
+
+  const items = missing
+    .filter((c) => !(bothIdFormsMissing && (c === 'ID_CARD' || c === 'PASSPORT')))
+    .map((c) => DOCUMENT_LABELS[c] ?? c.toLowerCase().replace(/_/g, ' '));
+
+  if (bothIdFormsMissing) items.unshift('ID card or passport');
+  return items;
+}
+
+export const getMyDocumentStatus = registerTool<MyDocumentsArgs>({
+  name: 'documents.my_status',
+  description:
+    "Check which onboarding documents the authenticated user has already provided and " +
+    'which are still missing. Use for "what documents do I still need", "welche ' +
+    'Unterlagen fehlen noch", "am I missing anything for onboarding", "is my file complete".',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef:
+    'IF-DOC-GetDocumentCompleteness (documents/service.ts getDocumentCompleteness()) ' +
+    '+ IF-EMP-GetByUserId (employee-management/service.ts getByUserId())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    'Self-scoped + READ_ONLY, the same envelope as assignments.list_mine.',
+
+  args: MyDocumentsArgs,
+  // The route enforces no permission token -- requireRole over all five roles
+  // plus a scope middleware IS the gate. Modelled honestly rather than
+  // borrowing a token the route does not check.
+  permission: null,
+  permissionRationale:
+    'GET /workers/:worker_id/documents/completeness (documents/routes.ts) carries ' +
+    'requireRole over all five roles and scopeWorkerReadRoute(), and NO ' +
+    'requirePermission. Self-scope is the control here: the worker id is the ' +
+    "actor's own, is not expressible as a tool argument (FORBIDDEN_ARG_KEY), and " +
+    'getDocumentCompleteness re-applies its own self-scope check for worker and ' +
+    'checker callers.',
+  scopeCheck: 'self',
+
+  invoke: async (_args, actor) => {
+    const serviceActor = toServiceActor(actor);
+
+    // The requirement comes from the RECORD, never from the caller. See the
+    // block comment above: this is the difference between a true answer and a
+    // confidently wrong one.
+    const record = await employeeManagementService.getByUserId(
+      serviceActor as never,
+      serviceActor.userId
+    );
+
+    const completeness = await documentService.getDocumentCompleteness(
+      serviceActor.userId,
+      record?.work_permit_required ?? false,
+      serviceActor.userId,
+      serviceActor.role
+    );
+
+    return {
+      complete: completeness.is_complete,
+      missing: describeMissingDocuments(completeness.missing_categories ?? []),
+      provided: completeness.document_count,
+      // Surfaced so the summary can say WHY a permit is or is not on the
+      // list, rather than leaving its absence unexplained.
+      workPermitRequired: completeness.work_permit_required,
+      // A record is genuinely absent for some callers (an admin with no
+      // employment record of their own). Reported rather than silently
+      // treated as "no permit needed".
+      hasEmploymentRecord: record !== null,
+    };
+  },
+
+  compress: (raw: unknown) => {
+    const r = raw as {
+      complete?: boolean;
+      missing?: string[];
+      provided?: number;
+      hasEmploymentRecord?: boolean;
+    } | null;
+
+    if (!r) return { summary: 'Could not read your document status.', data: null };
+
+    const missing = r.missing ?? [];
+    const summary = r.complete
+      ? `All required documents are on file (${r.provided ?? 0} uploaded).`
+      : `Still needed: ${missing.join(', ')}.`;
+
+    return {
+      summary,
+      // No document ids, no worker id, no category enums -- a person asking
+      // this needs the list and the verdict, nothing else.
+      data: { complete: r.complete, missing, provided: r.provided },
+    };
+  },
+  maxResultTokens: 150,
 });
