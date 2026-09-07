@@ -4,12 +4,20 @@ const mockEligible = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
 const mockFindMany = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
 
 jest.mock('../lib/roster-scope.js', () => ({ listEligibleWorkerIds: mockEligible }));
-jest.mock('../lib/db.js', () => ({ getPrisma: () => ({ user: { findMany: mockFindMany } }) }));
+const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+const mockListHotels = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+jest.mock('../lib/db.js', () => ({
+  getPrisma: () => ({ user: { findMany: mockFindMany }, hotel: { findUnique: mockHotelFindUnique } }),
+}));
+jest.mock('../modules/crm/service.js', () => ({ crmService: { listHotels: mockListHotels } }));
 
 import {
   resolveWorkerReference,
   describeUnresolved,
+  resolveHotelReference,
+  describeUnresolvedHotel,
   type WorkerReferenceResult,
+  type HotelReferenceResult,
 } from '../modules/chatbot/tools/worker-reference.js';
 import type { ActorContext } from '../modules/chatbot/tools/actor.js';
 
@@ -108,5 +116,90 @@ describe('describeUnresolved', () => {
     for (const r of cases) {
       expect(describeUnresolved(r)).not.toMatch(/\bw\d\b|cm[a-z0-9]{10,}/);
     }
+  });
+});
+
+
+describe('resolveHotelReference', () => {
+  const groupRm = { userId: 'rm', role: 'regional_manager', permissions: [], scope: { type: 'hotel_group', hotel_group_id: 'g1' } } as unknown as ActorContext;
+  const admin = { userId: 'a', role: 'admin', permissions: [], scope: null } as unknown as ActorContext;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockHotelFindUnique.mockResolvedValue({ id: 'h1', name: 'Premier Inn Essen' });
+    mockListHotels.mockResolvedValue({ hotels: [{ id: 'h7', name: 'Premier Inn Essen' }], pagination: {} });
+  });
+
+  it('uses a hotel-scoped manager’s own hotel, with no name needed', async () => {
+    const r = await resolveHotelReference(undefined, manager('h1'));
+    expect(r).toEqual({ status: 'RESOLVED', hotelId: 'h1', name: 'Premier Inn Essen' });
+    // No search: they have exactly one hotel.
+    expect(mockListHotels).not.toHaveBeenCalled();
+  });
+
+  it('REFUSES when a scoped manager names a hotel that is not theirs', async () => {
+    // Silently substituting their own hotel would place a worker somewhere
+    // they did not ask for — precisely what the confirmation summary exists
+    // to make visible.
+    const r = await resolveHotelReference('Hilton', manager('h1'));
+    expect(r.status).toBe('NOT_FOUND');
+  });
+
+  it('accepts a scoped manager naming their own hotel', async () => {
+    expect((await resolveHotelReference('Essen', manager('h1'))).status).toBe('RESOLVED');
+  });
+
+  it('asks an unscoped actor to name a hotel rather than guessing', async () => {
+    for (const actor of [admin, groupRm]) {
+      const r = await resolveHotelReference(undefined, actor);
+      expect(r.status).toBe('NEEDS_NAME');
+    }
+    expect(mockListHotels).not.toHaveBeenCalled();
+  });
+
+  it('searches through the ACTOR-SCOPED listing, never an open query', async () => {
+    // listHotels applies its own scope narrowing for managers and RMs — an
+    // IDOR fix of its own. Passing the actor is what bounds the candidates.
+    await resolveHotelReference('Essen', groupRm);
+    const [query, role, userId, scope] = mockListHotels.mock.calls[0];
+    expect(query).toMatchObject({ search: 'Essen' });
+    expect(role).toBe('regional_manager');
+    expect(userId).toBe('rm');
+    expect(scope).toEqual({ type: 'hotel_group', hotel_group_id: 'g1' });
+  });
+
+  it('refuses on ambiguity rather than picking one', async () => {
+    mockListHotels.mockResolvedValue({ hotels: [{ id: 'h1', name: 'Premier Inn A' }, { id: 'h2', name: 'Premier Inn B' }], pagination: {} });
+    const r = await resolveHotelReference('Premier', admin);
+    expect(r).toMatchObject({ status: 'AMBIGUOUS', candidates: ['Premier Inn A', 'Premier Inn B'] });
+  });
+
+  it('returns NOT_FOUND for a hotel outside scope, indistinguishably from none', async () => {
+    mockListHotels.mockResolvedValue({ hotels: [], pagination: {} });
+    expect((await resolveHotelReference('Nowhere', groupRm)).status).toBe('NOT_FOUND');
+  });
+
+  it('never leaks an id in any message', () => {
+    const cases: HotelReferenceResult[] = [
+      { status: 'NEEDS_NAME' },
+      { status: 'NOT_FOUND', query: 'x' },
+      { status: 'AMBIGUOUS', query: 'x', candidates: ['A'] },
+    ];
+    for (const r of cases) {
+      expect(describeUnresolvedHotel(r)).not.toMatch(/\bh\d\b|cm[a-z0-9]{10,}/);
+    }
+  });
+});
+
+describe('resolveWorkerReference with an explicit hotel', () => {
+  it('searches the GIVEN hotel roster, letting an unscoped actor use the tool', async () => {
+    jest.clearAllMocks();
+    mockEligible.mockResolvedValue(['w1']);
+    mockFindMany.mockResolvedValue([worker('w1', 'Anna', 'Schmidt')]);
+    const admin = { userId: 'a', role: 'admin', permissions: [], scope: null } as unknown as ActorContext;
+
+    const r = await resolveWorkerReference('Anna', admin, 'h7');
+    expect(mockEligible).toHaveBeenCalledWith('h7', 'WORKER');
+    expect(r).toMatchObject({ status: 'RESOLVED', hotelId: 'h7' });
   });
 });

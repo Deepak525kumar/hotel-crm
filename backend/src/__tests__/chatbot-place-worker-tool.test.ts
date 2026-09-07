@@ -2,6 +2,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockPlace = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
 const mockResolve = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+const mockResolveHotel = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
 
 jest.mock('../modules/assignments/service.js', () => ({
   assignmentService: { list: jest.fn(), placeOnCalendar: mockPlace },
@@ -9,10 +10,13 @@ jest.mock('../modules/assignments/service.js', () => ({
 }));
 jest.mock('../modules/chatbot/tools/worker-reference.js', () => ({
   resolveWorkerReference: mockResolve,
+  resolveHotelReference: mockResolveHotel,
   describeUnresolved: (r: any) =>
-    r.status === 'AMBIGUOUS' ? `More than one worker matches "${r.query}": ${r.candidates.join(', ')}.`
-    : r.status === 'NO_SCOPE' ? 'This can only be done by a manager assigned to a specific hotel.'
-    : `No worker matching "${r.query}" is on your team.`,
+    r.status === 'AMBIGUOUS' ? `More than one worker matches "${r.query}".` : `No worker matching "${r.query}" is on your team.`,
+  describeUnresolvedHotel: (r: any) =>
+    r.status === 'NEEDS_NAME' ? 'Which hotel? Please name it, since you cover more than one.'
+    : r.status === 'AMBIGUOUS' ? `More than one hotel matches "${r.query}".`
+    : `No hotel matching "${r.query}" is in your scope.`,
 }));
 
 import { placeWorkerOnCalendar } from '../modules/chatbot/tools/definitions/self-service.tools.js';
@@ -27,6 +31,7 @@ const actorFor = (role: string): ActorContext =>
 describe('assignments.place_worker — the week-planning write', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockResolveHotel.mockResolvedValue({ status: 'RESOLVED', hotelId: 'h1', name: 'Premier Inn' });
     mockResolve.mockResolvedValue({ status: 'RESOLVED', workerId: 'w1', fullName: 'Anna Schmidt', hotelId: 'h1' });
     mockPlace.mockResolvedValue({ assignment: { id: 'a1' }, calendar_entry: { id: 'c1' } });
   });
@@ -57,7 +62,9 @@ describe('assignments.place_worker — the week-planning write', () => {
 
   it('resolves the name and NEVER takes a hotel from arguments', async () => {
     await placeWorkerOnCalendar.invoke({ worker_name: 'Anna', day: '2026-09-10' } as any, actorFor('MANAGER'));
-    expect(mockResolve).toHaveBeenCalledWith('Anna', expect.anything());
+    // Third argument is the RESOLVED hotel id, which came from the hotel
+    // resolver (itself scoped to the actor) — never from an argument.
+    expect(mockResolve).toHaveBeenCalledWith('Anna', expect.anything(), 'h1');
     const [input] = mockPlace.mock.calls[0];
     // Both ids come from the resolver, which took the hotel from the actor's
     // own scope — not from anything the model said.
@@ -80,11 +87,46 @@ describe('assignments.place_worker — the week-planning write', () => {
     expect(placeWorkerOnCalendar.compress(out).summary).toMatch(/No worker matching/);
   });
 
-  it('writes nothing for an actor with no hotel scope', async () => {
-    mockResolve.mockResolvedValue({ status: 'NO_SCOPE' });
+  it('ASKS WHICH HOTEL when the actor covers more than one', async () => {
+    // Changed 2026-09-07: an admin or RM used to be refused outright, which
+    // was a hole in the feature rather than a limit. They are now asked to
+    // name a hotel, because guessing one would place a worker somewhere
+    // nobody asked for.
+    mockResolveHotel.mockResolvedValue({ status: 'NEEDS_NAME' });
     const out = await placeWorkerOnCalendar.invoke({ worker_name: 'Anna', day: '2026-09-10' } as any, actorFor('ADMIN'));
     expect(mockPlace).not.toHaveBeenCalled();
-    expect(placeWorkerOnCalendar.compress(out).summary).toMatch(/manager assigned to a specific hotel/);
+    expect(mockResolve).not.toHaveBeenCalled(); // no roster to search yet
+    expect(placeWorkerOnCalendar.compress(out).summary).toMatch(/Which hotel\?/);
+  });
+
+  it('lets an admin place a worker once they name the hotel', async () => {
+    mockResolveHotel.mockResolvedValue({ status: 'RESOLVED', hotelId: 'h7', name: 'Premier Inn Essen' });
+    const out = await placeWorkerOnCalendar.invoke(
+      { worker_name: 'Anna', day: '2026-09-10', hotel_name: 'Essen' } as any,
+      actorFor('ADMIN'),
+    );
+    expect(mockResolveHotel).toHaveBeenCalledWith('Essen', expect.anything());
+    expect(mockResolve).toHaveBeenCalledWith('Anna', expect.anything(), 'h7');
+    expect(mockPlace.mock.calls[0][0]).toMatchObject({ hotel_id: 'h7' });
+    // The hotel is named back, since an admin covering several needs to see
+    // which one this landed on.
+    expect(placeWorkerOnCalendar.compress(out).summary).toContain('Premier Inn Essen');
+  });
+
+  it('refuses a hotel it cannot identify, without touching the roster', async () => {
+    mockResolveHotel.mockResolvedValue({ status: 'AMBIGUOUS', query: 'Premier', candidates: ['A', 'B'] });
+    const out = await placeWorkerOnCalendar.invoke(
+      { worker_name: 'Anna', day: '2026-09-10', hotel_name: 'Premier' } as any,
+      actorFor('ADMIN'),
+    );
+    expect(mockResolve).not.toHaveBeenCalled();
+    expect(mockPlace).not.toHaveBeenCalled();
+    expect(placeWorkerOnCalendar.compress(out).summary).toMatch(/More than one hotel matches/);
+  });
+
+  it('accepts a hotel NAME but never a hotel id', () => {
+    expect(placeWorkerOnCalendar.args.safeParse({ worker_name: 'Anna', day: '2026-09-10', hotel_name: 'Essen' }).success).toBe(true);
+    expect(placeWorkerOnCalendar.args.safeParse({ worker_name: 'Anna', day: '2026-09-10', hotel_id: 'h7' }).success).toBe(false);
   });
 
   it('is invisible to workers and checkers', async () => {
