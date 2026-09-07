@@ -24,14 +24,18 @@ There is no chatbot yet. There is a **safe harness for one**, plus a working zer
 | Actor | `tools/actor.ts` | Branded `ActorContext`, constructible **only** from `req.auth` |
 | Registry | `tools/registry.ts` | Declarative registration; forbidden-argument invariant |
 | **Executor** | `tools/executor.ts` | **The security boundary** — the five-step gate |
-| Tool | `tools/definitions/self-service.tools.ts` | `assignments.list_mine` — self-scoped, READ_ONLY |
+| Tools | `tools/definitions/self-service.tools.ts` | **12 registered** — 6 READ_ONLY, 1 LOW_RISK_WRITE, 5 HIGH_RISK_WRITE. All `approvalRef: PENDING` |
+| Confirmation | `guardrails/confirm-token.ts` | HMAC token binding actor + conversation + turn + tool + args hash + expiry |
+| Worker/hotel reference | `tools/worker-reference.ts` | Free-text name → id, **scope narrowed before matching** |
+| L1 router | `orchestrator/router-l1.ts` | Tool selection; `visibleTools()` filtered by live permissions |
+| Providers | `provider/bedrock-provider.ts`, `provider/mantle-provider.ts` | Bedrock Converse and mantle (OpenAI-shaped, SigV4) |
 | Tool-call log | `tools/tool-call-log.ts` | `ChatbotToolCall` rows + write idempotency |
 | Budget guard | `guardrails/budget.ts` | Monthly + per-conversation + per-worker-daily caps |
 | Redaction | `guardrails/redaction.ts` | Special-category values → presence booleans |
 | L0 router | `orchestrator/router-l0.ts` | Deterministic commands, **zero LLM calls** |
 | Orchestrator | `orchestrator/orchestrator.ts` | Turn loop and routing ladder |
 | Templates | `orchestrator/templates.ts` | Deterministic rendering (no second model call) |
-| Provider seam | `provider/llm-provider.ts` | Interface only; `getProvider()` returns `null` |
+| Provider seam | `provider/llm-provider.ts` | Interface; selected by `CHATBOT_PROVIDER` (`none`/`bedrock`/`mantle`) |
 
 Routes, all authenticated, all behind the flag: `GET /chatbot/commands`, `POST /chatbot/conversations`, `POST /chatbot/conversations/:id/messages`, `GET /chatbot/conversations/:id`, `GET /chatbot/tools`, `POST /chatbot/tools/invoke`.
 
@@ -41,14 +45,41 @@ Database: `ChatbotConversation`, `ChatbotToolCall`, `ChatbotBudgetCounter`. Migr
 
 Each of these is a deliberate refusal, not an oversight. Re-deciding them is fine; doing so *unknowingly* is the failure mode this section exists to prevent.
 
-- **No LLM provider.** No Bedrock or Anthropic client. Provider selection (Bedrock `eu-central-1` vs. the Anthropic API direct) is live and has a GDPR data-residency dimension — the platform holds German workforce data (`SOCIAL_SECURITY_NUMBER`, `TAX_NUMBER`) already in `eu-central-1`.
-- **No L1 router, no L3 planner, no prompts.** The L1 branch is reached and logged but **deliberately not stubbed**. An unrun API-shape guess is exactly how a defect ships unnoticed — this already happened once in the throwaway prototype, where an empty `messages: []` array on the opening turn would have failed on the very first real call.
-- **No conversation transcript is stored.** `session_state` is structured; `ChatbotToolCall` stores an args **hash**, never argument values or results. This sidesteps `OD-CHAT-008` (transcript retention), `OD-CHAT-018` (encryption at rest) and `OD-CHAT-019` (transcript tier) rather than foreclosing them.
-- **No write tool, and no tool touching another person's record.** Was blocked on `OD-CHAT-005`; `ADR-073` (Accepted 2026-09-04) answers it: a user may do through the assistant exactly what they can do by hand, within their own scope. The hygiene test still fails the build on a write tool, and MUST stay that way until the confirmation flow exists — `ADR-053` item 5 makes confirmation mandatory for high-risk writes, and `CHATBOT_CONFIRM_TOKEN_SECRET` is still configured-but-unused.
-- **No analytics tool.** Blocked on `OQ-ANALYTICS-01` — `API_INDEX.yaml` records the leaderboard routes as missing `requireRole`/`checkHotelAccess`. Wrapping a broken route in a tool would industrialize the breakage.
-- **No confirmation-token flow.** `CHATBOT_CONFIRM_TOKEN_SECRET` is configured but unused, because no `HIGH_RISK_WRITE` tool exists to need it.
+> **Superseded 2026-09-07.** The first, fourth and sixth bullets below described the
+> scaffold stage and are no longer true: a provider, an L1 router, write tools and the
+> confirmation flow all exist and have been exercised end-to-end against a live model.
+> They are kept, struck through, because *why* each was refused still governs the ones
+> that remain open. Everything not struck through is still a live refusal.
 
-The last two constraints are enforced **mechanically** by `chatbot-tool-registry-hygiene.test.ts`, not left to reviewer memory. Those tests are expected to be updated deliberately when the decisions land.
+- ~~**No LLM provider.**~~ **Built.** Two: `bedrock-provider.ts` (Converse) and
+  `mantle-provider.ts` (OpenAI-shaped, SigV4, `bedrock-mantle.<region>.api.aws` — note
+  `.api.aws`, not `.amazonaws.com`). `bedrock-runtime` is blocked on this account pending
+  AWS verification, which is why mantle exists. The GDPR residency dimension still governs
+  the production choice: both are pinned to `eu-central-1` and mantle **does** exist there,
+  despite the console presenting it under N. Virginia.
+- ~~**No L1 router, no L3 planner, no prompts.**~~ **L1 built** (`router-l1.ts`). No L3
+  planner. The warning that produced this refusal was vindicated: `zodToJsonSchema` emitted
+  an EMPTY schema for every `ZodEffects` (any tool using `.refine()`), and that was found
+  only by a live end-to-end run, exactly as predicted.
+- **No conversation transcript is stored.** `session_state` is structured; `ChatbotToolCall` stores an args **hash**, never argument values or results. This sidesteps `OD-CHAT-008` (transcript retention), `OD-CHAT-018` (encryption at rest) and `OD-CHAT-019` (transcript tier) rather than foreclosing them.
+- ~~**No write tool, and no tool touching another person's record.**~~ **Both built**, in
+  that order and only after `ADR-073` (Accepted 2026-09-04) settled the rule: a user may do
+  through the assistant exactly what they can do by hand, within their own scope. Five
+  HIGH_RISK_WRITE tools now exist, four of which touch another person's record
+  (`assignments.place_worker`, `assignments.place_many`, `quality.assign_rework`,
+  `calendar.mark_worker_absence`). Every one of them takes a NAME, never an id — ids are
+  FORBIDDEN_ARG_KEYS — and resolves it inside the actor's own scope.
+- ~~**No confirmation-token flow.**~~ **Built** (`guardrails/confirm-token.ts`).
+  `CHATBOT_CONFIRM_TOKEN_SECRET` is now REQUIRED when `FEATURE_CHATBOT` is on, enforced at
+  boot. The token binds actor, conversation, turn index, tool name, an args hash and an
+  expiry, so a confirmation authorises one exact call and nothing else.
+- **No analytics tool.** Blocked on `OQ-ANALYTICS-01` — `API_INDEX.yaml` records the leaderboard routes as missing `requireRole`/`checkHotelAccess`. Wrapping a broken route in a tool would industrialize the breakage.
+- **Still no analytics tool, no document-upload tool, and no stored transcript.** Those
+  three refusals stand, for the reasons given above and below.
+
+`chatbot-tool-registry-hygiene.test.ts` still enforces the remaining constraints
+mechanically rather than by reviewer memory — it was updated deliberately as each decision
+landed, which is the intended workflow, not a bypass.
 
 ## 4. Before you enable the flag
 
@@ -120,6 +151,19 @@ and assert it**: `calendar-my-absences-scope.test.ts` hardcoded `permissions: []
 exercised a permission gate and went 403 the moment one existed — while real users, whose
 permissions come from `ROLE_PERMISSIONS[user.role]`, were unaffected. Fixtures that fabricate
 permissions hide exactly this.
+
+**A route gated on a ROLE and no token needs a token before a write tool can wrap it.**
+`POST /calendar/absences` gated on `requireRole(admin|manager|regional_manager)` with no
+permission token, so `calendar.mark_worker_absence` had nothing honest to declare: `null` is
+refused for a HIGH_RISK_WRITE (correctly), and `staffing:write` — held by exactly those same
+three roles — would have been a token the route does not check, which is the trap two
+paragraphs down. The fix, 2026-09-07, was `calendar:absence:write-team`, granted to those
+three roles **and enforced on the route**, making it a no-op for HTTP callers and a true
+statement for the tool. Same argument and same resolution as `calendar:absence:write-own`
+(2026-09-04). Adding `requirePermission` to an existing route is the dangerous half: it
+silently locks out any admitted role that lacks the token, so
+`self-scoped-write-permissions.test.ts` reads the role list **out of the route file** and
+cross-checks it against `ROLE_PERMISSIONS` — a restated list would only agree with itself.
 
 **Use `anyOf` for an either/or gate; `permission: null` is not the workaround for one.**
 `requireContractReadAccess()` and `requirePayslipReadAccess()` (hr/routes.ts) gate
