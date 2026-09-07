@@ -84,6 +84,34 @@ export const L0_COMMANDS: readonly L0Command[] = [
     ],
   },
   {
+    id: 'my_documents',
+    label: 'My documents',
+    tool: 'documents.my_status',
+    args: {},
+    // The most-asked onboarding question, and the one whose asker is least
+    // able to navigate a checklist UI -- so it earns an L0 entry, answered
+    // deterministically at zero token cost. German phrases are stored in
+    // FOLDED form (ae/oe/ue/ss), matching every other command here, because
+    // folding is applied to the input before comparison.
+    phrases: [
+      'my documents',
+      'my document status',
+      'what documents do i need',
+      'which documents do i need',
+      'what documents are missing',
+      'which documents are missing',
+      'am i missing any documents',
+      'are my documents complete',
+      'meine unterlagen',
+      'meine dokumente',
+      'welche unterlagen fehlen',
+      'welche unterlagen fehlen noch',
+      'welche dokumente fehlen',
+      'fehlen noch unterlagen',
+      'sind meine unterlagen vollstaendig',
+    ],
+  },
+  {
     id: 'my_notifications',
     label: 'My messages',
     tool: 'notifications.list_mine',
