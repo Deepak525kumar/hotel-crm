@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDate } from '../schema-primitives.js';
 import { assignmentService } from '../../../assignments/service.js';
 import { attendanceService } from '../../../attendance/service.js';
 import { roomService } from '../../../rooms/service.js';
@@ -371,10 +372,7 @@ export const logRoomCleaned = registerTool<LogRoomArgs>({
 
 const MyRoomsArgs = z
   .object({
-    day: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD')
-      .optional(),
+    day: isoDate.optional(),
   })
   .strict();
 

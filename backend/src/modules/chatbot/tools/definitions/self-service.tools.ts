@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDate } from '../schema-primitives.js';
 import { assignmentService } from '../../../assignments/service.js';
 import { hrService } from '../../../hr/service.js';
 import { qualityService } from '../../../quality/service.js';
@@ -824,7 +825,7 @@ const MarkMyAbsenceArgs = z
     // Mirrors MarkAbsenceSchema rather than approximating it. A looser shape
     // would let the model produce a call the service then rejects -- after
     // the user had already confirmed it.
-    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+    day: isoDate,
     kind: z.enum(['SICK', 'VACATION']),
     reason: z.string().trim().min(1).max(500).optional(),
   })
@@ -1033,7 +1034,7 @@ const PlaceWorkerArgs = z
     // A NAME, not an id. Bounded because it becomes a scan over the hotel's
     // roster, and because a 500-character "name" is not a name.
     worker_name: z.string().trim().min(2).max(80),
-    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+    day: isoDate,
     // Optional, and a NAME rather than an id (`hotel_id` is forbidden). A
     // hotel-scoped manager never needs it -- they have exactly one hotel. An
     // admin or regional manager covers several and must say which, since
@@ -1147,7 +1148,7 @@ const PlaceManyArgs = z
         z
           .object({
             worker_name: z.string().trim().min(2).max(80),
-            day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+            day: isoDate,
           })
           .strict()
       )
@@ -1326,7 +1327,7 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
 const MarkWorkerAbsenceArgs = z
   .object({
     worker_name: z.string().trim().min(2).max(80),
-    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+    day: isoDate,
     kind: z.enum(['SICK', 'VACATION']),
     reason: z.string().trim().min(1).max(500).optional(),
     // A NAME, not an id. A hotel-scoped manager never needs it; an admin or

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDate } from '../schema-primitives.js';
 import { reportService } from '../../../reports/service.js';
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
@@ -26,7 +27,7 @@ import { registerTool, type CompactResult } from '../registry.js';
  * the conversation and gets decided from.
  */
 
-const DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');
+const DAY = isoDate;
 
 const DATASETS = ['assignments', 'attendance', 'absences', 'rooms'] as const;
 

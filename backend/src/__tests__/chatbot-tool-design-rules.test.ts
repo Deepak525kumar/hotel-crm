@@ -13,6 +13,7 @@ import {
   NotFoundError,
   ValidationError,
 } from '../lib/errors.js';
+import { isoDate, plausibleDate } from '../modules/chatbot/tools/schema-primitives.js';
 import { ROLE_PERMISSIONS } from '../config/constants.js';
 import type { ActorContext } from '../modules/chatbot/tools/actor.js';
 // Registers every tool definition as an import side effect.
@@ -331,5 +332,97 @@ describe('rule: structured failures that say what to do next', () => {
     expect(describeToolError(toolError('FORBIDDEN', 'You cannot do that.'))).not.toMatch(
       /try again|rephrase/i
     );
+  });
+});
+
+/**
+ * RULE: semantic validation, not merely syntactic. Valid JSON can still be
+ * nonsense -- an `age` of 250 parses perfectly.
+ */
+describe('rule: arguments are validated semantically', () => {
+  it('rejects a date that is only a well-formed string', () => {
+    // The bug this replaced: every tool used a bare shape regex, which
+    // accepts a thirteenth month and a forty-fifth day.
+    for (const bad of ['2026-13-45', '2026-02-30', '2026-04-31', '2026-00-10', '2026-01-00']) {
+      expect({ date: bad, accepted: isoDate.safeParse(bad).success }).toEqual({
+        date: bad,
+        accepted: false,
+      });
+    }
+  });
+
+  it('accepts real dates including a leap day', () => {
+    for (const good of ['2026-09-08', '2024-02-29', '2026-12-31']) {
+      expect({ date: good, accepted: isoDate.safeParse(good).success }).toEqual({
+        date: good,
+        accepted: true,
+      });
+    }
+  });
+
+  it('rejects 2026-02-30 rather than silently answering about March 2', () => {
+    // JavaScript rolls this over. The platform learned that in
+    // quality/service.ts: the response echoed back a day nobody asked about.
+    expect(new Date('2026-02-30T00:00:00.000Z').toISOString().slice(0, 10)).toBe('2026-03-02');
+    expect(isoDate.safeParse('2026-02-30').success).toBe(false);
+  });
+
+  it('rejects a date far outside anything this platform can discuss', () => {
+    // Not a format problem -- a typo or a hallucination. Letting it through
+    // produces a confidently empty answer that reads like a real result.
+    expect(plausibleDate.safeParse('1970-01-01').success).toBe(false);
+    expect(plausibleDate.safeParse('2400-01-01').success).toBe(false);
+    expect(plausibleDate.safeParse(`${new Date().getUTCFullYear()}-06-01`).success).toBe(true);
+  });
+
+  it('lets no tool declare its own date regex', () => {
+    // A rule copied into fifteen schemas becomes fifteen slightly different
+    // rules within a year. Asserted against the source.
+    const { readFileSync, readdirSync } = require('node:fs') as typeof import('node:fs');
+    const dir = 'src/modules/chatbot/tools/definitions';
+    for (const file of readdirSync(dir)) {
+      const source = readFileSync(`${dir}/${file}`, 'utf8');
+      expect({ file, hasOwnRegex: /\\d\{4\}-\\d\{2\}-\\d\{2\}/.test(source) }).toEqual({
+        file,
+        hasOwnRegex: false,
+      });
+    }
+  });
+});
+
+/**
+ * RULE: resolve ambiguity before a consequential action. "Cancel the
+ * reservation" with three active reservations must ask, never pick.
+ */
+describe('rule: ambiguity is refused, never guessed', () => {
+  it('gives every context resolver an explicit AMBIGUOUS outcome', () => {
+    const { readFileSync, readdirSync } = require('node:fs') as typeof import('node:fs');
+    const dir = 'src/modules/chatbot/tools';
+    const resolvers = readdirSync(dir).filter((f) => f.endsWith('-reference.ts'));
+
+    // If a resolver file exists at all, it must be able to say "several
+    // matched" -- a resolver that can only succeed or fail will pick one.
+    expect(resolvers.length).toBeGreaterThan(0);
+    for (const file of resolvers) {
+      const source = readFileSync(`${dir}/${file}`, 'utf8');
+      expect({ file, refusesAmbiguity: source.includes("'AMBIGUOUS'") }).toEqual({
+        file,
+        refusesAmbiguity: true,
+      });
+    }
+  });
+
+  it('never lets a resolver silently take the first of several matches', () => {
+    const { readFileSync, readdirSync } = require('node:fs') as typeof import('node:fs');
+    const dir = 'src/modules/chatbot/tools';
+    for (const file of readdirSync(dir).filter((f) => f.endsWith('-reference.ts'))) {
+      const source = readFileSync(`${dir}/${file}`, 'utf8');
+      // Every resolver counts its matches and branches on more-than-one
+      // before returning anything.
+      expect({ file, guards: /length > 1|length !== 1/.test(source) }).toEqual({
+        file,
+        guards: true,
+      });
+    }
   });
 });

@@ -383,6 +383,23 @@ const envSchema = z.object({
   // table size -- that is what produced the original defect.
   PLATFORM_NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().positive().default(1825),
 
+  // Operational payroll evidence -- WorkerAssignment and everything that
+  // cascades from it (Attendance, RoomLog, QualityVerification). Ten years,
+  // per the owner decision of 2026-09-08 and the German commercial/tax
+  // retention norm for payroll-relevant records: these rows are what a wage
+  // dispute or a tax audit would be settled from.
+  //
+  // 3653 = 10 years including leap days. Expressed in days like every other
+  // window here, and NOT to be shortened for capacity reasons -- that is the
+  // exact mistake ADR-033 already had to correct once (see
+  // platform-table-sweep-job.ts).
+  //
+  // OD-RETENTION-01 (tax-advisor sign-off) remains open and is tracked
+  // separately; ten years is the conservative choice pending it, because
+  // keeping records too long is a storage-limitation finding while deleting
+  // them too early is an unanswerable audit.
+  PLATFORM_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(3653),
+
   // PLATFORM_AUDIT_LOG_RETENTION_DAYS was REMOVED (2026-09-04). ADR-033
   // excludes AuditLog from all three tiers and retains it INDEFINITELY: it is
   // the platform's own accountability record under CRR §30, and deleting it
