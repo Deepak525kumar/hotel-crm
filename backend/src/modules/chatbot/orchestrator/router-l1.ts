@@ -117,6 +117,19 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
     case 'ZodDefault':
     case 'ZodNullable':
       return zodToJsonSchema(def.innerType);
+    // `.refine()` / `.transform()` wrap the schema in a ZodEffects. Without
+    // this the wrapper fell through to the permissive `{}` below, and the
+    // model was told the tool takes NO ARGUMENTS.
+    //
+    // Found by the first end-to-end run against a live model, not by a unit
+    // test: `calendar.mark_my_absence` is the only tool using `.refine()`,
+    // and it is the only write tool reachable by natural language. The model
+    // picked the right tool and produced perfect arguments when given a real
+    // schema -- it simply was not given one, so it sent none and the
+    // executor rejected the call. The failure surfaced as "I did not
+    // understand that", which reads like a model problem and is not.
+    case 'ZodEffects':
+      return zodToJsonSchema(def.schema);
     default:
       return {};
   }

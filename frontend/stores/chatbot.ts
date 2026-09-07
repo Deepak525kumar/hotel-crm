@@ -165,7 +165,7 @@ async function exchange(
           role: "assistant" as const,
           text: turn.reply,
           route: turn.route,
-          pendingConfirmation: turn.pending_confirmation,
+          pendingConfirmation: turn.pendingConfirmation,
         },
       ],
     }));
