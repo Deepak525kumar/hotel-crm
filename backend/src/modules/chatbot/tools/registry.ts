@@ -238,6 +238,55 @@ export function permissionTokens(permission: ToolRegistration<any>['permission']
   return permission.anyOf;
 }
 
+/**
+ * Refuses to run with an UNAPPROVED tool registered.
+ *
+ * `ADR-053` item 4 requires every tool its own explicit approval, and until
+ * now that requirement was honoured by convention alone: `approvalRef` had to
+ * be non-empty, and the string `'PENDING -- ...'` satisfied that perfectly.
+ * The platform would have started, served, and executed a tool nobody had
+ * approved, with nothing anywhere saying so.
+ *
+ * Called at boot ONLY when `FEATURE_CHATBOT` is on, so development keeps
+ * working normally with tools mid-review -- the flag is what turns the
+ * requirement on, which matches how the approval gate is written.
+ *
+ * Deliberately fatal rather than a warning, and deliberately listing every
+ * offender rather than the first: this is the last mechanical check standing
+ * between an unreviewed capability and production, and a warning in a boot
+ * log is not a gate.
+ */
+export function assertAllToolsApproved(): void {
+  const all = listTools();
+
+  // An EMPTY registry is the failure mode this check is most likely to have,
+  // not a clean bill of health: tools register as an import side effect, so
+  // calling this before the definitions are loaded would pass vacuously
+  // while looking like it worked. That already happened once during
+  // development, with the call placed before createApp().
+  if (all.length === 0) {
+    throw new Error(
+      'FEATURE_CHATBOT is enabled but no tools are registered. This is almost ' +
+        'certainly an ordering bug -- tool definitions register when the chatbot ' +
+        'service module is imported, so this check must run after that import, ' +
+        'not before it.'
+    );
+  }
+
+  const pending = all
+    .filter((tool) => /\bPENDING\b/i.test(tool.approvalRef))
+    .map((tool) => tool.name);
+
+  if (pending.length > 0) {
+    throw new Error(
+      `FEATURE_CHATBOT is enabled but ${pending.length} tool(s) are not approved: ` +
+        `${pending.join(', ')}. ADR-053 item 4 requires each tool its own explicit ` +
+        'approval from the commissioning human. Either obtain it and update ' +
+        "`approvalRef`, or unregister the tool -- do not enable the flag around it."
+    );
+  }
+}
+
 export function resolveTool(name: string): ToolRegistration<any> | undefined {
   if (typeof name !== 'string') return undefined;
   return registry.get(name);
