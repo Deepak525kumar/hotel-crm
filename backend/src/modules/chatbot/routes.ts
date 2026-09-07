@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.js';
+import { chatbotActionRateLimit, chatbotTurnRateLimit } from './guardrails/rate-limit.js';
 import {
   exchangeMessage,
   getConversation,
@@ -26,13 +27,18 @@ router.get('/tools', listTools);
 // req.auth.permissions before anything runs.
 //
 // @requiresPermission staffing:read
-router.post('/tools/invoke', invokeTool);
+router.post('/tools/invoke', chatbotActionRateLimit(), invokeTool);
 
 // Conversation lifecycle. Self-scoped throughout: a conversation belongs to
 // the worker who started it, and ownership is re-checked in the service and
 // again in the orchestrator (RULE-CHAT-09).
-router.post('/conversations', startConversation);
-router.post('/conversations/:id/messages', exchangeMessage);
+router.post('/conversations', chatbotActionRateLimit(), startConversation);
+// The metered path: this is the one that may reach the model, and the only
+// one that can hold a connection for CHATBOT_TURN_TIMEOUT_MS. Limited per
+// USER, not per IP -- see guardrails/rate-limit.ts for why that distinction
+// matters on a shared office NAT. Complements the token budgets rather than
+// duplicating them: they bound spend, this bounds rate.
+router.post('/conversations/:id/messages', chatbotTurnRateLimit(), exchangeMessage);
 router.get('/conversations/:id', getConversation);
 
 // L0 command manifest — the client renders these as quick-reply chips. A

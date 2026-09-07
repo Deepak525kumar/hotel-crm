@@ -618,6 +618,22 @@ const envSchema = z.object({
 
   CHATBOT_MAX_TOOL_CALLS_PER_TURN: z.coerce.number().int().positive().default(5),
   CHATBOT_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(20000),
+  // Request-RATE limits for the chatbot, distinct from the token budgets
+  // above and NOT a substitute for them. The budgets bound what a user may
+  // SPEND (per conversation, per day, per month); these bound how FAST they
+  // may ask. A user cannot exceed their daily token cap either way, but
+  // without these they can exhaust it in seconds -- and every turn is a
+  // synchronous upstream call held open for up to CHATBOT_TURN_TIMEOUT_MS,
+  // so a burst is a resource problem before it is a cost one.
+  //
+  // 20 model turns/minute is far above human typing cadence (a person sends
+  // one every few seconds at most) and still bounds a runaway client loop.
+  CHATBOT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000),
+  CHATBOT_TURN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  // Direct tool invocation and conversation creation put no model in the
+  // loop, so they are cheaper and get a looser bound -- but they still write
+  // rows, so they are not unbounded.
+  CHATBOT_ACTION_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(40),
   // HMAC secret for high-risk-write confirmation tokens (§6/§9 of the
   // architecture doc). Only required once a HIGH_RISK_WRITE tool is
   // registered — none is yet — enforced below via superRefine rather than

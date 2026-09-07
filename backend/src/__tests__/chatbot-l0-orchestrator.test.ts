@@ -32,6 +32,13 @@ jest.mock('../config/env.js', () => ({
     CHATBOT_CONVERSATION_TOKEN_CAP: 25000,
     CHATBOT_USER_DAILY_TOKEN_CAP: 60000,
     CHATBOT_MAX_TOOL_CALLS_PER_TURN: 5,
+    // Generous on purpose: these suites fire many requests in a tight loop
+    // and are not testing the rate limiter. Omitting them is not harmless --
+    // guardrails/rate-limit.ts now throws rather than let express-rate-limit
+    // silently substitute its own default of 5.
+    CHATBOT_RATE_LIMIT_WINDOW_MS: 60000,
+    CHATBOT_TURN_RATE_LIMIT_MAX: 10000,
+    CHATBOT_ACTION_RATE_LIMIT_MAX: 10000,
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));

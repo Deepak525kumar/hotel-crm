@@ -21,7 +21,15 @@ jest.mock('../lib/logger.js', () => ({
 }));
 
 jest.mock('../config/env.js', () => ({
-  getEnv: () => ({ NODE_ENV: 'test' }),
+  getEnv: () => ({
+    NODE_ENV: 'test',
+    // Required, not optional: guardrails/rate-limit.ts refuses to build a
+    // limiter without a real bound, so mounting the chatbot router needs
+    // these. Generous because this suite tests the feature flag, not rates.
+    CHATBOT_RATE_LIMIT_WINDOW_MS: 60000,
+    CHATBOT_TURN_RATE_LIMIT_MAX: 10000,
+    CHATBOT_ACTION_RATE_LIMIT_MAX: 10000,
+  }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
 
