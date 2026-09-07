@@ -3,7 +3,7 @@ import { BaseService } from '../../lib/base-service.js';
 import { ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { runTurn, type TurnResult } from './orchestrator/orchestrator.js';
 import type { ActorContext } from './tools/actor.js';
-import { executeTool, type ExecutionOutcome } from './tools/executor.js';
+import { actorHasPermission, executeTool, type ExecutionOutcome } from './tools/executor.js';
 import { listTools } from './tools/registry.js';
 import type { ToolDescriptorDto } from './types.js';
 
@@ -144,18 +144,13 @@ export class ChatbotService extends BaseService {
     return listTools()
       .filter((tool) => {
         if (tool.permission === null) return true; // no token gates it
-        const required = Array.isArray(tool.permission) ? tool.permission : [tool.permission];
-        const held = actor.permissions ?? [];
-        if (held.includes('admin:*')) return true;
-        return required.every(
-          (permission) =>
-            held.includes(permission) ||
-            held.some((heldPerm) => {
-              const [heldResource] = heldPerm.split(':');
-              const [requiredResource] = permission.split(':');
-              return heldPerm.endsWith(':*') && heldResource === requiredResource;
-            })
-        );
+        // Delegated to the executor's OWN predicate, not reimplemented.
+        // This WAS a third independent copy of that logic -- identical at the
+        // time, and silently wrong the moment `anyOf` was added, because a
+        // copy treats `{ anyOf: [...] }` as an array and matches nothing.
+        // The manifest would then have hidden tools the executor would
+        // happily run, which reads as the assistant being broken.
+        return actorHasPermission(actor, tool.permission);
       })
       .map((tool) => ({
         name: tool.name,

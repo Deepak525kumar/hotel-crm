@@ -270,29 +270,30 @@ export const listMyNotifications = registerTool<MyNotificationsArgs>({
  *     worker | checker        -> hr:contract:read-own
  *     admin | manager | RM    -> hr:read
  *
- * The registry's `permission` field cannot express that. Its array form is
- * an AND (`every()` in permissions.ts), so `['hr:read',
- * 'hr:contract:read-own']` would demand BOTH and deny everyone -- no role
- * holds both. Declaring either token alone locks out the other half of the
- * platform: `hr:contract:read-own` denies every manager asking about their
- * own contract, and `hr:read` denies every worker and checker, who are the
- * population this question mostly comes from.
+ * The registry's array form is an AND (`every()` in permissions.ts), so
+ * `['hr:read', 'hr:contract:read-own']` would demand BOTH and deny everyone
+ * -- no role holds both. Declaring either token alone locks out the other
+ * half of the platform: `hr:contract:read-own` denies every manager asking
+ * about their own contract, and `hr:read` denies every worker and checker,
+ * who are the population this question mostly comes from.
+ *
+ * The `anyOf` form (added 2026-09-07, for exactly this) is an OR, so it
+ * admits precisely the two populations the route admits.
  *
  * Verified against the real ROLE_PERMISSIONS, not assumed:
  *   ADMIN/MANAGER/RM   hr:read = yes, hr:contract:read-own = no
  *   CHECKER/WORKER     hr:read = no,  hr:contract:read-own = yes
  * Every role can read its OWN contract; none can do it through one token.
  *
- * So `permission: null` is the honest modelling, and it is safe here rather
- * than permissive: the tool is self-scoped (the executor enforces that), the
- * worker id is the actor's own and is not expressible as an argument, and
- * hrService.getContractStatus applies its own self-scope check on top. The
- * admitted population is exactly the population the route admits.
- *
- * FOLLOW-UP: this pattern recurs -- `requirePayslipReadAccess()` has the
- * identical shape -- so the registry should eventually express
- * role-conditional permissions rather than have each tool restate this. That
- * is a registry change, not something to keep working around per tool.
+ * ONE DIFFERENCE FROM THE ROUTE, stated rather than glossed: the route picks
+ * a token BY ROLE, so a hypothetical role holding `hr:contract:read-own`
+ * while being neither worker nor checker would be sent to `hr:read` by the
+ * route and admitted by `anyOf` here. No such role exists today (verified
+ * above against the real sets), and the direction of the gap is bounded --
+ * both tokens are contract-read tokens, and the tool is self-scoped, so the
+ * worst case is an actor reading its OWN contract. If a future role splits
+ * these apart, the registry needs a role-conditional form, not another
+ * per-tool workaround.
  */
 const MyContractArgs = z.object({}).strict();
 
@@ -355,7 +356,9 @@ export const getMyContract = registerTool<MyContractArgs>({
     'assignments.list_mine and notifications.list_mine.',
 
   args: MyContractArgs,
-  permission: null,
+  // Mirrors requireContractReadAccess() (hr/routes.ts:121-123): worker and
+  // checker gate on hr:contract:read-own, every other role on hr:read.
+  permission: { anyOf: ['hr:read', 'hr:contract:read-own'] },
   permissionRationale:
     'The wrapped route gates role-conditionally (worker/checker: ' +
     'hr:contract:read-own; admin/manager/RM: hr:read) and the registry cannot ' +
@@ -461,14 +464,11 @@ export const listMyPayslips = registerTool<MyPayslipsArgs>({
     'specific tool. Self-scoped + READ_ONLY.',
 
   args: MyPayslipsArgs,
-  permission: null,
-  permissionRationale:
-    'requirePayslipReadAccess() gates role-conditionally (worker/checker: ' +
-    'hr:payslip:read-own; admin/manager/RM: hr:read) and the registry cannot express ' +
-    'an OR -- naming both denies everyone, naming either locks out half the platform. ' +
-    'Self-scope is the control: worker_id is forced to the actor\'s own id in invoke(), ' +
-    'is not expressible as a tool argument (FORBIDDEN_ARG_KEY), and listPayroll ' +
-    're-forces it for worker/checker callers.',
+  // Mirrors requirePayslipReadAccess() (hr/routes.ts:136-138): worker and
+  // checker gate on hr:payslip:read-own, every other role on hr:read. See the
+  // hr.my_contract block above for the one way `anyOf` differs from a
+  // role-conditional gate, and why that gap is bounded for a self-scoped read.
+  permission: { anyOf: ['hr:read', 'hr:payslip:read-own'] },
   scopeCheck: 'self',
 
   invoke: async (args, actor) => {

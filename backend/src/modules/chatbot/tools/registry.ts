@@ -98,7 +98,30 @@ export interface ToolRegistration<A extends SafeArgs = SafeArgs> {
    * every legitimate user. `assertValidRegistration` constrains `null` hard
    * (see below), so it cannot become a loophole.
    */
-  permission: string | string[] | null;
+  /**
+   * `'tok'`         — require it.
+   * `['a','b']`     — require BOTH (an AND, matching requirePermission's array form).
+   * `{ anyOf: [] }` — require AT LEAST ONE.
+   * `null`          — the wrapped interface enforces no token at all.
+   *
+   * `anyOf` exists for routes whose gate is ROLE-CONDITIONAL, of which this
+   * platform has several: `requireContractReadAccess()` demands
+   * `hr:contract:read-own` of a worker or checker and `hr:read` of everyone
+   * else. Neither the string nor the array form can express that -- the array
+   * is an AND, so naming both tokens denies everyone, since no role holds
+   * both. Before `anyOf`, such tools were modelled as `null` with a written
+   * rationale, which under-declared them.
+   *
+   * NOTE THE ONE DIFFERENCE from a true role-conditional gate: `anyOf` admits
+   * anyone holding EITHER token, where the route would demand the specific
+   * one for their role. The sets coincide today (no worker holds `hr:read`),
+   * and the executor is a precondition rather than the authorization -- the
+   * owning service re-checks -- but a future role holding both tokens would
+   * be admitted here and could still be refused downstream. That is the
+   * correct direction to be wrong in, and it is written down rather than
+   * discovered.
+   */
+  permission: string | string[] | { anyOf: string[] } | null;
   /** Why `permission` is null. Required when it is; ignored otherwise. */
   permissionRationale?: string;
   scopeCheck: ScopeCheck;
@@ -124,6 +147,13 @@ export function assertValidRegistration(reg: ToolRegistration<any>): void {
     throw new Error(
       `Tool "${reg.name}" is HIGH_RISK_WRITE and must require confirmation (ADR-053 item 5)`
     );
+  }
+
+  if (reg.permission && typeof reg.permission === 'object' && 'anyOf' in reg.permission) {
+    if (reg.permission.anyOf.length === 0) {
+      // Would deny everyone, silently, and read as "no permission needed".
+      throw new Error(`Tool "${reg.name}" declares an empty anyOf, which denies every role`);
+    }
   }
 
   // A token-less tool is only permissible in the narrowest possible shape:
@@ -193,6 +223,21 @@ export function registerTool<A extends SafeArgs>(reg: ToolRegistration<A>): Tool
  * hard-denied by the executor. A Map (not an object literal) so inherited
  * members like "constructor" or "__proto__" cannot resolve.
  */
+/**
+ * Every token a permission declaration mentions, in any of its forms.
+ *
+ * For inspection only -- it flattens `anyOf` to a flat list and therefore
+ * LOSES the OR/AND distinction. Never use it to decide access; that is
+ * `actorHasPermission`'s job, and three copies of that logic have already
+ * had to be collapsed back into one.
+ */
+export function permissionTokens(permission: ToolRegistration<any>['permission']): string[] {
+  if (permission === null) return [];
+  if (typeof permission === 'string') return [permission];
+  if (Array.isArray(permission)) return permission;
+  return permission.anyOf;
+}
+
 export function resolveTool(name: string): ToolRegistration<any> | undefined {
   if (typeof name !== 'string') return undefined;
   return registry.get(name);

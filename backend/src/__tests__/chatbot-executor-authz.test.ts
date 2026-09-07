@@ -1,4 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { actorHasPermission } from '../modules/chatbot/tools/executor.js';
+import { listTools } from '../modules/chatbot/tools/registry.js';
+import { ROLE_PERMISSIONS } from '../config/constants.js';
 import type { Request, Response, NextFunction } from 'express';
 
 /**
@@ -383,4 +386,41 @@ describe('chatbot tool manifest', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.map((t: { name: string }) => t.name)).toContain('assignments.list_mine');
   });
+
+  /**
+   * THE MANIFEST AND THE EXECUTOR MUST AGREE, for every role and every tool.
+   *
+   * `listAvailableTools` once carried its own copy of the permission logic --
+   * a third one, alongside the executor's and the L1 router's. All three were
+   * identical when written, which is exactly why the drift was invisible: the
+   * copy only became wrong when `anyOf` was added, and it would then have
+   * hidden the two HR tools from every caller while the executor ran them
+   * happily. That reads to a user as "the assistant can't do this", with
+   * nothing failing anywhere.
+   *
+   * Asserting agreement rather than any particular answer means this keeps
+   * holding whatever the permission model grows into next.
+   */
+  it.each(Object.keys(ROLE_PERMISSIONS))(
+    'shows role %s exactly the tools the executor would let it run',
+    async (role) => {
+      const permissions = ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] ?? [];
+      testAuth = { userId: 'u1', role: role.toLowerCase(), permissions, scope: null };
+
+      const res = await request(makeApp()).get('/chatbot/tools');
+      expect(res.status).toBe(200);
+
+      const listed = (res.body.data as Array<{ name: string }>).map((t) => t.name).sort();
+      // The branded ActorContext the executor takes; the route builds the
+      // same thing from req.auth. Cast because the brand is deliberately
+      // unforgeable outside the module that mints it.
+      const actor = { userId: 'u1', role: role.toLowerCase(), permissions, scope: null } as unknown as Parameters<typeof actorHasPermission>[0];
+      const expected = listTools()
+        .filter((t) => t.permission === null || actorHasPermission(actor, t.permission))
+        .map((t) => t.name)
+        .sort();
+
+      expect({ role, listed }).toEqual({ role, listed: expected });
+    }
+  );
 });

@@ -121,16 +121,31 @@ exercised a permission gate and went 403 the moment one existed — while real u
 permissions come from `ROLE_PERMISSIONS[user.role]`, were unaffected. Fixtures that fabricate
 permissions hide exactly this.
 
-**The registry cannot express a role-conditional permission, and several routes have one.**
+**Use `anyOf` for an either/or gate; `permission: null` is not the workaround for one.**
 `requireContractReadAccess()` and `requirePayslipReadAccess()` (hr/routes.ts) gate
 worker/checker on `hr:contract:read-own` / `hr:payslip:read-own` and admin/manager/RM on
 `hr:read`. `ToolRegistration.permission`'s array form is an AND (`every()` in permissions.ts),
 so naming both tokens denies **everyone** (no role holds both) and naming either alone locks out
-half the platform. `hr.my_contract` models this as `permission: null` with a written rationale,
-which is safe there only because the tool is self-scoped, the worker id is the actor's own and is
-not expressible as an argument, and the service re-checks. **Do not copy the `null` without
-copying all three of those conditions** — and prefer fixing the registry to express an OR, rather
-than restating this per tool.
+half the platform. Both tools were modelled as `permission: null` plus a paragraph of rationale
+until 2026-09-07, when the registry gained `{ anyOf: [...] }` — an OR — because the workaround had
+already been restated twice and was about to be a third time. Declare the gate; do not describe it
+in prose. One caveat is recorded at `hr.my_contract`: `anyOf` admits anyone holding *either*
+token, while the route picks a token *by role*, so a future role that splits these apart needs a
+role-conditional form rather than another workaround.
+
+`permission: null` remains correct for a route that carries **no** `requirePermission` at all
+(`GET /assignments`, `GET /notifications`), and `assertValidRegistration` still constrains it to
+READ_ONLY + self-scoped + a written rationale.
+
+**The tool manifest must agree with the executor, and has drifted before.**
+`listAvailableTools` carried its own copy of the permission logic — a third one, beside the
+executor's and the L1 router's. All three were identical when written, which is exactly why it was
+invisible; the copy only became wrong when `anyOf` landed, and would then have hidden the two HR
+tools from every caller while the executor ran them happily. That reads to a user as "the
+assistant is broken", with nothing failing anywhere. All three now delegate to
+`actorHasPermission`, and `chatbot-executor-authz.test.ts` asserts manifest/executor **agreement**
+per role rather than any particular answer, so it survives the next change to the model. Use
+`permissionTokens()` for inspection only — it flattens `anyOf` and loses the OR.
 
 **A manager naming a WORKER is legitimate; a model naming an ID is not.** `worker_id` and
 `hotel_id` are FORBIDDEN_ARG_KEYS, so a manager-scoped tool cannot accept either — but a manager

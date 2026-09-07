@@ -150,8 +150,9 @@ describe('visibleTools', () => {
     const a = actor('worker', []);
     for (const tool of visibleTools(a)) {
       if (tool.permission === null) continue;
-      const required = Array.isArray(tool.permission) ? tool.permission : [tool.permission];
-      expect(required.every((t) => a.permissions.includes(t))).toBe(true);
+      // Delegated, not re-derived: `anyOf` is an OR and a flat `.every()`
+      // over its tokens would assert the wrong thing entirely.
+      expect(actorHasPermission(a, tool.permission)).toBe(true);
     }
   });
 });
