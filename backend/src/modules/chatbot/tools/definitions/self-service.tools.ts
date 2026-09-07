@@ -1194,3 +1194,147 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
   },
   maxResultTokens: 1200,
 });
+
+/**
+ * A manager records a SICK or VACATION day for one of their own workers.
+ *
+ * WHY THIS EXISTS. The owner's motivating use case is dictating a week's plan
+ * in prose -- "Anna is off sick Monday, put Tomasz on Tuesday" -- and until
+ * now only the second half of that sentence was possible. `place_worker`
+ * covered assignments; absence had only the SELF path
+ * (`calendar.mark_my_absence`), so a manager could not record the thing they
+ * are most often told by phone at 6am. `markAbsenceForWorker` already existed
+ * in the service and was deliberately left unwrapped; this wraps it.
+ *
+ * THE PERMISSION IS NEW, AND THAT WAS THE HONEST OPTION. `POST
+ * /calendar/absences` gated on `requireRole(admin|manager|regional_manager)`
+ * and no token at all, so there was no true `permission` for this tool to
+ * declare. `null` is not available to a HIGH_RISK_WRITE (the registry refuses
+ * it, correctly), and borrowing `staffing:write` -- which happens to be held
+ * by those same three roles -- would have declared a token the route does not
+ * check, the documented trap in CHATBOT_HANDOFF section 6. So
+ * `calendar:absence:write-team` was added to exactly those roles AND enforced
+ * on the route, making it a no-op for HTTP callers and a true statement here.
+ * This is the same argument, and the same resolution, as the 2026-09-04
+ * decision that introduced `calendar:absence:write-own`.
+ *
+ * WHY IT IS SAFE TO EXPOSE A WRITE ON ANOTHER PERSON'S RECORD:
+ *
+ *  - `worker_id` is never an argument (FORBIDDEN_ARG_KEY). The worker is
+ *    named in free text and resolved inside the actor's own scope by
+ *    `resolveWorkerReference`, which narrows candidates to the hotel BEFORE
+ *    matching -- so a name that matches nobody in scope cannot reveal that it
+ *    matches someone elsewhere.
+ *  - `markAbsenceForWorker` re-checks group scope itself
+ *    (`isWorkerInGroupScope`) exactly as the HTTP route relies on. The model
+ *    cannot widen it; nothing it emits is an authorization input.
+ *  - It also refuses to overwrite an absence the WORKER marked themselves
+ *    (`assertSelfMarkedAbsenceIsUntouched`, per the 2026-08-29 owner
+ *    decision). That protection is inherited here, not restated -- a manager
+ *    cannot use the assistant to silently replace a worker's own declaration
+ *    any more than they can by hand.
+ *  - HIGH_RISK_WRITE with `confirm: true`: it commits another person's day
+ *    and is a protected record afterwards, so the actor sees the exact call
+ *    before it runs.
+ *
+ * KNOWN LIMIT, stated rather than discovered later: `resolveWorkerReference`
+ * searches WORKER-role staff only, so a checker's absence cannot be recorded
+ * this way even though a manager supervises checkers too. That is the
+ * resolver's existing behaviour, shared with `place_worker`, and widening it
+ * is a change to that helper's contract rather than something to special-case
+ * here.
+ */
+const MarkWorkerAbsenceArgs = z
+  .object({
+    worker_name: z.string().trim().min(2).max(80),
+    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+    kind: z.enum(['SICK', 'VACATION']),
+    reason: z.string().trim().min(1).max(500).optional(),
+    // A NAME, not an id. A hotel-scoped manager never needs it; an admin or
+    // regional manager covers several and must say which, since guessing
+    // would search the wrong roster.
+    hotel_name: z.string().trim().min(2).max(120).optional(),
+  })
+  .strict()
+  // The service's rule, restated so it fails at PROPOSAL time rather than
+  // after the manager has already confirmed a call that cannot run.
+  .refine((d) => d.kind !== 'VACATION' || Boolean(d.reason), {
+    message: 'reason is required for a VACATION absence',
+    path: ['reason'],
+  });
+
+type MarkWorkerAbsenceArgs = z.infer<typeof MarkWorkerAbsenceArgs>;
+
+export const markWorkerAbsence = registerTool<MarkWorkerAbsenceArgs>({
+  name: 'calendar.mark_worker_absence',
+  description:
+    "Record a sick or vacation day for one of the manager's OWN workers. Use for " +
+    '"Anna is off sick on Monday", "Tomasz called in sick", "book Maria off next ' +
+    'Friday". Give the worker\'s name as they are known at the hotel; the day must ' +
+    'be YYYY-MM-DD. A vacation day requires a reason; a sick day does not. This ' +
+    "does NOT record the manager's own absence -- use calendar.mark_my_absence for that.",
+  tier: 'HIGH_RISK_WRITE',
+  confirm: true,
+
+  interfaceRef: 'IF-CAL-MarkAbsenceForWorker (calendar/service.ts markAbsenceForWorker())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It ' +
+    "writes to another person's calendar and creates a record protected against " +
+    'later correction, so it warrants at least the scrutiny of ' +
+    'assignments.place_worker.',
+
+  args: MarkWorkerAbsenceArgs,
+  permission: 'calendar:absence:write-team',
+  // 'none' for the same reason as assignments.place_worker: there is no hotel
+  // ARGUMENT to pre-check. The hotel comes from the actor's own scope inside
+  // invoke(), and markAbsenceForWorker re-checks group scope regardless.
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    // Hotel FIRST: the roster is a property of a hotel, so there is nothing
+    // to search until we know which one.
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') {
+      return { refused: describeUnresolvedHotel(hotel) };
+    }
+
+    const resolved = await resolveWorkerReference(args.worker_name, actor, hotel.hotelId);
+    if (resolved.status !== 'RESOLVED') {
+      // A refusal, not an exception: "there are two Annas" is a normal answer
+      // the manager can act on, and throwing would turn it into a failed turn
+      // carrying no useful guidance.
+      return { refused: describeUnresolved(resolved) };
+    }
+
+    const absence = await calendarService.markAbsenceForWorker(
+      {
+        worker_id: resolved.workerId,
+        day: args.day,
+        kind: args.kind,
+        ...(args.reason ? { reason: args.reason } : {}),
+      },
+      toServiceActor(actor)
+    );
+
+    return { worker: resolved.fullName, hotel: hotel.name, absence };
+  },
+
+  compress: (raw: unknown) => {
+    const result = raw as
+      | { refused?: string; worker?: string; hotel?: string; absence?: { day?: string; kind?: string } }
+      | null;
+
+    if (!result) return { summary: 'Nothing was recorded.', data: null };
+    if (result.refused) return { summary: result.refused, data: null };
+
+    const kind = String(result.absence?.kind ?? '').toLowerCase();
+    return {
+      summary: `Recorded ${kind} leave for ${result.worker} on ${result.absence?.day}.`,
+      // Deliberately no worker id: the manager asked by name and reads the
+      // answer by name, and an id here would only give the model a string it
+      // might repeat back.
+      data: { worker: result.worker, day: result.absence?.day, kind: result.absence?.kind },
+    };
+  },
+  maxResultTokens: 120,
+});

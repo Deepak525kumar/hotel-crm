@@ -167,6 +167,23 @@ const MANAGER_PERMISSIONS = Object.freeze([
     // was the alternative and was rejected.
     'calendar:absence:write-own',
     'notifications:mark-read-own',
+    // The manager-on-a-worker's-behalf counterpart, added 2026-09-07 for the
+    // same reason and by the same argument as the two above: naming the
+    // capability rather than loosening the registry.
+    //
+    // `POST /calendar/absences` gated on requireRole(admin|manager|
+    // regional_manager) and NO token, so no honest `permission` existed for a
+    // chatbot tool to declare -- and `null` is not available to a
+    // HIGH_RISK_WRITE, correctly. Borrowing `staffing:write` (which happens to
+    // match the same three roles) was the alternative and was rejected: it is
+    // not a calendar token, and declaring a token the route does not check is
+    // the documented trap in CHATBOT_HANDOFF section 6.
+    //
+    // Granted to exactly the roles the route already admits -- MANAGER (RM
+    // inherits this list) and ADMIN, never WORKER or CHECKER -- and the route
+    // now enforces it too (calendar/routes.ts), so this is a no-op for HTTP
+    // callers and the declaration is true rather than merely convenient.
+    'calendar:absence:write-team',
 ]) as string[];
 
 // ADR-031 D-1 (PR-3): ROLE_PERMISSIONS is now consulted on the request path
@@ -215,6 +232,23 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // was the alternative and was rejected.
     'calendar:absence:write-own',
     'notifications:mark-read-own',
+    // The manager-on-a-worker's-behalf counterpart, added 2026-09-07 for the
+    // same reason and by the same argument as the two above: naming the
+    // capability rather than loosening the registry.
+    //
+    // `POST /calendar/absences` gated on requireRole(admin|manager|
+    // regional_manager) and NO token, so no honest `permission` existed for a
+    // chatbot tool to declare -- and `null` is not available to a
+    // HIGH_RISK_WRITE, correctly. Borrowing `staffing:write` (which happens to
+    // match the same three roles) was the alternative and was rejected: it is
+    // not a calendar token, and declaring a token the route does not check is
+    // the documented trap in CHATBOT_HANDOFF section 6.
+    //
+    // Granted to exactly the roles the route already admits -- MANAGER (RM
+    // inherits this list) and ADMIN, never WORKER or CHECKER -- and the route
+    // now enforces it too (calendar/routes.ts), so this is a no-op for HTTP
+    // callers and the declaration is true rather than merely convenient.
+    'calendar:absence:write-team',
   ]) as string[],
   MANAGER: MANAGER_PERMISSIONS,
   // ADR-060 / ADR-030 §3 C-33: RM = Manager's operational set plus

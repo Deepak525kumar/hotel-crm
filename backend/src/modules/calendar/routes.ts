@@ -43,9 +43,20 @@ router.get(
 // group-scoped counterpart. Group-scope enforcement
 // (isWorkerInGroupScope) happens in the service, same as every other
 // manager-on-a-worker's-behalf write in this codebase.
+// @requiresPermission calendar:absence:write-team
 router.post(
   '/absences',
   requireRole(['admin', 'manager', 'regional_manager']),
+  // Added 2026-09-07 alongside the token itself. A NO-OP for HTTP callers:
+  // the token is held by exactly the three roles requireRole already admits,
+  // so nobody who could reach this route before is turned away now.
+  //
+  // It is here so the capability is nameable rather than implied by a role
+  // list -- the same argument that added `calendar:absence:write-own` to the
+  // self path above. Without it, the chatbot tool wrapping this endpoint
+  // would have to declare a token this route does not check (a lie about the
+  // real gate) or `null` (which the registry rightly refuses for a write).
+  requirePermission('calendar:absence:write-team'),
   (req, res, next) => calendarController.markAbsenceForWorker(req, res, next)
 );
 
