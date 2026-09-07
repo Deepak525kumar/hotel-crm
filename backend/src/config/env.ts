@@ -585,7 +585,12 @@ const envSchema = z.object({
   // orchestrator degrades to the confirmed fallback (RULE-CHAT-03) rather
   // than erroring. Bedrock chosen 2026-09-04 -- see bedrock-provider.ts for
   // the data-residency and no-stored-secret reasoning.
-  CHATBOT_PROVIDER: z.enum(['none', 'bedrock']).default('none'),
+  // 'mantle' added 2026-09-07. bedrock-runtime is unusable on this account
+  // (every model, including first-party Nova, returns "Operation not
+  // allowed" pending an account verification standing for days); mantle is a
+  // different service with a different gate and works today. It is also in
+  // eu-central-1, so choosing it costs no data residency.
+  CHATBOT_PROVIDER: z.enum(['none', 'bedrock', 'mantle']).default('none'),
 
   // Frankfurt: the same region as RDS and S3. Inference must not leave the
   // jurisdiction the subjects' data already lives in.
@@ -597,6 +602,19 @@ const envSchema = z.object({
   // API is the one that accepts them.
   CHATBOT_MODEL_FAST: z.string().default('eu.anthropic.claude-haiku-4-5-20251001-v1:0'),
   CHATBOT_MODEL_PLANNING: z.string().default('eu.anthropic.claude-sonnet-4-5-20250929-v1:0'),
+
+  // Mantle model ids, which are NOT the bedrock-runtime ones: no `eu.`
+  // inference-profile prefix, and no Anthropic models -- none is entitled on
+  // this account (that needs an AWS Sales conversation), so these are
+  // open-weight. Qwen3 235B was verified doing real tool calling before it
+  // was chosen: asked "what are my shifts this week?" it selected the tool
+  // and inferred `limit: 7` unprompted.
+  //
+  // The same model serves both tiers for now. Splitting them is worthwhile
+  // once the planning path exists and there is something to measure; picking
+  // a second model before then would be a guess dressed as a decision.
+  CHATBOT_MANTLE_MODEL_FAST: z.string().default('qwen.qwen3-235b-a22b-2507'),
+  CHATBOT_MANTLE_MODEL_PLANNING: z.string().default('qwen.qwen3-235b-a22b-2507'),
 
   CHATBOT_MAX_TOOL_CALLS_PER_TURN: z.coerce.number().int().positive().default(5),
   CHATBOT_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(20000),
