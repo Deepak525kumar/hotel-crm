@@ -664,3 +664,40 @@ export interface ReworkRoundPhotos {
   cancelled_at: string | null;
   cancellation_reason: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Chatbot. Behind FEATURE_CHATBOT, off in production — every /chatbot/* route
+// 404s until it is enabled, which is a supported state, not an error.
+// ---------------------------------------------------------------------------
+
+/** A quick-reply chip. Tapping one costs ZERO model tokens — L0 resolves it. */
+export interface ChatbotCommandDto {
+  id: string;
+  label: string;
+  tool: string;
+}
+
+export interface ChatbotConversationDto {
+  id: string;
+  status: string;
+}
+
+/**
+ * One turn.
+ *
+ * Field names are camelCase because the API returns its TurnResult object
+ * as-is. The web client typed these as snake_case at first, which made
+ * `pendingConfirmation` permanently undefined and left high-risk writes with
+ * no Confirm button — unapprovable, with nothing on screen explaining why.
+ */
+export interface ChatbotTurnDto {
+  reply: string;
+  status: string;
+  route: 'L0' | 'L1' | 'L3' | 'none';
+  toolInvoked?: string;
+  pendingConfirmation?: {
+    token: string;
+    summary: string;
+    toolName: string;
+  };
+}

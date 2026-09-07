@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChatLauncher } from '@/components/ChatLauncher';
 import { useRouter } from 'expo-router';
 import useSWR from 'swr';
 import { useTranslation } from 'react-i18next';
@@ -252,6 +253,10 @@ export default function HomeScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+      {/* Outside SafeAreaView so it floats over the scrolling content rather
+          than scrolling with it. Renders nothing when the backend does not
+          serve the chatbot, which is production today. */}
+      <ChatLauncher />
     </ThemedView>
   );
 }

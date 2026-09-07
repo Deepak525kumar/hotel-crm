@@ -6,6 +6,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
+import { ChatLauncher } from '@/components/ChatLauncher';
 import { ThemedView } from '@/components/themed-view';
 import { Badge, Button, Card, EmptyState, ScreenHeader, SectionHeader, StatTile } from '@/components/ui';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -202,6 +203,10 @@ export default function HomeScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+      {/* Outside SafeAreaView so it floats over the scrolling content rather
+          than scrolling with it. Renders nothing when the backend does not
+          serve the chatbot, which is production today. */}
+      <ChatLauncher />
     </ThemedView>
   );
 }

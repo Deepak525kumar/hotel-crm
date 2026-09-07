@@ -35,6 +35,9 @@ import type {
   RoomsForCheck,
   User,
   WorkerDocument,
+  ChatbotCommandDto,
+  ChatbotConversationDto,
+  ChatbotTurnDto,
 } from '@/types/api';
 import type { UiLocale } from '@/lib/locales';
 import type { InspectionOutcome } from '@/lib/inspection-outcome';
@@ -381,6 +384,55 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  /**
+   * Chatbot. Every route 404s while FEATURE_CHATBOT is off, which is its
+   * state in production — `isAvailable()` exists so the app can decide
+   * whether to offer the assistant at all rather than surfacing a failed
+   * request to a worker who never asked for one.
+   */
+  chatbot: {
+    /**
+     * Deliberately swallows the error: a 404 means the flag is off and a 403
+     * means this user may not use it, and in both cases the right UI is no
+     * assistant. Distinguishing them would leak that an unreleased feature
+     * exists.
+     */
+    isAvailable: async (): Promise<boolean> => {
+      try {
+        await request<ChatbotCommandDto[]>('/chatbot/commands');
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    commands: () => request<ChatbotCommandDto[]>('/chatbot/commands'),
+
+    startConversation: () =>
+      request<ChatbotConversationDto>('/chatbot/conversations', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+
+    /**
+     * Exactly ONE of text, commandId or confirmToken. The backend rejects any
+     * other combination, and a confirmation carries no text precisely so
+     * there is nothing to alter between what was approved and what runs.
+     */
+    sendMessage: (
+      conversationId: string,
+      input: { text?: string; commandId?: string; confirmToken?: string },
+    ) =>
+      request<ChatbotTurnDto>(`/chatbot/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({
+          ...(input.text !== undefined ? { text: input.text } : {}),
+          ...(input.commandId !== undefined ? { command_id: input.commandId } : {}),
+          ...(input.confirmToken !== undefined ? { confirm_token: input.confirmToken } : {}),
+        }),
+      }),
+  },
+
   auth: {
     // Anti-enumeration by design: the server answers 200 whether or not the
     // address exists, so callers must not infer anything from success.
