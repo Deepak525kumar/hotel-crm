@@ -3,6 +3,7 @@ import { assignmentService } from '../../../assignments/service.js';
 import { hrService } from '../../../hr/service.js';
 import { qualityService } from '../../../quality/service.js';
 import { calendarService } from '../../../calendar/service.js';
+import { describeUnresolved, resolveWorkerReference } from '../worker-reference.js';
 import { notificationService } from '../../../notifications/service.js';
 import type { AssignmentDto } from '../../../assignments/types.js';
 import { toServiceActor } from '../actor.js';
@@ -907,4 +908,101 @@ export const listTeamAssignments = registerTool<TeamAssignmentsArgs>({
 
   compress: compressTeamAssignments,
   maxResultTokens: 900,
+});
+
+
+/**
+ * A manager puts one of their workers on the calendar for a day.
+ *
+ * THE WEEK-PLANNING CAPABILITY, one day at a time. "Put Anna on Tuesday" is
+ * the shape a manager actually speaks, and this is the first tool that can
+ * act on it.
+ *
+ * THE WORKER IS NAMED, NOT IDENTIFIED. `worker_id` and `hotel_id` are
+ * FORBIDDEN_ARG_KEYS and a tool cannot accept either; an id supplied by a
+ * model is an authorization input wearing a semantic costume. So the
+ * argument is a NAME, and `resolveWorkerReference` turns it into an id
+ * server-side, from the caller's own hotel roster -- scoping the candidate
+ * set BEFORE matching, so a name that matches nobody in scope cannot reveal
+ * that it matches someone elsewhere. Ambiguity refuses rather than guessing.
+ *
+ * The hotel is likewise never an argument: it is the one the actor is scoped
+ * to. An admin or regional manager, having no single hotel, is refused
+ * rather than having one guessed for them.
+ *
+ * A RE-RESOLUTION RACE EXISTS AND IS ACCEPTED. The name is resolved when the
+ * tool runs, which for a confirmed write is AFTER the manager approved a
+ * summary. If the roster changed in between -- a second "Anna" joining the
+ * hotel within those five minutes -- resolution becomes ambiguous and the
+ * tool refuses rather than writing. It cannot silently roster a different
+ * person: the only outcomes are the same worker, or a refusal. Narrowing
+ * this further means storing the resolved id in the pending call, which
+ * would put an id where the confirmation summary cannot show it, and a
+ * summary the manager cannot verify is worse than a rare refusal.
+ *
+ * HIGH_RISK_WRITE: placing someone on the calendar creates a real assignment,
+ * notifies them, and commits their day. Confirmation is forced at
+ * registration.
+ */
+const PlaceWorkerArgs = z
+  .object({
+    // A NAME, not an id. Bounded because it becomes a scan over the hotel's
+    // roster, and because a 500-character "name" is not a name.
+    worker_name: z.string().trim().min(2).max(80),
+    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+  })
+  .strict();
+
+type PlaceWorkerArgs = z.infer<typeof PlaceWorkerArgs>;
+
+export const placeWorkerOnCalendar = registerTool<PlaceWorkerArgs>({
+  name: 'assignments.place_worker',
+  description:
+    "Put one of the manager's OWN workers on the calendar for a given day. Use for " +
+    '"put Anna on Tuesday", "schedule Tomasz for the 12th". Give the worker\'s name as ' +
+    'they are known at the hotel; the day must be YYYY-MM-DD.',
+  tier: 'HIGH_RISK_WRITE',
+  confirm: true,
+
+  interfaceRef: 'IF-ASG-PlaceOnCalendar (assignments/service.ts placeOnCalendar())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. FIRST ' +
+    "tool that writes to another person's schedule, so it warrants closer review " +
+    'than the self-scoped writes: it commits a worker\'s day and notifies them.',
+
+  args: PlaceWorkerArgs,
+  permission: 'staffing:write',
+  // 'none': there is no hotel ARGUMENT to pre-check. The hotel comes from the
+  // actor's own scope inside invoke(), and placeOnCalendar re-checks it with
+  // isHotelInScope() regardless -- the same guard the HTTP route relies on.
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    const resolved = await resolveWorkerReference(args.worker_name, actor);
+    if (resolved.status !== 'RESOLVED') {
+      // A refusal, not an exception: "there are two Annas" is a normal
+      // answer a manager can act on, and throwing would turn it into a
+      // failed turn with no useful guidance.
+      return { refused: describeUnresolved(resolved) };
+    }
+
+    const result = await assignmentService.placeOnCalendar(
+      { worker_id: resolved.workerId, hotel_id: resolved.hotelId, day: args.day },
+      toServiceActor(actor)
+    );
+    return { placed: { worker: resolved.fullName, day: args.day }, result };
+  },
+
+  compress: (raw: unknown) => {
+    const out = raw as { refused?: string; placed?: { worker: string; day: string } } | null;
+    if (out?.refused) return { summary: out.refused, data: null };
+    if (out?.placed) {
+      return {
+        summary: `${out.placed.worker} is on the calendar for ${out.placed.day}.`,
+        data: { worker: out.placed.worker, day: out.placed.day },
+      };
+    }
+    return { summary: 'Done.', data: null };
+  },
+  maxResultTokens: 120,
 });
