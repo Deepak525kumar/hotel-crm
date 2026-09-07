@@ -85,7 +85,11 @@ router.patch(
 // Update (start/complete/cancel): all authenticated roles with service-level guards.
 router.get('/', listAssignments);
 router.get('/:id', getAssignment);
-router.patch('/:id', updateAssignment);
+// @requiresPermission assignments:status-write
+// Added 2026-09-08 with the token. A NO-OP for HTTP callers: every role holds
+// it, matching a route that admits every authenticated caller. The service
+// remains the real boundary -- it decides WHOSE assignment may be touched.
+router.patch('/:id', requirePermission('assignments:status-write'), updateAssignment);
 
 // ADR-028 (OQ-ANALYTICS-03): manager-entered "rooms completed" count. RBAC
 // mirrors analytics'/quality's manager-write precedent (Epic 5 PR 5.5, ADR-024):

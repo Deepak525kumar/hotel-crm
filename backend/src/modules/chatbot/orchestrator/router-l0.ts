@@ -112,6 +112,24 @@ export const L0_COMMANDS: readonly L0Command[] = [
     ],
   },
   {
+    id: 'my_rooms',
+    label: 'My rooms today',
+    tool: 'rooms.my_rooms',
+    args: {},
+    // Asked constantly mid-shift, and free to answer. German phrases in the
+    // folded form the matcher uses (ae/oe/ue/ss).
+    phrases: [
+      'my rooms',
+      'my rooms today',
+      'how many rooms have i done',
+      'how many rooms did i do',
+      'which rooms did i log',
+      'meine zimmer',
+      'wie viele zimmer habe ich geschafft',
+      'wie viele zimmer habe ich gemacht',
+    ],
+  },
+  {
     id: 'my_notifications',
     label: 'My messages',
     tool: 'notifications.list_mine',

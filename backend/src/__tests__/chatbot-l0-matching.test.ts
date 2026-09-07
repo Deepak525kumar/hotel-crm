@@ -141,3 +141,41 @@ describe('the documents command (2026-09-07)', () => {
     expect(hit?.args).toEqual({});
   });
 });
+
+/**
+ * An L0 command routes STRAIGHT to a tool, with `confirmed: false`, so a
+ * command pointing at a tool that requires confirmation cannot execute: the
+ * executor's confirmation gate throws. That is the correct direction to fail
+ * -- a quick-reply chip must never be a way around a confirmation -- but the
+ * result would reach the user as an opaque error on a tapped chip.
+ *
+ * So the rule is that L0 only ever fronts unconfirmed tools, and it is
+ * asserted here rather than left to whoever adds the next command.
+ */
+describe('L0 commands and the confirmation gate', () => {
+  it('never fronts a tool that requires confirmation', async () => {
+    const { resolveTool } = await import('../modules/chatbot/tools/registry.js');
+    await import('../modules/chatbot/service.js');
+
+    for (const command of L0_COMMANDS) {
+      const tool = resolveTool(command.tool);
+      expect({ command: command.id, tool: command.tool, found: Boolean(tool) }).toEqual({
+        command: command.id,
+        tool: command.tool,
+        found: true,
+      });
+      expect({ command: command.id, confirms: tool?.confirm }).toEqual({
+        command: command.id,
+        confirms: false,
+      });
+    }
+  });
+
+  it('every command points at a tool that is actually registered', () => {
+    // A typo here is a chip that fails on tap, and nothing else would catch it.
+    expect(L0_COMMANDS.length).toBeGreaterThan(0);
+    for (const command of L0_COMMANDS) {
+      expect(command.tool).toMatch(/^[a-z_]+\.[a-z_]+$/);
+    }
+  });
+});
