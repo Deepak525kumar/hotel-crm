@@ -70,12 +70,19 @@ export interface ExecuteRequest {
  */
 export function actorHasPermission(
   actor: ActorContext,
-  permissions: string | string[]
+  permissions: string | string[] | { anyOf: string[] }
 ): boolean {
-  const required = Array.isArray(permissions) ? permissions : [permissions];
   const held = actor.permissions ?? [];
 
   if (held.includes('admin:*')) return true;
+
+  // `anyOf` is an OR, for routes whose gate is role-conditional. Delegates
+  // per token so the wildcard rules below apply identically either way.
+  if (typeof permissions === 'object' && !Array.isArray(permissions)) {
+    return permissions.anyOf.some((token) => actorHasPermission(actor, token));
+  }
+
+  const required = Array.isArray(permissions) ? permissions : [permissions];
 
   return required.every(
     (permission) =>

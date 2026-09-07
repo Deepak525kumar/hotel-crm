@@ -102,6 +102,31 @@ describe('registered tools vs. real ROLE_PERMISSIONS', () => {
     }
   });
 
+  /**
+   * The claim the `anyOf` form was added to make good on: the HR self-reads
+   * are gated role-conditionally at the route (worker/checker on the
+   * `*:read-own` token, everyone else on `hr:read`), and EVERY role can read
+   * its own contract and payslips -- just never through a single token.
+   *
+   * Before `anyOf` these two were `permission: null` with a paragraph of
+   * rationale, which meant this suite's self-scoped test passed over them
+   * without asserting anything. Named explicitly so the coverage is real.
+   */
+  it.each([['hr.my_contract'], ['hr.my_payslips']])(
+    'lets every real role reach %s, matching the role-conditional route gate',
+    (toolName) => {
+      const tool = listTools().find((t) => t.name === toolName);
+      expect(tool).toBeDefined();
+      // Not null: the whole point is that the gate is now DECLARED.
+      expect(tool!.permission).not.toBeNull();
+
+      const roles = Object.keys(ROLE_PERMISSIONS) as Array<keyof typeof ROLE_PERMISSIONS>;
+      for (const role of roles) {
+        expect({ role, usable: canUse(tool!, realActor(role)) }).toEqual({ role, usable: true });
+      }
+    }
+  );
+
   it('constrains any token-less tool to READ_ONLY + self-scoped + rationale', () => {
     for (const tool of listTools().filter((t) => t.permission === null)) {
       expect({

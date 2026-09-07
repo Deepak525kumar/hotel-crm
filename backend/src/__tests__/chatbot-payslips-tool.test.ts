@@ -66,11 +66,15 @@ describe('hr.my_payslips', () => {
     expect(mockListPayroll.mock.calls[0][0]).not.toHaveProperty('status');
   });
 
-  it('stays inside the envelope a null permission requires', () => {
+  it('declares the same role-conditional gate the route enforces', () => {
     expect(listMyPayslips.tier).toBe('READ_ONLY');
     expect(listMyPayslips.scopeCheck).toBe('self');
-    expect(listMyPayslips.permission).toBeNull();
-    expect(listMyPayslips.permissionRationale).toBeTruthy();
+    // Was `permission: null` plus a paragraph of rationale, because the
+    // registry could not express an OR. requirePayslipReadAccess()
+    // (hr/routes.ts:136-138) sends worker and checker to
+    // `hr:payslip:read-own` and every other role to `hr:read`; `anyOf`
+    // now says so directly, so the gate is declared instead of described.
+    expect(listMyPayslips.permission).toEqual({ anyOf: ['hr:read', 'hr:payslip:read-own'] });
   });
 
   it('confirms the role-conditional OR is real for payslips too', () => {

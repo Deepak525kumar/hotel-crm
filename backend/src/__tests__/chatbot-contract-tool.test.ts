@@ -71,11 +71,15 @@ describe('hr.my_contract', () => {
     expect(holds('MANAGER', 'hr:contract:read-own')).toBe(false);
   });
 
-  it('stays inside the envelope a null permission requires', () => {
+  it('declares the same role-conditional gate the route enforces', () => {
     expect(getMyContract.tier).toBe('READ_ONLY');
     expect(getMyContract.scopeCheck).toBe('self');
-    expect(getMyContract.permission).toBeNull();
-    expect(getMyContract.permissionRationale).toBeTruthy();
+    // Was `permission: null` plus a paragraph of rationale, because the
+    // registry could not express an OR. requireContractReadAccess()
+    // (hr/routes.ts:121-123) sends worker and checker to
+    // `hr:contract:read-own` and every other role to `hr:read`; `anyOf`
+    // now says so directly, so the gate is declared instead of described.
+    expect(getMyContract.permission).toEqual({ anyOf: ['hr:read', 'hr:contract:read-own'] });
   });
 
   it('drops every internal identifier from the result', () => {

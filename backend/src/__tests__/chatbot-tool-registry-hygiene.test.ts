@@ -1,4 +1,5 @@
 import { describe, it, expect, jest } from '@jest/globals';
+import { actorHasPermission } from '../modules/chatbot/tools/executor.js';
 
 /**
  * Static hygiene checks over the whole tool registry, in the spirit of
@@ -39,6 +40,7 @@ import {
   assertValidRegistration,
   describeSchemaKeys,
   listTools,
+  permissionTokens,
   resolveTool,
 } from '../modules/chatbot/tools/registry.js';
 // Importing the service registers every tool definition as a side effect.
@@ -85,7 +87,7 @@ describe('tool registry hygiene — every registered tool', () => {
         // asserted in chatbot-real-permissions.test.ts.
         expect(tool.permissionRationale?.trim()).toBeTruthy();
       } else {
-        const tokens = Array.isArray(tool.permission) ? tool.permission : [tool.permission];
+        const tokens = permissionTokens(tool.permission);
         expect(tokens.length).toBeGreaterThan(0);
         expect(tokens.every((t) => t.length > 0)).toBe(true);
       }
@@ -214,5 +216,61 @@ describe('tool lookup is allow-listed', () => {
 
   it('does not resolve an unregistered name', () => {
     expect(resolveTool('assignments.drop_table')).toBeUndefined();
+  });
+});
+
+/**
+ * `anyOf` is an OR, and it is the only OR in the permission model. Its
+ * semantics are asserted directly rather than only through the tools that
+ * happen to use it today, because a subtle change here would quietly widen
+ * or narrow access everywhere at once.
+ */
+describe('permission: anyOf', () => {
+  const actor = (permissions: string[]) =>
+    ({ userId: 'u1', role: 'worker', permissions, scope: null }) as unknown as Parameters<
+      typeof actorHasPermission
+    >[0];
+
+  const GATE = { anyOf: ['hr:read', 'hr:contract:read-own'] };
+
+  it('admits an actor holding EITHER token', () => {
+    expect(actorHasPermission(actor(['hr:read']), GATE)).toBe(true);
+    expect(actorHasPermission(actor(['hr:contract:read-own']), GATE)).toBe(true);
+  });
+
+  it('denies an actor holding neither', () => {
+    expect(actorHasPermission(actor(['staffing:read']), GATE)).toBe(false);
+    expect(actorHasPermission(actor([]), GATE)).toBe(false);
+  });
+
+  it('applies wildcards inside anyOf exactly as it does outside', () => {
+    expect(actorHasPermission(actor(['hr:*']), GATE)).toBe(true);
+    expect(actorHasPermission(actor(['admin:*']), GATE)).toBe(true);
+    // A wildcard on an unrelated resource must not leak across.
+    expect(actorHasPermission(actor(['staffing:*']), GATE)).toBe(false);
+  });
+
+  it('refuses to register an empty anyOf, which would deny everyone silently', () => {
+    expect(() =>
+      assertValidRegistration({
+        name: 'test.empty_any_of',
+        description: 'x',
+        tier: 'READ_ONLY',
+        confirm: false,
+        args: z.object({}).strict(),
+        permission: { anyOf: [] },
+        scopeCheck: 'self',
+        interfaceRef: 'x',
+        approvalRef: 'x',
+        invoke: async () => ({ summary: '', data: null }),
+      } as never)
+    ).toThrow(/anyOf/i);
+  });
+
+  it('flattens every form for inspection without deciding access', () => {
+    expect(permissionTokens(null)).toEqual([]);
+    expect(permissionTokens('hr:read')).toEqual(['hr:read']);
+    expect(permissionTokens(['a', 'b'])).toEqual(['a', 'b']);
+    expect(permissionTokens({ anyOf: ['a', 'b'] })).toEqual(['a', 'b']);
   });
 });
