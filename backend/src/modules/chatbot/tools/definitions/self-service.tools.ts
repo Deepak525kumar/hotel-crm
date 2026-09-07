@@ -790,3 +790,121 @@ export const markMyAbsence = registerTool<MarkMyAbsenceArgs>({
   },
   maxResultTokens: 80,
 });
+
+
+// ---------------------------------------------------------------------------
+// MANAGER-SCOPED TOOLS
+//
+// The first tools that read beyond the caller's own record. ADR-073 permits
+// this: a Manager may see through the assistant exactly what they can see by
+// hand, which for assignments is their own hotel or group and nothing else.
+// ---------------------------------------------------------------------------
+
+/**
+ * A manager's view of their team's shifts.
+ *
+ * WHY THERE IS NO worker_id OR hotel_id ARGUMENT, even though a manager
+ * genuinely needs to ask about one worker: both are FORBIDDEN_ARG_KEYS, and
+ * rightly so -- an id supplied by a model is an authorization input wearing a
+ * semantic costume. The free-text `q` is the honest way to express "Anna's
+ * shifts": it searches worker name, hotel name and city INSIDE the scope the
+ * service has already narrowed to, so a manager can name a person without
+ * anyone being able to name an id.
+ *
+ * Scope is not this tool's job. `assignmentService.list()` narrows a
+ * scoped-manager role to its own hotel_group itself -- that narrowing was
+ * added as an IDOR fix (2026-08-08) after list() was found returning every
+ * assignment platform-wide -- and it is the same code path the HTTP route
+ * uses. Duplicating it here would be a second scope implementation to drift.
+ *
+ * `staffing:read` is declared honestly: WORKER and CHECKER do not hold it, so
+ * this tool is invisible to them, which is correct -- a worker asking about
+ * "the team" should get nothing, and gets nothing.
+ */
+const TeamAssignmentsArgs = z
+  .object({
+    // Free text across worker name, hotel name and city. Capped at the same
+    // 120 characters ListAssignmentsQuerySchema caps at: this becomes several
+    // LIKE clauses over joined tables, and an unbounded term is a cheap way
+    // to make an expensive query.
+    q: z.string().trim().max(120).optional(),
+    status: z
+      .enum(['CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'NO_SHOW', 'CANCELLED', 'REASSIGNED'])
+      .optional(),
+    limit: z.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+
+type TeamAssignmentsArgs = z.infer<typeof TeamAssignmentsArgs>;
+
+interface TeamAssignmentRow {
+  id?: string;
+  worker_id?: string;
+  hotel_id?: string;
+  status?: string;
+  confirmed_at?: string | null;
+  worker_name?: string | null;
+  hotel_name?: string | null;
+}
+
+function compressTeamAssignments(raw: unknown): CompactResult {
+  const rows = ((raw as { data?: TeamAssignmentRow[] } | null)?.data ?? []) as TeamAssignmentRow[];
+  const data = rows.map((row) => ({
+    // Names, not ids. A manager asking who is working wants people, and an
+    // id would cost tokens on every row while giving the model a string it
+    // might repeat back as if it meant something.
+    worker: row.worker_name ?? null,
+    hotel: row.hotel_name ?? null,
+    day: row.confirmed_at ? row.confirmed_at.slice(0, 10) : null,
+    status: row.status ?? null,
+  }));
+
+  return {
+    summary:
+      data.length === 0
+        ? 'No shifts found for your team.'
+        : `${data.length} shift${data.length === 1 ? '' : 's'} across your team.`,
+    data,
+  };
+}
+
+export const listTeamAssignments = registerTool<TeamAssignmentsArgs>({
+  name: 'assignments.list_for_my_team',
+  description:
+    "List shifts across the manager's OWN hotel or group. Use for questions like " +
+    '"who is working tomorrow", "show me Anna\'s shifts", "what is scheduled at my hotel". ' +
+    'Search by name with the q parameter.',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef: 'IF-ASG-ListAssignments (assignments/service.ts list())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. First ' +
+    'manager-scoped READ tool; permitted by ADR-073, which is Accepted.',
+
+  args: TeamAssignmentsArgs,
+  // A real token, and one that excludes exactly the roles it should:
+  // WORKER and CHECKER do not hold staffing:read, so this tool is invisible
+  // to them.
+  permission: 'staffing:read',
+  // 'none', not 'hotel'. There is no hotel argument for the executor to
+  // pre-check -- the scoping happens inside list(), which narrows a
+  // scoped-manager role to its own hotel_group. 'hotel' here would resolve
+  // against an absent argument and assert something this tool does not mean.
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    return assignmentService.list(
+      {
+        ...(args.q ? { q: args.q } : {}),
+        ...(args.status ? { status: args.status as never } : {}),
+        page: 1,
+        limit: args.limit,
+      } as never,
+      toServiceActor(actor)
+    );
+  },
+
+  compress: compressTeamAssignments,
+  maxResultTokens: 900,
+});

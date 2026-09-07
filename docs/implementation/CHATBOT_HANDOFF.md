@@ -132,6 +132,17 @@ not expressible as an argument, and the service re-checks. **Do not copy the `nu
 copying all three of those conditions** — and prefer fixing the registry to express an OR, rather
 than restating this per tool.
 
+**A manager naming a WORKER is legitimate; a model naming an ID is not.** `worker_id` and
+`hotel_id` are FORBIDDEN_ARG_KEYS, so a manager-scoped tool cannot accept either — but a manager
+genuinely needs to ask about one person. The honest resolution is a free-text `q` that searches
+worker/hotel names *inside the scope the owning service has already narrowed to*
+(`assignments.list_for_my_team`). Do NOT add an id argument "just for managers": an id supplied by
+a model is an authorization input wearing a semantic costume, and the forbidden-key list exists
+precisely to stop that. **The same problem is unsolved for manager WRITES** — `placeOnCalendar`
+requires `worker_id` and `hotel_id`, so a "put Anna on Tuesday" tool needs name→id resolution
+performed server-side within the caller's scope, with explicit ambiguity handling. That is a
+design task, not a wiring one.
+
 **Verify your base branch is current before concluding anything about the repo.** A stale working branch made `prisma migrate dev` report drift for columns that a migration on `origin/main` already created, which was briefly mistaken for a missing-migration defect. Confirm against `origin/main`, not whatever branch happens to be checked out.
 
 ## 7. Next steps, in order
