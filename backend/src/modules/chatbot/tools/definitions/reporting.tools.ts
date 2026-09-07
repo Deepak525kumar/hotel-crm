@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isoDate } from '../schema-primitives.js';
+import { plausibleDate } from '../schema-primitives.js';
 import { reportService } from '../../../reports/service.js';
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
@@ -27,7 +27,13 @@ import { registerTool, type CompactResult } from '../registry.js';
  * the conversation and gets decided from.
  */
 
-const DAY = isoDate;
+// `plausibleDate`, not bare `isoDate`: a report range is the one place a
+// wildly wrong year does real damage. "2026" mistyped as "2016" is inside the
+// 366-day cap, parses, and returns an EMPTY report -- which a manager reads as
+// "nobody worked", not as "you asked about the wrong decade". Ten years back
+// also matches the operational retention window: there is nothing older left
+// to report on, so admitting such a range could only ever mislead.
+const DAY = plausibleDate;
 
 const DATASETS = ['assignments', 'attendance', 'absences', 'rooms'] as const;
 

@@ -5,6 +5,7 @@ import { attendanceService } from '../../../attendance/service.js';
 import { roomService } from '../../../rooms/service.js';
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
+import { CALENDAR_TIMEZONE } from '../../../../lib/utils.js';
 import type { ActorContext } from '../actor.js';
 
 /**
@@ -66,9 +67,30 @@ type ShiftResolution =
   | { status: 'NONE'; day: string }
   | { status: 'AMBIGUOUS'; day: string; count: number };
 
-/** Today, in the platform's calendar convention (YYYY-MM-DD). */
+/**
+ * Today, in the platform's OWN calendar timezone -- not UTC.
+ *
+ * THIS WAS A DEFECT. The first version sliced `toISOString()`, which is UTC,
+ * and the platform's calendar day is Europe/Berlin. At 00:30 Berlin on the
+ * 9th it is still 22:30 UTC on the 8th, so every tool here resolved
+ * YESTERDAY's shift: a night-shift worker clocking in just after midnight
+ * would have been checked in against the wrong day, and their rooms logged
+ * against it, with no error anywhere -- a plausible wrong answer.
+ *
+ * That population is exactly who these tools were built for. `utils.ts`
+ * already had `todayInCalendarTimezone()` for precisely this reason; the
+ * duplicate here repeated the shape without the lesson, the same way the date
+ * regex did.
+ *
+ * Equivalent to `todayInCalendarTimezone()` for the current instant; that
+ * helper takes no clock, which is why this formats directly.
+ */
 export function todayIso(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
+  // Takes an explicit instant so the timezone behaviour is TESTABLE at a
+  // fixed moment. Comparing today's value against another helper only
+  // detects the defect during the two hours a day when UTC and Berlin
+  // actually differ -- a test that passes 22 hours out of 24 is not a guard.
+  return new Intl.DateTimeFormat('en-CA', { timeZone: CALENDAR_TIMEZONE }).format(now);
 }
 
 /**
@@ -92,8 +114,21 @@ export async function resolveMyShift(
 
   // The service narrows to the caller's own rows for any self-scoped role --
   // this tool never passes a worker id, and could not: it is a forbidden key.
+  //
+  // FILTERED SERVER-SIDE, on `from`/`to`. The first version fetched one page
+  // of 50 and filtered by day in memory, which was a latent inability to
+  // clock in: `list` orders by `confirmed_at desc`, so a worker confirmed for
+  // a month of shifts would push today's -- confirmed weeks ago -- past the
+  // 50-row window. They would be told "you have no shift scheduled today" and
+  // could not start work, with nothing wrong anywhere in the logs.
+  //
+  // A single day cannot overflow a page the way a rolling history can. The
+  // query gained `from`/`to` in this same change set; not using it here was
+  // the oversight.
   const { data } = await assignmentService.list(
-    { page: 1, per_page: 50 } as Parameters<typeof assignmentService.list>[0],
+    { from: day, to: day, page: 1, per_page: 50 } as Parameters<
+      typeof assignmentService.list
+    >[0],
     serviceActor
   );
 
