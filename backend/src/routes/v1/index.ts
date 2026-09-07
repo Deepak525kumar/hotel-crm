@@ -74,9 +74,11 @@ router.use('/employees', (req, res, next) => {
 // above. While disabled, requests fall through to the 404 handler
 // ("both-off = current behavior").
 //
-// Scaffold stage: no LLM provider is wired. What is mounted here is the tool
-// executor's authorization boundary plus one self-scoped read-only tool,
-// exercisable with zero AI calls.
+// Gated on FEATURE_CHATBOT, which defaults to false and stays off outside
+// development until SPEC-CHATBOT-001 is frozen and each tool is approved
+// individually under ADR-053 item 4. When enabled, this serves the tool
+// registry, the L0 command path (no model, zero tokens) and the L1 model
+// path, all behind per-user rate limits and token budgets.
 router.use('/chatbot', (req, res, next) => {
   if (!isChatbotEnabled()) {
     next();

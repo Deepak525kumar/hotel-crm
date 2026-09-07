@@ -27,6 +27,12 @@ jest.mock('../lib/logger.js', () => ({
 
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
+    // See the note in chatbot-executor-authz.test.ts: rate-limit config is
+    // required, not optional, so a mock that mounts chatbot routes must
+    // supply it. Generous because these suites are not testing the limiter.
+    CHATBOT_RATE_LIMIT_WINDOW_MS: 60000,
+    CHATBOT_TURN_RATE_LIMIT_MAX: 10000,
+    CHATBOT_ACTION_RATE_LIMIT_MAX: 10000,
     NODE_ENV: 'test',
     CHATBOT_MONTHLY_TOKEN_CAP: 1000000,
     CHATBOT_CONVERSATION_TOKEN_CAP: 25000,

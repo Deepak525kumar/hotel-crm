@@ -55,6 +55,13 @@ jest.mock('../config/env.js', () => ({
     NODE_ENV: 'test',
     FEATURE_CHATBOT: true,
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
+    // Generous on purpose: these suites fire many requests in a tight loop
+    // and are not testing the rate limiter. Omitting them is not harmless --
+    // guardrails/rate-limit.ts now throws rather than let express-rate-limit
+    // silently substitute its own default of 5.
+    CHATBOT_RATE_LIMIT_WINDOW_MS: 60000,
+    CHATBOT_TURN_RATE_LIMIT_MAX: 10000,
+    CHATBOT_ACTION_RATE_LIMIT_MAX: 10000,
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
