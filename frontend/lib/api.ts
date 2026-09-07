@@ -25,6 +25,9 @@ import type {
   Availability,
   BroadcastEligibilityDto,
   CalendarAbsence,
+  ChatbotCommand,
+  ChatbotConversation,
+  ChatbotTurn,
   CalendarEntryDto,
   CheckInInput,
   ConsentNotice,
@@ -946,6 +949,59 @@ export const notificationsApi = {
   /** Mark a single notification as read; returns the updated record. */
   markAsRead: (id: string) =>
     apiFetch<Notification>(`/notifications/${id}/read`, { method: "POST" }),
+};
+
+/**
+ * Chatbot API, matching the backend `/chatbot/*` routes.
+ *
+ * EVERY ROUTE 404s WHEN `FEATURE_CHATBOT` IS OFF, which is its state in
+ * production today. That is a supported condition, not an error: callers use
+ * `isAvailable()` to decide whether to render the assistant at all, rather
+ * than surfacing a failed request to a worker who never asked for it.
+ */
+export const chatbotApi = {
+  /**
+   * Feature probe. Resolves true only if the backend actually serves the
+   * chatbot routes for this user.
+   *
+   * Deliberately swallows the error: a 404 here means the flag is off and a
+   * 403 means this user may not use it, and in both cases the correct UI is
+   * simply no assistant. Distinguishing them would leak whether an unreleased
+   * feature exists.
+   */
+  isAvailable: async (): Promise<boolean> => {
+    try {
+      await apiFetch<ChatbotCommand[]>("/chatbot/commands");
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  /** The quick-reply chips. Each one answers with ZERO model tokens. */
+  commands: () => apiFetch<ChatbotCommand[]>("/chatbot/commands"),
+
+  startConversation: () =>
+    apiFetch<ChatbotConversation>("/chatbot/conversations", { method: "POST", body: {} }),
+
+  /**
+   * One turn. Exactly ONE of `text`, `commandId` or `confirmToken` is sent --
+   * the backend rejects any other combination, and a confirmation carries no
+   * text precisely so there is nothing to alter between what the user
+   * approved and what runs.
+   */
+  sendMessage: (
+    conversationId: string,
+    input: { text?: string; commandId?: string; confirmToken?: string },
+  ) =>
+    apiFetch<ChatbotTurn>(`/chatbot/conversations/${conversationId}/messages`, {
+      method: "POST",
+      body: {
+        ...(input.text !== undefined ? { text: input.text } : {}),
+        ...(input.commandId !== undefined ? { command_id: input.commandId } : {}),
+        ...(input.confirmToken !== undefined ? { confirm_token: input.confirmToken } : {}),
+      },
+    }),
 };
 
 /** Hotels API matching the backend `/crm/hotels/*` routes. */

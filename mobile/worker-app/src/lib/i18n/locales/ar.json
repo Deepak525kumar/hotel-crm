@@ -1223,5 +1223,22 @@
     "suggestions": "Suggestions:",
     "goToCheckIn": "الذهاب إلى تسجيل الحضور",
     "loggedCount": "{{n}} غرف"
+  },
+  "chatbot": {
+    "title": "المساعد",
+    "subtitle": "إجابات عن ورديّاتك وعقدك وكشوف رواتبك ورسائلك.",
+    "greeting": "كيف يمكنني المساعدة؟",
+    "greetingHint": "اطرح سؤالاً أو اختر من الأسفل.",
+    "placeholder": "اسأل عن ورديّاتك أو عقدك أو رسائلك…",
+    "inputLabel": "رسالة",
+    "send": "إرسال",
+    "close": "إغلاق",
+    "openFull": "فتح الصفحة كاملة",
+    "transcript": "محادثة",
+    "thinking": "جارٍ التفكير…",
+    "confirm": "تأكيد",
+    "cancel": "إلغاء",
+    "confirmed": "تم التأكيد",
+    "cancelled": "أُلغي"
   }
 }

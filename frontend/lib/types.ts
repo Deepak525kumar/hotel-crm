@@ -1885,3 +1885,52 @@ export interface ReworkRoundPhotos {
   cancelled_at: string | null;
   cancellation_reason: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Chatbot (backend `/chatbot/*`). Behind FEATURE_CHATBOT, off in production.
+// ---------------------------------------------------------------------------
+
+/** A quick-reply chip. Tapping one costs ZERO model tokens — L0 resolves it. */
+export interface ChatbotCommand {
+  id: string;
+  label: string;
+  tool: string;
+}
+
+export interface ChatbotConversation {
+  id: string;
+  status: string;
+}
+
+/**
+ * The result of one turn.
+ *
+ * `pending_confirmation` is present when the assistant is proposing a
+ * high-risk write and NOTHING HAS BEEN WRITTEN YET. The client renders
+ * `summary` and, only if the user accepts, sends `token` straight back as the
+ * next turn's sole input.
+ */
+export interface ChatbotTurn {
+  reply: string;
+  status: string;
+  route: "L0" | "L1" | "L3" | "none";
+  tool_invoked?: string;
+  pending_confirmation?: {
+    token: string;
+    summary: string;
+    tool_name: string;
+  };
+}
+
+/** One rendered bubble. Local to the client — transcripts are never stored. */
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  /** Which rung answered, so the zero-cost path is visible while developing. */
+  route?: ChatbotTurn["route"];
+  pendingConfirmation?: ChatbotTurn["pending_confirmation"];
+  /** Set once the user has answered a confirmation, so it cannot be re-answered. */
+  resolved?: "confirmed" | "cancelled";
+  failed?: boolean;
+}

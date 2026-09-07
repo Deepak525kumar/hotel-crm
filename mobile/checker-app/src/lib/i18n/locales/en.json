@@ -1222,5 +1222,22 @@
     },
     "goToCheckIn": "Go to check-in",
     "loggedCount": "{{n}} rooms"
+  },
+  "chatbot": {
+    "title": "Assistant",
+    "subtitle": "Answers about your own shifts, contract, payslips and messages.",
+    "greeting": "How can I help?",
+    "greetingHint": "Ask a question, or pick one below.",
+    "placeholder": "Ask about your shifts, contract or messages…",
+    "inputLabel": "Message",
+    "send": "Send",
+    "close": "Close",
+    "openFull": "Open full page",
+    "transcript": "Conversation",
+    "thinking": "Thinking…",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "confirmed": "Confirmed",
+    "cancelled": "Cancelled"
   }
 }
