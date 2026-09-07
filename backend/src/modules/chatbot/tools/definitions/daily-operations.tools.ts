@@ -4,6 +4,28 @@ import { attendanceService } from '../../../attendance/service.js';
 import { roomService } from '../../../rooms/service.js';
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
+
+/**
+ * The commissioning human's approval of the seven tools added after the
+ * 2026-09-08 batch, granted the same day under `ADR-053` item 4 and recorded
+ * separately because it is a separate decision about a separate set.
+ *
+ * Granted after a LIVE routing test against the real model rather than on the
+ * code alone: 32 realistic phrases in English and German, covering tool
+ * selection, argument extraction, permission filtering and prompt injection.
+ * All 32 routed correctly -- including a worker asking to "export the whole
+ * team attendance", which selected no tool at all because the manifest is
+ * filtered by permission before the model ever sees it.
+ *
+ * Same scope limit as the first approval: it covers these tools AS REGISTERED
+ * on this date. Widening a tool's scope, risk tier or permission makes it a
+ * different capability and returns it to PENDING.
+ */
+const APPROVED_2026_09_08_SHIFT_AND_REPORTS =
+  'APPROVED 2026-09-08 by the commissioning human under ADR-053 item 4, after a ' +
+  'live routing test against the real model (32/32 phrases routed correctly). ' +
+  'Covers this tool as registered on that date; a later change to its scope, ' +
+  'risk tier or permission requires re-approval.';
 import type { ActorContext } from '../actor.js';
 
 /**
@@ -169,10 +191,9 @@ export const checkInToMyShift = registerTool<CheckInArgs>({
 
   interfaceRef: 'IF-ATT-CheckIn (attendance/service.ts checkIn())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. The ' +
-    "2026-09-08 blanket approval covers the thirteen tools registered on that date " +
-    'and explicitly does not extend to later ones. Writes a timestamped payroll ' +
-    'record the worker cannot themselves retract, which is why it is HIGH_RISK.',
+    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
+    ' Registration note: ' +
+    'Writes a timestamped payroll record the worker cannot themselves retract, which is why it is HIGH_RISK. Refuses at a geofenced hotel, correctly -- a chatbot has no GPS.',
 
   args: CheckInArgs,
   permission: 'attendance:write-own',
@@ -238,8 +259,9 @@ export const checkOutOfMyShift = registerTool<CheckOutArgs>({
 
   interfaceRef: 'IF-ATT-UpdateAttendance (attendance/service.ts update())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. Closes a ' +
-    'payroll record with a timestamp the worker cannot themselves change afterwards.',
+    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
+    ' Registration note: ' +
+    'Closes a payroll record with a timestamp the worker cannot themselves change afterwards.',
 
   args: CheckOutArgs,
   // The SELF token, even though PATCH /attendance/:id enforces none: this tool
@@ -330,9 +352,9 @@ export const logRoomCleaned = registerTool<LogRoomArgs>({
 
   interfaceRef: 'IF-ROOM-LogRoom (rooms/service.ts logRoom())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. The one ' +
-    'unconfirmed write in this batch; the reversibility argument for that is at the ' +
-    'tier declaration above.',
+    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
+    ' Registration note: ' +
+    'The one unconfirmed write: a worker logs rooms many times a shift, and can correct or delete their own log.',
 
   args: LogRoomArgs,
   permission: 'rooms:write',
@@ -391,8 +413,9 @@ export const listMyRoomsToday = registerTool<MyRoomsArgs>({
 
   interfaceRef: 'IF-ROOM-ListMyRooms (rooms/service.ts listMyRooms())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
-    'Self-scoped + READ_ONLY, the same envelope as assignments.list_mine.',
+    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
+    ' Registration note: ' +
+    'Self-scoped + READ_ONLY.',
 
   args: MyRoomsArgs,
   permission: 'rooms:read',
