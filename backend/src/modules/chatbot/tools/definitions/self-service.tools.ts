@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDate } from '../schema-primitives.js';
 import { assignmentService } from '../../../assignments/service.js';
 import { hrService } from '../../../hr/service.js';
 import { qualityService } from '../../../quality/service.js';
@@ -11,6 +12,12 @@ import {
   resolveHotelReference,
   resolveWorkerReference,
 } from '../worker-reference.js';
+import {
+  describeInspectionMiss,
+  describeNotificationMiss,
+  resolveInspectionReference,
+  resolveNotificationReference,
+} from '../context-reference.js';
 import { notificationService } from '../../../notifications/service.js';
 import type { AssignmentDto } from '../../../assignments/types.js';
 import { toServiceActor } from '../actor.js';
@@ -105,7 +112,11 @@ function compressAssignments(raw: unknown): CompactResult {
 
 export const listMyAssignments = registerTool<ListMineArgs>({
   name: 'assignments.list_mine',
-  description: "List the authenticated worker's own shift assignments.",
+  description:
+    "List the authenticated worker's OWN upcoming or past shift assignments. Use for " +
+    '"what are my shifts", "am I working tomorrow", "wann arbeite ich", "show my ' +
+    'schedule". Returns the day, hotel and status of each shift, and only ever the ' +
+    "caller's own -- never another worker's.",
   tier: 'READ_ONLY',
   confirm: false,
 
@@ -651,11 +662,16 @@ export const listMyInspections = registerTool<MyInspectionsArgs>({
  */
 const AssignReworkArgs = z
   .object({
-    // Mirrors AssignReworkSchema. `verification_id` says WHICH inspection --
-    // semantic, not authorization. The service loads it, finds its
-    // assignment and re-checks hotel scope, so an invented id is refused
-    // rather than acted on.
-    verification_id: z.string().min(1).max(64),
+    // A ROOM NUMBER, not a verification id (changed 2026-09-08). The id was
+    // semantic rather than authorization -- FORBIDDEN_ARG_KEYS never covered
+    // it -- but a model has no way to know one, so a live routing check found
+    // this tool selecting NOTHING for its own example phrase. It was
+    // unreachable in practice while every unit test passed, because the tests
+    // supplied an id the model never has.
+    //
+    // The inspection is resolved from the checker's OWN checks instead
+    // (context-reference.ts), scope before match, exactly as a worker name is.
+    room_number: z.string().trim().min(1).max(20),
     // Required by the service too. The worker is told why their room is
     // coming back, so an empty note would be a notification that explains
     // nothing.
@@ -669,7 +685,9 @@ export const assignReworkTool = registerTool<AssignReworkArgs>({
   name: 'quality.assign_rework',
   description:
     'Send an inspected room back to the worker for rework, with a note explaining what ' +
-    'needs redoing. Use when a checker says a room must be done again.',
+    'needs redoing. Use when a checker says a room must be redone, e.g. "send 214 back", ' +
+    '"Zimmer 214 nochmal machen". Requires an existing inspection and a note. Returns ' +
+    'confirmation that the rework was assigned and the worker notified.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 
@@ -684,11 +702,24 @@ export const assignReworkTool = registerTool<AssignReworkArgs>({
   scopeCheck: 'hotel',
 
   invoke: async (args, actor) => {
-    return qualityService.assignRework(args, toServiceActor(actor));
+    const resolved = await resolveInspectionReference(actor, args.room_number);
+    if (resolved.status !== 'RESOLVED') {
+      // A refusal, not an exception: "you never inspected that room" and
+      // "it is already back with the worker" are both normal answers a
+      // checker can act on.
+      return { refused: describeInspectionMiss(resolved) };
+    }
+
+    const result = await qualityService.assignRework(
+      { verification_id: resolved.value.id, notes: args.notes },
+      toServiceActor(actor)
+    );
+    return { ...(result as Record<string, unknown>), room_number: resolved.value.roomNumber };
   },
 
   compress: (raw: unknown) => {
-    const result = raw as { id?: string; room_number?: string | null } | null;
+    const result = raw as { refused?: string; id?: string; room_number?: string | null } | null;
+    if (result?.refused) return { summary: result.refused, data: null };
     return {
       summary: result?.room_number
         ? `Room ${result.room_number} sent back for rework.`
@@ -715,11 +746,17 @@ export const assignReworkTool = registerTool<AssignReworkArgs>({
  */
 const MarkNotificationReadArgs = z
   .object({
-    // Semantic, not authorization: WHICH notification, never WHOSE.
-    // markAsRead compares notification.user_id against the caller and throws
-    // ForbiddenError otherwise, so a guessed or hallucinated id cannot read
-    // across users.
-    notification_id: z.string().min(1).max(64),
+    // FREE TEXT and OPTIONAL, not an id (changed 2026-09-08). The id was
+    // semantic rather than authorization, so nothing structural forbade it --
+    // but a model has no way to know one, and a live routing check found this
+    // tool selecting NOTHING for its own example phrase. It was unreachable
+    // in practice while every unit test passed, because the tests supplied an
+    // id the model never has.
+    //
+    // Omitted means "the most recent unread", which is what "mark that as
+    // read" means in practice -- nobody says it about a message from last
+    // week. Given, it matches the caller's OWN messages only.
+    match: z.string().trim().min(1).max(120).optional(),
   })
   .strict();
 
@@ -728,8 +765,13 @@ type MarkNotificationReadArgs = z.infer<typeof MarkNotificationReadArgs>;
 export const markMyNotificationRead = registerTool<MarkNotificationReadArgs>({
   name: 'notifications.mark_read',
   description:
-    "Mark one of the authenticated user's own notifications as read. Use when they say " +
-    'they have read a message, or ask to clear or dismiss one.',
+    "Mark one of the authenticated user's own messages as read. Use when they say they " +
+    'have read a message or ask to dismiss one, e.g. "mark that as read", "gelesen", ' +
+    '"dismiss the payslip one". Leave `match` EMPTY for "that" or "the last one" -- it ' +
+    'then marks their most recent unread message, which is almost always what is meant. ' +
+    'Set `match` only when they name a specific message, and then to words FROM that ' +
+    'message ("payslip", "shift"), never to words from their own instruction. Returns ' +
+    'which message was marked.',
   tier: 'LOW_RISK_WRITE',
   confirm: false,
 
@@ -744,10 +786,21 @@ export const markMyNotificationRead = registerTool<MarkNotificationReadArgs>({
   scopeCheck: 'self',
 
   invoke: async (args, actor) => {
-    return notificationService.markAsRead(args.notification_id, toServiceActor(actor).userId);
+    const resolved = await resolveNotificationReference(actor, args.match);
+    if (resolved.status !== 'RESOLVED') {
+      return { refused: describeNotificationMiss(resolved) };
+    }
+    await notificationService.markAsRead(resolved.value.id, toServiceActor(actor).userId);
+    return { marked: resolved.value.label };
   },
 
-  compress: () => ({ summary: 'Marked as read.', data: null }),
+  compress: (raw: unknown) => {
+    const r = raw as { refused?: string; marked?: string } | null;
+    if (r?.refused) return { summary: r.refused, data: null };
+    // Names WHICH message, because "marked as read" on its own leaves a
+    // person unsure whether the assistant picked the one they meant.
+    return { summary: `Marked as read: ${r?.marked ?? 'message'}.`, data: null };
+  },
   maxResultTokens: 40,
 });
 
@@ -772,7 +825,7 @@ const MarkMyAbsenceArgs = z
     // Mirrors MarkAbsenceSchema rather than approximating it. A looser shape
     // would let the model produce a call the service then rejects -- after
     // the user had already confirmed it.
-    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+    day: isoDate,
     kind: z.enum(['SICK', 'VACATION']),
     reason: z.string().trim().min(1).max(500).optional(),
   })
@@ -793,7 +846,8 @@ export const markMyAbsence = registerTool<MarkMyAbsenceArgs>({
   description:
     "Record one of the authenticated user's OWN sick or vacation days. Use for " +
     '"I am sick today", "ich bin krank", "book me off on the 12th". A vacation day ' +
-    'requires a reason; a sick day does not.',
+    'requires a reason; a sick day does not. Give the day as YYYY-MM-DD. Returns ' +
+    'confirmation of the day and kind recorded.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 
@@ -980,7 +1034,7 @@ const PlaceWorkerArgs = z
     // A NAME, not an id. Bounded because it becomes a scan over the hotel's
     // roster, and because a 500-character "name" is not a name.
     worker_name: z.string().trim().min(2).max(80),
-    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+    day: isoDate,
     // Optional, and a NAME rather than an id (`hotel_id` is forbidden). A
     // hotel-scoped manager never needs it -- they have exactly one hotel. An
     // admin or regional manager covers several and must say which, since
@@ -1094,7 +1148,7 @@ const PlaceManyArgs = z
         z
           .object({
             worker_name: z.string().trim().min(2).max(80),
-            day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+            day: isoDate,
           })
           .strict()
       )
@@ -1273,7 +1327,7 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
 const MarkWorkerAbsenceArgs = z
   .object({
     worker_name: z.string().trim().min(2).max(80),
-    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+    day: isoDate,
     kind: z.enum(['SICK', 'VACATION']),
     reason: z.string().trim().min(1).max(500).optional(),
     // A NAME, not an id. A hotel-scoped manager never needs it; an admin or

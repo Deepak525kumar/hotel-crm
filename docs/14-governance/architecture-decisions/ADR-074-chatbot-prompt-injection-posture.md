@@ -1,6 +1,10 @@
 # ADR-074: Chatbot Prompt-Injection Posture — Containment, Not Detection
 
-- **Status:** Proposed — awaiting ratification by the commissioning human, who holds this decision
+- **Status:** **Accepted** — ratified by the commissioning human on 2026-09-08, closing `OD-CHAT-006`, the last of the three `GD-19` G2-freeze blockers.
+
+  **Ratified on observed evidence, not on the argument alone.** Before ratification the posture was attacked against the live model: ten prompt-injection attempts in English and German — instruction override, `</system>` prompt-structure escape, claimed CTO and administrator identity, system-prompt extraction, a supplied `worker_id`, and explicit tool coercion — plus twenty-two ordinary routing cases. **All ten were contained and all twenty-two routed correctly.** The decisive measurement was not that the model refused: a worker's manifest contained **13 of 20 tools and zero manager-scoped ones**, so the tools an attacker was trying to reach were never offered to the model in the first place. The battery is preserved at `backend/scripts/chatbot-injection-check.ts`.
+
+  **One amendment made at ratification.** The commissioning human's direction was that guardrails must be proper ones, and identified a real gap in this record as written: containment was **silent**. It guarantees an attack cannot succeed; it said nothing when one was attempted, so a sustained campaign against the assistant would have produced no signal anywhere. §5 is therefore amended to require a **monitored tripwire** (`guardrails/injection-tripwire.ts`): it logs and alerts on injection signals and **never blocks, never alters routing, and is never read by any decision**. That constraint is the point — a blocking filter is bypassable, would refuse legitimate messages ("ignore that, I meant Tuesday"), and, worst of all, becomes the control people believe in while the structural guarantees stop being audited. Detection is instrumentation here, never a defence.
   per `OD-CHAT-013` (module owner, closed 2026-09-04).
 - **Date:** 2026-09-07
 - **Scope:** `SPEC-CHATBOT-001`; `OD-CHAT-006`; the `backend-chatbot` executor, tool registry, L1

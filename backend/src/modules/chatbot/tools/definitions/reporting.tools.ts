@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDate } from '../schema-primitives.js';
 import { reportService } from '../../../reports/service.js';
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
@@ -48,7 +49,7 @@ const APPROVED_2026_09_08_SHIFT_AND_REPORTS =
  * the conversation and gets decided from.
  */
 
-const DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');
+const DAY = isoDate;
 
 const DATASETS = ['assignments', 'attendance', 'absences', 'rooms'] as const;
 
@@ -130,7 +131,9 @@ export const exportTeamReport = registerTool<ExportArgs>({
   description:
     'Produce a downloadable Excel or PDF report of TEAM data for a date range. Use for ' +
     '"export that to Excel", "give me a PDF of last month\'s attendance", "download ' +
-    'the August roster". Manager, regional manager and admin only.',
+    'the August roster". Dates must be YYYY-MM-DD and the range at most 366 days. ' +
+    'Manager, regional manager and admin only. Returns a download link that expires ' +
+    'shortly.',
   // A file leaving the platform with other people's names, hours and absences
   // in it is not a read -- it is a disclosure, and one nobody can recall once
   // the link is shared. Confirmation makes the actor see the exact dataset,
@@ -175,7 +178,8 @@ export const exportMyData = registerTool<ExportMineArgs>({
     "Export ALL of the authenticated user's own data as an Excel workbook: their " +
     'shifts, attendance, absences and rooms logged. Use for "export my data", "download ' +
     'all my information", "meine Daten exportieren". Available to every user. Defaults ' +
-    'to the last 12 months if no dates are given.',
+    'to the last 12 months if no dates are given; give any other range as YYYY-MM-DD. ' +
+    'Returns a download link that expires shortly.',
   // Self-scoped and reversible in the only sense that matters -- it discloses
   // nothing to anyone but the person asking, about themselves. Confirmation
   // would put a speed bump in front of a legal right.

@@ -5,6 +5,7 @@ import { logger } from '../../../lib/logger.js';
 import type { ActorContext } from '../tools/actor.js';
 import { executeTool } from '../tools/executor.js';
 import { findPriorCall, recordToolCall } from '../tools/tool-call-log.js';
+import { describeToolError } from '../tools/tool-errors.js';
 import { resolveTool } from '../tools/registry.js';
 import { checkBudget, recordSpend } from '../guardrails/budget.js';
 import {
@@ -12,6 +13,7 @@ import {
   issueConfirmToken,
   verifyConfirmToken,
 } from '../guardrails/confirm-token.js';
+import { recordInjectionAttempt } from '../guardrails/injection-tripwire.js';
 import { redact } from '../guardrails/redaction.js';
 import { getProvider, ProviderUnavailableError } from '../provider/llm-provider.js';
 import { matchL0, resolveCommandId } from './router-l0.js';
@@ -75,6 +77,25 @@ export async function runTurn(params: {
 }): Promise<TurnResult> {
   const prisma = getPrisma();
   const env = getEnv();
+
+  // OBSERVE ONLY. Records that an injection attempt was made; changes nothing
+  // about what happens next, by design (ADR-074, ratified 2026-09-08). The
+  // containment guarantees are what stop an attack -- this exists because
+  // those guarantees were SILENT: a hundred probes produced no signal
+  // anywhere, so nobody could tell the assistant was under attack.
+  //
+  // Placed before every branch so a probe is seen whether it lands on L0, L1
+  // or a confirmation. Deliberately NOT awaited into a decision, and the
+  // function returns void so "block on this" cannot be written without
+  // changing its signature.
+  if (params.text) {
+    recordInjectionAttempt({
+      text: params.text,
+      actorId: params.actor.userId,
+      actorRole: params.actor.role,
+      conversationId: params.conversationId,
+    });
+  }
 
   const conversation = await prisma.chatbotConversation.findUnique({
     where: { id: params.conversationId },
@@ -240,6 +261,36 @@ export async function runTurn(params: {
       return { reply: renderDenied(), status: conversation.status, route: 'L1', toolInvoked: pending.toolName };
     }
 
+    if (confirmedOutcome.status === 'FAILED') {
+      // AUDITED EXACTLY LIKE A THROW. Classifying inside the executor turned
+      // this path from an exception into a return value, and the audit row
+      // that the catch block below writes was silently skipped as a result --
+      // caught by the regression test that exists for precisely this. A
+      // confirmed high-risk write that did not succeed must leave a record;
+      // "nothing happened" and "we tried and it failed" are different facts,
+      // and only one of them is visible without this row.
+      await recordToolCall({
+        conversationId: params.conversationId,
+        turnIndex: pending.turnIndex,
+        toolName: pending.toolName,
+        tier: resolveTool(pending.toolName)?.tier ?? 'HIGH_RISK_WRITE',
+        args: pending.args as Record<string, unknown>,
+        confirmed: true,
+        outcome: {
+          status: 'DENIED',
+          reason: confirmedOutcome.error.message,
+          denialCode: 'EXECUTION_FAILED',
+        },
+      });
+
+      return {
+        reply: describeToolError(confirmedOutcome.error),
+        status: conversation.status,
+        route: 'L1',
+        toolInvoked: pending.toolName,
+      };
+    }
+
     return {
       reply: renderToolResult(redact(confirmedOutcome.result)),
       status: conversation.status,
@@ -321,6 +372,18 @@ export async function runTurn(params: {
         reply: renderDenied(),
         status: ChatbotConversationStatus.IN_PROGRESS,
         route: 'L0',
+      };
+    }
+
+    if (outcome.status === 'FAILED') {
+      // The tool ran and the owning service refused or a dependency failed.
+      // The person is told what happened and what to do about it; the CODE
+      // decided which of those two it is (tool-errors.ts).
+      return {
+        reply: describeToolError(outcome.error),
+        status: ChatbotConversationStatus.IN_PROGRESS,
+        route: 'L0',
+        toolInvoked: command.tool,
       };
     }
 
@@ -561,6 +624,18 @@ export async function runTurn(params: {
   // special-category values become presence booleans and never reach the
   // reply. A second model call here would also be the point where tool data
   // could re-enter a prompt as instructions.
+  if (outcome.status === 'FAILED') {
+    // The tool ran and the owning service refused or a dependency failed.
+    // The person is told what happened and what to do about it; the CODE
+    // decided which of those two it is (tool-errors.ts).
+    return {
+    reply: describeToolError(outcome.error),
+    status: ChatbotConversationStatus.IN_PROGRESS,
+    route: 'L1',
+    toolInvoked: completion.toolUse.name,
+    };
+  }
+
   const safe = redact(outcome.result);
   return {
     reply: renderToolResult(safe),

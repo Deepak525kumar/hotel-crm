@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDate } from '../schema-primitives.js';
 import { assignmentService } from '../../../assignments/service.js';
 import { attendanceService } from '../../../attendance/service.js';
 import { roomService } from '../../../rooms/service.js';
@@ -393,10 +394,7 @@ export const logRoomCleaned = registerTool<LogRoomArgs>({
 
 const MyRoomsArgs = z
   .object({
-    day: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD')
-      .optional(),
+    day: isoDate.optional(),
   })
   .strict();
 
@@ -407,7 +405,8 @@ export const listMyRoomsToday = registerTool<MyRoomsArgs>({
   description:
     'List the rooms the authenticated user has logged as cleaned, for today or a ' +
     'given day. Use for "how many rooms have I done", "which rooms did I log", ' +
-    '"wie viele Zimmer habe ich geschafft". Also reports any room sent back for rework.',
+    '"wie viele Zimmer habe ich geschafft". Defaults to today; give another day as ' +
+    'YYYY-MM-DD. Returns the room numbers logged and reports any sent back for rework.',
   tier: 'READ_ONLY',
   confirm: false,
 

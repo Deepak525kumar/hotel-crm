@@ -8,6 +8,8 @@ export interface PlatformTableSweepJobConfig {
   /** Safety bound on batches deleted per table per run, mirroring SessionSweepJob. */
   maxBatchesPerRun?: number;
   notificationRetentionDays: number;
+  /** WorkerAssignment and everything cascading from it. Ten years by policy. */
+  operationalRetentionDays: number;
 }
 
 /**
@@ -52,6 +54,7 @@ export class PlatformTableSweepJob implements ScheduledJob {
   private readonly batchSize: number;
   private readonly maxBatchesPerRun: number;
   private readonly notificationRetentionDays: number;
+  private readonly operationalRetentionDays: number;
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -61,14 +64,18 @@ export class PlatformTableSweepJob implements ScheduledJob {
     this.batchSize = config.batchSize;
     this.maxBatchesPerRun = config.maxBatchesPerRun ?? 50;
     this.notificationRetentionDays = config.notificationRetentionDays;
+    this.operationalRetentionDays = config.operationalRetentionDays;
   }
 
   async run(): Promise<void> {
     const notificationsDeleted = await this.sweepNotifications();
+    const assignmentsDeleted = await this.sweepOperationalRecords();
 
     logger.info('platform_table_sweep_completed', {
       notifications_deleted: notificationsDeleted,
       notification_retention_days: this.notificationRetentionDays,
+      assignments_deleted: assignmentsDeleted,
+      operational_retention_days: this.operationalRetentionDays,
     });
   }
 
@@ -89,6 +96,53 @@ export class PlatformTableSweepJob implements ScheduledJob {
       if (stale.length === 0) break;
 
       const { count } = await this.prisma.notification.deleteMany({
+        where: { id: { in: stale.map((row) => row.id) } },
+      });
+      total += count;
+
+      if (stale.length < this.batchSize) break;
+    }
+
+    return total;
+  }
+
+  /**
+   * Operational payroll evidence: `WorkerAssignment` and everything that
+   * cascades from it.
+   *
+   * SWEEPING THE PARENT IS THE ONLY COHERENT DESIGN HERE, and that is a
+   * schema fact rather than a preference. `Attendance`, `RoomLog` and
+   * `QualityVerification` are all `onDelete: Cascade` on `assignment_id`, so
+   * a shift's attendance cannot outlive the shift. Giving those tables
+   * shorter windows of their own would be a policy the database cannot
+   * express: the cascade would delete them early anyway, on the parent's
+   * clock. One window, applied at the parent, is what is actually enforceable.
+   *
+   * TEN YEARS, per the owner decision of 2026-09-08. These rows are what a
+   * wage dispute or a tax audit is settled from, and German commercial and
+   * tax law commonly requires ten years for payroll-relevant records.
+   * `OD-RETENTION-01` (tax-advisor sign-off) is still open; ten years is the
+   * conservative side of that question, because keeping records too long is a
+   * storage-limitation finding while deleting them too early is an
+   * unanswerable audit.
+   *
+   * Filtered on `day`, the shift's own calendar date, not `created_at`: a row
+   * entered late still describes the day it describes, and retention is about
+   * the event, not the paperwork.
+   */
+  private async sweepOperationalRecords(): Promise<number> {
+    const cutoff = this.cutoff(this.operationalRetentionDays);
+    let total = 0;
+
+    for (let batch = 0; batch < this.maxBatchesPerRun; batch++) {
+      const stale = await this.prisma.workerAssignment.findMany({
+        where: { day: { lt: cutoff } },
+        select: { id: true },
+        take: this.batchSize,
+      });
+      if (stale.length === 0) break;
+
+      const { count } = await this.prisma.workerAssignment.deleteMany({
         where: { id: { in: stale.map((row) => row.id) } },
       });
       total += count;

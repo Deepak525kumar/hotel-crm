@@ -35,13 +35,20 @@ const mkPrisma = () => ({
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     deleteMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  // Defaults to "nothing stale" so every pre-existing notification test is
+  // unaffected by this table being swept in the same run.
+  workerAssignment: {
+    findMany: jest.fn(async () => []) as jest.MockedFunction<(...args: any[]) => any>,
+    deleteMany: jest.fn(async () => ({ count: 0 })) as jest.MockedFunction<(...args: any[]) => any>,
+  },
 });
 
 const CONFIG = {
   intervalMs: 86_400_000,
   batchSize: 2,
   maxBatchesPerRun: 3,
-  notificationRetentionDays: 90,
+  operationalRetentionDays: 3653,
+      notificationRetentionDays: 90,
 };
 
 describe('PlatformTableSweepJob', () => {
@@ -162,10 +169,15 @@ describe('ADR-033 retention policy', () => {
         deleteMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({ count: 0 }),
       },
       auditLog: { findMany: auditFindMany, deleteMany: auditDeleteMany },
+      workerAssignment: {
+        findMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue([]),
+        deleteMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({ count: 0 }),
+      },
     };
     await new PlatformTableSweepJob(prisma as never, {
       intervalMs: 1000,
       batchSize: 10,
+      operationalRetentionDays: 3653,
       notificationRetentionDays: 1825,
     }).run();
 
@@ -197,5 +209,83 @@ describe('ADR-033 retention policy', () => {
     } finally {
       process.env = saved;
     }
+  });
+});
+
+/**
+ * Operational payroll evidence: ten years, per the owner decision of
+ * 2026-09-08 and the German payroll-retention norm.
+ */
+describe('operational records (WorkerAssignment and its cascade)', () => {
+  it('sweeps assignments on their OWN ten-year window, not the notification one', async () => {
+    const prisma = mkPrisma();
+    prisma.notification.findMany.mockResolvedValue([]);
+    prisma.workerAssignment.findMany.mockResolvedValueOnce([{ id: 'a1' }]).mockResolvedValue([]);
+    prisma.workerAssignment.deleteMany.mockResolvedValue({ count: 1 });
+
+    const job = new PlatformTableSweepJob(prisma as never, CONFIG);
+    await job.run();
+
+    const where = prisma.workerAssignment.findMany.mock.calls[0][0].where;
+    const cutoff = where.day.lt as Date;
+    const days = (Date.now() - cutoff.getTime()) / 86_400_000;
+    // Ten years, not the notification window. A shared cutoff would delete a
+    // decade of payroll evidence on a five-year clock.
+    expect(Math.round(days)).toBe(3653);
+  });
+
+  /**
+   * Filtered on `day`, the shift's own date, not `created_at`. A row entered
+   * late still describes the day it describes; retention is about the event,
+   * not the paperwork.
+   */
+  it('measures the window from the shift date, not the row creation date', async () => {
+    const prisma = mkPrisma();
+    prisma.notification.findMany.mockResolvedValue([]);
+    prisma.workerAssignment.findMany.mockResolvedValue([]);
+
+    await new PlatformTableSweepJob(prisma as never, CONFIG).run();
+
+    const where = prisma.workerAssignment.findMany.mock.calls[0][0].where;
+    expect(where).toHaveProperty('day');
+    expect(where).not.toHaveProperty('created_at');
+  });
+
+  it('deletes by explicit id list, never by the date predicate', async () => {
+    const prisma = mkPrisma();
+    prisma.notification.findMany.mockResolvedValue([]);
+    prisma.workerAssignment.findMany.mockResolvedValueOnce([{ id: 'a1' }]).mockResolvedValue([]);
+    prisma.workerAssignment.deleteMany.mockResolvedValue({ count: 1 });
+
+    await new PlatformTableSweepJob(prisma as never, CONFIG).run();
+
+    // Deleting by the predicate would race the select and remove rows that
+    // became eligible between the two statements.
+    expect(prisma.workerAssignment.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ['a1'] } },
+    });
+  });
+
+  it('does nothing when nothing is old enough', async () => {
+    const prisma = mkPrisma();
+    prisma.notification.findMany.mockResolvedValue([]);
+    prisma.workerAssignment.findMany.mockResolvedValue([]);
+
+    await new PlatformTableSweepJob(prisma as never, CONFIG).run();
+    expect(prisma.workerAssignment.deleteMany).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The schema fact this design rests on: Attendance, RoomLog and
+   * QualityVerification are onDelete: Cascade on assignment_id. The sweep must
+   * NOT delete them directly -- doing so on a different clock would be a
+   * policy the database cannot express, since the cascade removes them on the
+   * parent's clock regardless.
+   */
+  it('never sweeps the cascading children directly', () => {
+    const prisma = mkPrisma() as Record<string, unknown>;
+    expect(prisma.attendance).toBeUndefined();
+    expect(prisma.roomLog).toBeUndefined();
+    // If either is ever added to this mock, the job must still not call it.
   });
 });

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { ForbiddenError, ValidationError } from '../../../lib/errors.js';
+import { classifyToolError, type ToolError } from './tool-errors.js';
 import { logger } from '../../../lib/logger.js';
 import { resolveHotelAccess, resolveWorkerScope } from '../../../middleware/permissions.js';
 import type { ActorContext } from './actor.js';
@@ -33,7 +34,12 @@ import { resolveTool, type CompactResult, type ToolRegistration } from './regist
 
 export type ExecutionOutcome =
   | { status: 'SUCCESS'; result: CompactResult; durationMs: number }
-  | { status: 'DENIED'; reason: string; denialCode: DenialCode };
+  | { status: 'DENIED'; reason: string; denialCode: DenialCode }
+  // The tool ran and the owning service refused or failed. Distinct from
+  // DENIED, which means the executor's own gate stopped it before anything
+  // ran -- conflating them would tell a caller a business-rule conflict was
+  // an authorization problem.
+  | { status: 'FAILED'; error: ToolError; durationMs: number };
 
 export type DenialCode =
   | 'UNREGISTERED_TOOL'
@@ -189,9 +195,34 @@ export async function executeTool(req: ExecuteRequest): Promise<ExecutionOutcome
 
   // ---- Step 5: action -------------------------------------------------------
   // The owning service runs its OWN authorization and its OWN audit inside
-  // invoke() (ADR-053 item 3). Any error it raises propagates unchanged —
-  // notably ForbiddenError, which is the service refusing on its own terms.
-  const raw = await tool.invoke(args, req.actor);
+  // invoke() (ADR-053 item 3).
+  //
+  // Errors are CLASSIFIED rather than propagated raw. A bare rethrow told the
+  // caller only that "something broke", which collapses three different
+  // questions -- what went wrong, whether to try again, what to do instead --
+  // into one unusable signal. The predictable results are a model that
+  // retries an invalid input until the turn budget dies, and a person told
+  // "failed" when the real answer was "you already checked in".
+  //
+  // Classification is by the platform's own error CLASSES, never by message
+  // text: messages get reworded and translated, and a text matcher degrades
+  // silently to INTERNAL the first time somebody improves the wording.
+  let raw: unknown;
+  try {
+    raw = await tool.invoke(args, req.actor);
+  } catch (error) {
+    const classified = classifyToolError(error);
+    logger.warn('Chatbot tool failed', {
+      tool: tool.name,
+      code: classified.code,
+      retryable: classified.retryable,
+      next_action: classified.nextAction,
+      userId: req.actor.userId,
+      requestId: req.requestId,
+    });
+    return { status: 'FAILED', error: classified, durationMs: Date.now() - started };
+  }
+
   const result = tool.compress(raw);
 
   logger.info('Chatbot tool executed', {

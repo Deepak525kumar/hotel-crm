@@ -141,6 +141,7 @@ async function main() {
           batchSize: env.PLATFORM_TABLE_SWEEP_BATCH_SIZE,
           maxBatchesPerRun: env.PLATFORM_TABLE_SWEEP_MAX_BATCHES_PER_RUN,
           notificationRetentionDays: env.PLATFORM_NOTIFICATION_RETENTION_DAYS,
+          operationalRetentionDays: env.PLATFORM_OPERATIONAL_RETENTION_DAYS,
         })
       )
       .register(
