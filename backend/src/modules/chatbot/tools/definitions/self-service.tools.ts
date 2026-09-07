@@ -3,6 +3,7 @@ import { assignmentService } from '../../../assignments/service.js';
 import { hrService } from '../../../hr/service.js';
 import { qualityService } from '../../../quality/service.js';
 import { calendarService } from '../../../calendar/service.js';
+import { describeUnresolved, resolveWorkerReference } from '../worker-reference.js';
 import { notificationService } from '../../../notifications/service.js';
 import type { AssignmentDto } from '../../../assignments/types.js';
 import { toServiceActor } from '../actor.js';
@@ -907,4 +908,258 @@ export const listTeamAssignments = registerTool<TeamAssignmentsArgs>({
 
   compress: compressTeamAssignments,
   maxResultTokens: 900,
+});
+
+
+/**
+ * A manager puts one of their workers on the calendar for a day.
+ *
+ * THE WEEK-PLANNING CAPABILITY, one day at a time. "Put Anna on Tuesday" is
+ * the shape a manager actually speaks, and this is the first tool that can
+ * act on it.
+ *
+ * THE WORKER IS NAMED, NOT IDENTIFIED. `worker_id` and `hotel_id` are
+ * FORBIDDEN_ARG_KEYS and a tool cannot accept either; an id supplied by a
+ * model is an authorization input wearing a semantic costume. So the
+ * argument is a NAME, and `resolveWorkerReference` turns it into an id
+ * server-side, from the caller's own hotel roster -- scoping the candidate
+ * set BEFORE matching, so a name that matches nobody in scope cannot reveal
+ * that it matches someone elsewhere. Ambiguity refuses rather than guessing.
+ *
+ * The hotel is likewise never an argument: it is the one the actor is scoped
+ * to. An admin or regional manager, having no single hotel, is refused
+ * rather than having one guessed for them.
+ *
+ * A RE-RESOLUTION RACE EXISTS AND IS ACCEPTED. The name is resolved when the
+ * tool runs, which for a confirmed write is AFTER the manager approved a
+ * summary. If the roster changed in between -- a second "Anna" joining the
+ * hotel within those five minutes -- resolution becomes ambiguous and the
+ * tool refuses rather than writing. It cannot silently roster a different
+ * person: the only outcomes are the same worker, or a refusal. Narrowing
+ * this further means storing the resolved id in the pending call, which
+ * would put an id where the confirmation summary cannot show it, and a
+ * summary the manager cannot verify is worse than a rare refusal.
+ *
+ * HIGH_RISK_WRITE: placing someone on the calendar creates a real assignment,
+ * notifies them, and commits their day. Confirmation is forced at
+ * registration.
+ */
+const PlaceWorkerArgs = z
+  .object({
+    // A NAME, not an id. Bounded because it becomes a scan over the hotel's
+    // roster, and because a 500-character "name" is not a name.
+    worker_name: z.string().trim().min(2).max(80),
+    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+  })
+  .strict();
+
+type PlaceWorkerArgs = z.infer<typeof PlaceWorkerArgs>;
+
+export const placeWorkerOnCalendar = registerTool<PlaceWorkerArgs>({
+  name: 'assignments.place_worker',
+  description:
+    "Put one of the manager's OWN workers on the calendar for a given day. Use for " +
+    '"put Anna on Tuesday", "schedule Tomasz for the 12th". Give the worker\'s name as ' +
+    'they are known at the hotel; the day must be YYYY-MM-DD.',
+  tier: 'HIGH_RISK_WRITE',
+  confirm: true,
+
+  interfaceRef: 'IF-ASG-PlaceOnCalendar (assignments/service.ts placeOnCalendar())',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. FIRST ' +
+    "tool that writes to another person's schedule, so it warrants closer review " +
+    'than the self-scoped writes: it commits a worker\'s day and notifies them.',
+
+  args: PlaceWorkerArgs,
+  permission: 'staffing:write',
+  // 'none': there is no hotel ARGUMENT to pre-check. The hotel comes from the
+  // actor's own scope inside invoke(), and placeOnCalendar re-checks it with
+  // isHotelInScope() regardless -- the same guard the HTTP route relies on.
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    const resolved = await resolveWorkerReference(args.worker_name, actor);
+    if (resolved.status !== 'RESOLVED') {
+      // A refusal, not an exception: "there are two Annas" is a normal
+      // answer a manager can act on, and throwing would turn it into a
+      // failed turn with no useful guidance.
+      return { refused: describeUnresolved(resolved) };
+    }
+
+    const result = await assignmentService.placeOnCalendar(
+      { worker_id: resolved.workerId, hotel_id: resolved.hotelId, day: args.day },
+      toServiceActor(actor)
+    );
+    return { placed: { worker: resolved.fullName, day: args.day }, result };
+  },
+
+  compress: (raw: unknown) => {
+    const out = raw as { refused?: string; placed?: { worker: string; day: string } } | null;
+    if (out?.refused) return { summary: out.refused, data: null };
+    if (out?.placed) {
+      return {
+        summary: `${out.placed.worker} is on the calendar for ${out.placed.day}.`,
+        data: { worker: out.placed.worker, day: out.placed.day },
+      };
+    }
+    return { summary: 'Done.', data: null };
+  },
+  maxResultTokens: 120,
+});
+
+/**
+ * A whole week in one instruction.
+ *
+ * "Anna Monday and Tuesday, Tomasz Wednesday, Ayşe Thursday and Friday" is
+ * how a manager actually plans, and this is the tool that accepts it.
+ *
+ * A BATCH TOOL RATHER THAN A PLANNING LAYER. The obvious alternative was a
+ * new routing rung that loops the model -- call a tool, feed the result back,
+ * call the next -- which is more machinery, more turns, more tokens, and
+ * more places for a partial failure to hide. A single tool taking a list
+ * reuses the confirmation flow, the resolver and the executor exactly as
+ * they are, and gives the manager ONE approval for the whole week instead of
+ * forty.
+ *
+ * EVERY NAME IS RESOLVED BEFORE ANYTHING IS WRITTEN. If one name is
+ * ambiguous or unknown, NOTHING is placed and the manager is told which
+ * entries are wrong. The alternative -- place the 38 that resolved, report
+ * the 2 that did not -- means a half-built week that is harder to reason
+ * about than an empty one: the manager cannot simply re-issue the
+ * instruction, because doing so would double-book the 38.
+ *
+ * PARTIAL FAILURE IS STILL POSSIBLE AFTER THAT POINT, and is reported per
+ * entry rather than collapsed into one status. A worker already placed that
+ * day, or newly ineligible for the hotel, fails at the service while its
+ * neighbours succeed. Those are real answers a manager can act on; hiding
+ * them behind "some placements failed" would not be.
+ */
+const MAX_PLACEMENTS = 30;
+
+const PlaceManyArgs = z
+  .object({
+    placements: z
+      .array(
+        z
+          .object({
+            worker_name: z.string().trim().min(2).max(80),
+            day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+          })
+          .strict()
+      )
+      .min(1)
+      // Bounded by the turn timeout, not by taste: each placement is a
+      // separate service call with its own eligibility and conflict checks,
+      // and a list long enough to exceed CHATBOT_TURN_TIMEOUT_MS would be
+      // aborted midway with some entries already written.
+      .max(MAX_PLACEMENTS),
+  })
+  .strict();
+
+type PlaceManyArgs = z.infer<typeof PlaceManyArgs>;
+
+interface PlacementOutcome {
+  worker: string;
+  day: string;
+  ok: boolean;
+  error?: string;
+}
+
+export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
+  name: 'assignments.place_many',
+  description:
+    "Put several of the manager's OWN workers on the calendar in one go. Use when a " +
+    'manager describes a schedule covering more than one worker or day, e.g. "Anna ' +
+    'Monday and Tuesday, Tomasz Wednesday". Give each worker\'s name and the day as ' +
+    'YYYY-MM-DD. For a single placement prefer assignments.place_worker.',
+  tier: 'HIGH_RISK_WRITE',
+  confirm: true,
+
+  interfaceRef: 'IF-ASG-PlaceOnCalendar (assignments/service.ts placeOnCalendar(), per entry)',
+  approvalRef:
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It commits ' +
+    "up to 30 workers' days in one action and notifies each of them, so it warrants the " +
+    'closest review of any tool in the registry.',
+
+  args: PlaceManyArgs,
+  permission: 'staffing:write',
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    const serviceActor = toServiceActor(actor);
+
+    // ---- Pass 1: resolve every name. Write nothing yet. -------------------
+    const resolutions = await Promise.all(
+      args.placements.map(async (p) => ({
+        placement: p,
+        resolved: await resolveWorkerReference(p.worker_name, actor),
+      }))
+    );
+
+    const unresolved = resolutions.filter((r) => r.resolved.status !== 'RESOLVED');
+    if (unresolved.length > 0) {
+      return {
+        refused: unresolved.map((r) => describeUnresolved(r.resolved)),
+        placed: [] as PlacementOutcome[],
+      };
+    }
+
+    // ---- Pass 2: place them, recording each outcome separately ------------
+    const outcomes: PlacementOutcome[] = [];
+    for (const { placement, resolved } of resolutions) {
+      if (resolved.status !== 'RESOLVED') continue; // narrowed above; keeps TS honest
+      try {
+        await assignmentService.placeOnCalendar(
+          { worker_id: resolved.workerId, hotel_id: resolved.hotelId, day: placement.day },
+          serviceActor
+        );
+        outcomes.push({ worker: resolved.fullName, day: placement.day, ok: true });
+      } catch (error) {
+        // Sequential, and deliberately NOT aborted on the first failure: one
+        // worker already booked that day should not cancel the rest of a
+        // week the manager has already approved.
+        outcomes.push({
+          worker: resolved.fullName,
+          day: placement.day,
+          ok: false,
+          error: error instanceof Error ? error.message : 'could not be placed',
+        });
+      }
+    }
+
+    return { refused: [] as string[], placed: outcomes };
+  },
+
+  compress: (raw: unknown) => {
+    const out = (raw ?? {}) as { refused?: string[]; placed?: PlacementOutcome[] };
+
+    if (out.refused && out.refused.length > 0) {
+      return {
+        summary:
+          `Nothing was scheduled. ${out.refused.length} name${out.refused.length === 1 ? '' : 's'} ` +
+          `could not be matched: ${out.refused.join(' ')}`,
+        data: null,
+      };
+    }
+
+    const placed = out.placed ?? [];
+    const ok = placed.filter((p) => p.ok);
+    const failed = placed.filter((p) => !p.ok);
+
+    return {
+      summary:
+        failed.length === 0
+          ? `Scheduled ${ok.length} shift${ok.length === 1 ? '' : 's'}.`
+          : `Scheduled ${ok.length} of ${placed.length}. ${failed.length} could not be placed.`,
+      // Failures carry their reason; successes are just a confirmation that
+      // the named person has that day. Names, never ids.
+      data: {
+        scheduled: ok.map((p) => ({ worker: p.worker, day: p.day })),
+        ...(failed.length > 0
+          ? { failed: failed.map((p) => ({ worker: p.worker, day: p.day, reason: p.error })) }
+          : {}),
+      },
+    };
+  },
+  maxResultTokens: 1200,
 });
