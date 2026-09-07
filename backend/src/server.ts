@@ -1,5 +1,7 @@
 import './instrument.js';
 import { loadEnv, getEnv } from './config/env.js';
+import { isChatbotEnabled } from './config/feature-flags.js';
+import { assertAllToolsApproved } from './modules/chatbot/tools/registry.js';
 import { createApp } from './app.js';
 import { connectDb, disconnectDb } from './lib/db.js';
 import { installConfiguredProvider } from './modules/chatbot/provider/llm-provider.js';
@@ -43,6 +45,16 @@ async function main() {
 
     // Create app
     const app = createApp();
+
+    // ADR-053 item 4: no unapproved tool may be reachable in production.
+    // FATAL by design, and AFTER createApp() on purpose -- tools register as
+    // a side effect of importing the chatbot service, which createApp() pulls
+    // in transitively. Run before it, the registry is still empty and the
+    // check passes vacuously while appearing to work. It still runs before
+    // app.listen(), so nothing is ever served unapproved.
+    if (isChatbotEnabled()) {
+      assertAllToolsApproved();
+    }
 
     // Start server
     const server = app.listen(env.PORT, () => {

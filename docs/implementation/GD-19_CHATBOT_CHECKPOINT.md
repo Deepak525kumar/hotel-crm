@@ -48,6 +48,46 @@ These remain exactly as open as before `ADR-053`. None is touched by the orchest
 
 ---
 
+## 2b. Tool approvals under `ADR-053` item 4
+
+`ADR-053` item 4 approves the tool-registry **architecture** and explicitly not any
+specific tool: *"Each tool integration is its own explicit future approval."*
+`OD-CHAT-013` assigns that authority to the commissioning human.
+
+**2026-09-08 — the thirteen tools then registered were approved**, in one decision, after
+review of the registry (name, risk tier, confirmation policy, wrapped `IF-*` interface and
+permission gate for each):
+
+| Tool | Tier | Wraps |
+|---|---|---|
+| `assignments.list_mine` | READ_ONLY | `IF-ASG-ListAssignments` |
+| `assignments.list_for_my_team` | READ_ONLY | `IF-ASG-ListAssignments` |
+| `notifications.list_mine` | READ_ONLY | `IF-NOTIF-GetNotifications` |
+| `hr.my_contract` | READ_ONLY | `IF-HR-GetContractStatus` |
+| `hr.my_payslips` | READ_ONLY | `IF-HR-ListPayroll` |
+| `quality.my_inspections` | READ_ONLY | `IF-QUAL-ListOwnChecks` |
+| `documents.my_status` | READ_ONLY | `IF-DOC-GetDocumentCompleteness` + `IF-EMP-GetByUserId` |
+| `notifications.mark_read` | LOW_RISK_WRITE | `IF-NOTIF-MarkAsRead` |
+| `calendar.mark_my_absence` | HIGH_RISK_WRITE | `IF-CAL-MarkAbsence` |
+| `calendar.mark_worker_absence` | HIGH_RISK_WRITE | `IF-CAL-MarkAbsenceForWorker` |
+| `assignments.place_worker` | HIGH_RISK_WRITE | `IF-ASG-PlaceOnCalendar` |
+| `assignments.place_many` | HIGH_RISK_WRITE | `IF-ASG-PlaceOnCalendar` |
+| `quality.assign_rework` | HIGH_RISK_WRITE | `IF-QUAL-AssignRework` |
+
+**Scope of that approval, recorded precisely because a blanket reading would hollow out the
+control it satisfies:** it covers those thirteen tools as registered on 2026-09-08. It is
+**not** a standing approval for tools added later — those register as `PENDING` and need
+their own decision — and it does **not** survive a change to what an approved tool does.
+Widening a tool's scope, risk tier or permission makes it a different capability from the
+one approved and returns it to `PENDING`.
+
+**The requirement is now mechanical, not conventional.** Until this date `approvalRef` only
+had to be a non-empty string, which `'PENDING -- ...'` satisfied perfectly: the platform
+would have booted and executed unapproved tools with nothing anywhere saying so.
+`assertAllToolsApproved()` runs at boot whenever `FEATURE_CHATBOT` is enabled and refuses to
+start, naming every offender. It also refuses an empty registry, because tools register as an
+import side effect and a check that runs too early passes vacuously while appearing to work.
+
 ## 3. Every other `OD-CHAT-*` item — exact current status
 
 ### Resolved

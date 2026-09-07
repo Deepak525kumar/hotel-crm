@@ -17,6 +17,26 @@ import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
 
 /**
+ * The commissioning human's approval of every tool registered on this date,
+ * under `ADR-053` item 4 ("each tool integration is its own explicit future
+ * approval"). Granted 2026-09-08, after review of the thirteen tools then in
+ * the registry.
+ *
+ * SCOPE OF THE APPROVAL, stated precisely because a blanket reading would
+ * hollow out the control it satisfies: it covers the THIRTEEN tools that
+ * existed on 2026-09-08 and the capability each one wrapped at that time. It
+ * is NOT a standing approval for tools added afterwards -- those register as
+ * PENDING and need their own decision, which is the whole point of item 4 --
+ * and it does NOT survive a change to what an approved tool does. Widening a
+ * tool's scope, tier, or permission makes it a different capability from the
+ * one approved, and it must go back to PENDING.
+ */
+const APPROVED_2026_09_08 =
+  'APPROVED 2026-09-08 by the commissioning human under ADR-053 item 4. ' +
+  'Covers this tool as registered on that date; a later change to its scope, ' +
+  'risk tier or permission requires re-approval.';
+
+/**
  * Self-scoped, read-only tools (ADR-053 item 2: each wraps an existing
  * module interface; no bespoke backend capability is created for the
  * chatbot's benefit).
@@ -91,10 +111,9 @@ export const listMyAssignments = registerTool<ListMineArgs>({
 
   interfaceRef: 'IF-ASG-ListAssignments (assignments/service.ts list())',
   approvalRef:
-    'PENDING — ADR-053 approves the registry architecture only. This tool is ' +
-    'self-scoped + read-only and is the reference implementation for the ' +
-    'authorization boundary; it still requires its own explicit approval before ' +
-    'the feature flag is enabled outside development.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    'Self-scoped + READ_ONLY, and the reference implementation for the authorization boundary every later tool follows.',
 
   args: ListMineArgs,
   // DEFECT FIX (2026-08-24): this previously required `staffing:read`, which
@@ -224,10 +243,9 @@ export const listMyNotifications = registerTool<MyNotificationsArgs>({
 
   interfaceRef: 'IF-NOTIF-GetNotifications (notifications/service.ts getNotifications())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 approves the registry architecture only, never a ' +
-    'specific tool. This one is self-scoped + READ_ONLY, the same envelope as ' +
-    'assignments.list_mine, and still requires its own explicit approval before ' +
-    'FEATURE_CHATBOT is enabled outside development.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    'Self-scoped + READ_ONLY, the same envelope as assignments.list_mine.',
 
   args: MyNotificationsArgs,
 
@@ -353,9 +371,9 @@ export const getMyContract = registerTool<MyContractArgs>({
 
   interfaceRef: 'IF-HR-GetContractStatus (hr/service.ts getContractStatus())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 approves the registry architecture only, never a ' +
-    'specific tool. Self-scoped + READ_ONLY, the same envelope as ' +
-    'assignments.list_mine and notifications.list_mine.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    'Self-scoped + READ_ONLY. Gated by anyOf because the route gates by role.',
 
   args: MyContractArgs,
   // Mirrors requireContractReadAccess() (hr/routes.ts:121-123): worker and
@@ -462,8 +480,9 @@ export const listMyPayslips = registerTool<MyPayslipsArgs>({
 
   interfaceRef: 'IF-HR-ListPayroll (hr/service.ts listPayroll())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 approves the registry architecture only, never a ' +
-    'specific tool. Self-scoped + READ_ONLY.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    'Self-scoped + READ_ONLY. Gated by anyOf because the route gates by role.',
 
   args: MyPayslipsArgs,
   // Mirrors requirePayslipReadAccess() (hr/routes.ts:136-138): worker and
@@ -565,8 +584,9 @@ export const listMyInspections = registerTool<MyInspectionsArgs>({
 
   interfaceRef: 'IF-QUAL-ListOwnChecks (quality/service.ts listOwnChecks())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 approves the registry architecture only, never a ' +
-    'specific tool. Self-scoped + READ_ONLY.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    'Self-scoped + READ_ONLY, on a single token matching the route exactly.',
 
   args: MyInspectionsArgs,
   // A real single token this time, matching the route exactly.
@@ -655,9 +675,9 @@ export const assignReworkTool = registerTool<AssignReworkArgs>({
 
   interfaceRef: 'IF-QUAL-AssignRework (quality/service.ts assignRework())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It is ' +
-    'the FIRST HIGH_RISK_WRITE in the registry and the first to touch another ' +
-    "person's record, so it is also the first real exercise of the confirmation flow.",
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    "The FIRST HIGH_RISK_WRITE in the registry and the first to touch another person's record; the first real exercise of the confirmation flow.",
 
   args: AssignReworkArgs,
   permission: 'quality:write',
@@ -715,8 +735,9 @@ export const markMyNotificationRead = registerTool<MarkNotificationReadArgs>({
 
   interfaceRef: 'IF-NOTIF-MarkAsRead (notifications/service.ts markAsRead())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
-    'Self-scoped, reversible, LOW_RISK_WRITE.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    'Self-scoped, reversible, LOW_RISK_WRITE. Confirmation deliberately not required (ADR-053 item 5 leaves it per-tool at this tier).',
 
   args: MarkNotificationReadArgs,
   permission: 'notifications:mark-read-own',
@@ -778,7 +799,9 @@ export const markMyAbsence = registerTool<MarkMyAbsenceArgs>({
 
   interfaceRef: 'IF-CAL-MarkAbsence (calendar/service.ts markAbsence())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    'Self-scoped, but HIGH_RISK_WRITE: it creates a PROTECTED record its own author cannot later have corrected on their behalf.',
 
   args: MarkMyAbsenceArgs,
   permission: 'calendar:absence:write-own',
@@ -887,8 +910,9 @@ export const listTeamAssignments = registerTool<TeamAssignmentsArgs>({
 
   interfaceRef: 'IF-ASG-ListAssignments (assignments/service.ts list())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. First ' +
-    'manager-scoped READ tool; permitted by ADR-073, which is Accepted.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    'First manager-scoped READ tool; permitted by ADR-073.',
 
   args: TeamAssignmentsArgs,
   // A real token, and one that excludes exactly the roles it should:
@@ -978,9 +1002,9 @@ export const placeWorkerOnCalendar = registerTool<PlaceWorkerArgs>({
 
   interfaceRef: 'IF-ASG-PlaceOnCalendar (assignments/service.ts placeOnCalendar())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. FIRST ' +
-    "tool that writes to another person's schedule, so it warrants closer review " +
-    'than the self-scoped writes: it commits a worker\'s day and notifies them.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    "First tool that writes to another person's SCHEDULE: it commits a worker's day and notifies them.",
 
   args: PlaceWorkerArgs,
   permission: 'staffing:write',
@@ -1104,9 +1128,9 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
 
   interfaceRef: 'IF-ASG-PlaceOnCalendar (assignments/service.ts placeOnCalendar(), per entry)',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It commits ' +
-    "up to 30 workers' days in one action and notifies each of them, so it warrants the " +
-    'closest review of any tool in the registry.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    "The widest blast radius in the registry -- up to 30 workers' days committed in one confirmed action, each of them notified.",
 
   args: PlaceManyArgs,
   permission: 'staffing:write',
@@ -1280,10 +1304,9 @@ export const markWorkerAbsence = registerTool<MarkWorkerAbsenceArgs>({
 
   interfaceRef: 'IF-CAL-MarkAbsenceForWorker (calendar/service.ts markAbsenceForWorker())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It ' +
-    "writes to another person's calendar and creates a record protected against " +
-    'later correction, so it warrants at least the scrutiny of ' +
-    'assignments.place_worker.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    "Writes to another person's calendar and creates a record protected against later correction.",
 
   args: MarkWorkerAbsenceArgs,
   permission: 'calendar:absence:write-team',
@@ -1430,8 +1453,9 @@ export const getMyDocumentStatus = registerTool<MyDocumentsArgs>({
     'IF-DOC-GetDocumentCompleteness (documents/service.ts getDocumentCompleteness()) ' +
     '+ IF-EMP-GetByUserId (employee-management/service.ts getByUserId())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
-    'Self-scoped + READ_ONLY, the same envelope as assignments.list_mine.',
+    APPROVED_2026_09_08 +
+    ' Registration note: ' +
+    'Self-scoped + READ_ONLY. Derives the work-permit requirement from the employment record, never from the caller.',
 
   args: MyDocumentsArgs,
   // The route enforces no permission token -- requireRole over all five roles
