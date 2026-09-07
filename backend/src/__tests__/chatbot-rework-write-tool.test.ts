@@ -1,6 +1,17 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockAssignRework = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+const mockResolveInspection = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+jest.mock('../modules/chatbot/tools/context-reference.js', () => ({
+  resolveInspectionReference: mockResolveInspection,
+  resolveNotificationReference: jest.fn(),
+  describeInspectionMiss: (r: any) =>
+    r.status === 'NONE_AVAILABLE' ? 'That room has already been sent back for rework.'
+    : r.status === 'AMBIGUOUS' ? `You inspected room ${r.query} more than once.`
+    : `You have no inspection on record for room ${r.query}.`,
+  describeNotificationMiss: (r: any) => `no message: ${r.status}`,
+}));
+
 jest.mock('../modules/quality/service.js', () => ({
   qualityService: { assignRework: mockAssignRework, listOwnChecks: jest.fn() },
 }));
@@ -43,18 +54,42 @@ describe('quality.assign_rework — the first HIGH_RISK_WRITE', () => {
   it('passes the caller through as the actor, so scope is the caller’s own', async () => {
     // assignRework applies isScopedManagerRole/isHotelInScope itself, so a
     // checker can only send back work at a hotel they already cover.
-    await assignReworkTool.invoke({ verification_id: 'v1', notes: 'missed the bathroom' } as any, actorFor('CHECKER'));
+    mockResolveInspection.mockResolvedValue({
+      status: 'RESOLVED',
+      value: { id: 'v1', roomNumber: '214', workerName: 'Anna Schmidt' },
+    });
+
+    await assignReworkTool.invoke({ room_number: '214', notes: 'missed the bathroom' } as any, actorFor('CHECKER'));
     expect(mockAssignRework).toHaveBeenCalledTimes(1);
     const [input, actor] = mockAssignRework.mock.calls[0];
+    // The verification id came from the RESOLVER, never from the arguments:
+    // a model has no way to know one, which is why this tool took a room
+    // number from 2026-09-08 and was unreachable in practice before that.
     expect(input).toEqual({ verification_id: 'v1', notes: 'missed the bathroom' });
     expect(actor.userId).toBe('u_CHECKER');
+  });
+
+  it('refuses instead of writing when the room is not one the caller inspected', async () => {
+    mockResolveInspection.mockResolvedValue({ status: 'NOT_FOUND', query: '999' });
+
+    const out = await assignReworkTool.invoke({ room_number: '999', notes: 'x' } as any, actorFor('CHECKER'));
+    expect(mockAssignRework).not.toHaveBeenCalled();
+    expect(assignReworkTool.compress?.(out).summary).toMatch(/no inspection on record/i);
+  });
+
+  it('does not send a room back twice', async () => {
+    mockResolveInspection.mockResolvedValue({ status: 'NONE_AVAILABLE' });
+
+    const out = await assignReworkTool.invoke({ room_number: '214', notes: 'x' } as any, actorFor('CHECKER'));
+    expect(mockAssignRework).not.toHaveBeenCalled();
+    expect(assignReworkTool.compress?.(out).summary).toMatch(/already been sent back/i);
   });
 
   it('refuses any argument naming a person or a hotel', () => {
     // Those are authorization inputs; the model must never supply one.
     for (const bad of [
-      { verification_id: 'v1', notes: 'x', worker_id: 'w1' },
-      { verification_id: 'v1', notes: 'x', hotel_id: 'h1' },
+      { room_number: '214', notes: 'x', worker_id: 'w1' },
+      { room_number: '214', notes: 'x', hotel_id: 'h1' },
       { verification_id: 'v1', notes: 'x', actorId: 'a' },
     ]) {
       expect(assignReworkTool.args.safeParse(bad).success).toBe(false);

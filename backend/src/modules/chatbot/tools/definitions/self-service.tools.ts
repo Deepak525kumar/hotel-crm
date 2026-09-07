@@ -11,6 +11,12 @@ import {
   resolveHotelReference,
   resolveWorkerReference,
 } from '../worker-reference.js';
+import {
+  describeInspectionMiss,
+  describeNotificationMiss,
+  resolveInspectionReference,
+  resolveNotificationReference,
+} from '../context-reference.js';
 import { notificationService } from '../../../notifications/service.js';
 import type { AssignmentDto } from '../../../assignments/types.js';
 import { toServiceActor } from '../actor.js';
@@ -655,11 +661,16 @@ export const listMyInspections = registerTool<MyInspectionsArgs>({
  */
 const AssignReworkArgs = z
   .object({
-    // Mirrors AssignReworkSchema. `verification_id` says WHICH inspection --
-    // semantic, not authorization. The service loads it, finds its
-    // assignment and re-checks hotel scope, so an invented id is refused
-    // rather than acted on.
-    verification_id: z.string().min(1).max(64),
+    // A ROOM NUMBER, not a verification id (changed 2026-09-08). The id was
+    // semantic rather than authorization -- FORBIDDEN_ARG_KEYS never covered
+    // it -- but a model has no way to know one, so a live routing check found
+    // this tool selecting NOTHING for its own example phrase. It was
+    // unreachable in practice while every unit test passed, because the tests
+    // supplied an id the model never has.
+    //
+    // The inspection is resolved from the checker's OWN checks instead
+    // (context-reference.ts), scope before match, exactly as a worker name is.
+    room_number: z.string().trim().min(1).max(20),
     // Required by the service too. The worker is told why their room is
     // coming back, so an empty note would be a notification that explains
     // nothing.
@@ -690,11 +701,24 @@ export const assignReworkTool = registerTool<AssignReworkArgs>({
   scopeCheck: 'hotel',
 
   invoke: async (args, actor) => {
-    return qualityService.assignRework(args, toServiceActor(actor));
+    const resolved = await resolveInspectionReference(actor, args.room_number);
+    if (resolved.status !== 'RESOLVED') {
+      // A refusal, not an exception: "you never inspected that room" and
+      // "it is already back with the worker" are both normal answers a
+      // checker can act on.
+      return { refused: describeInspectionMiss(resolved) };
+    }
+
+    const result = await qualityService.assignRework(
+      { verification_id: resolved.value.id, notes: args.notes },
+      toServiceActor(actor)
+    );
+    return { ...(result as Record<string, unknown>), room_number: resolved.value.roomNumber };
   },
 
   compress: (raw: unknown) => {
-    const result = raw as { id?: string; room_number?: string | null } | null;
+    const result = raw as { refused?: string; id?: string; room_number?: string | null } | null;
+    if (result?.refused) return { summary: result.refused, data: null };
     return {
       summary: result?.room_number
         ? `Room ${result.room_number} sent back for rework.`
@@ -721,11 +745,17 @@ export const assignReworkTool = registerTool<AssignReworkArgs>({
  */
 const MarkNotificationReadArgs = z
   .object({
-    // Semantic, not authorization: WHICH notification, never WHOSE.
-    // markAsRead compares notification.user_id against the caller and throws
-    // ForbiddenError otherwise, so a guessed or hallucinated id cannot read
-    // across users.
-    notification_id: z.string().min(1).max(64),
+    // FREE TEXT and OPTIONAL, not an id (changed 2026-09-08). The id was
+    // semantic rather than authorization, so nothing structural forbade it --
+    // but a model has no way to know one, and a live routing check found this
+    // tool selecting NOTHING for its own example phrase. It was unreachable
+    // in practice while every unit test passed, because the tests supplied an
+    // id the model never has.
+    //
+    // Omitted means "the most recent unread", which is what "mark that as
+    // read" means in practice -- nobody says it about a message from last
+    // week. Given, it matches the caller's OWN messages only.
+    match: z.string().trim().min(1).max(120).optional(),
   })
   .strict();
 
@@ -734,8 +764,13 @@ type MarkNotificationReadArgs = z.infer<typeof MarkNotificationReadArgs>;
 export const markMyNotificationRead = registerTool<MarkNotificationReadArgs>({
   name: 'notifications.mark_read',
   description:
-    "Mark one of the authenticated user's own notifications as read. Use when they say " +
-    'they have read a message, or ask to clear or dismiss one.',
+    "Mark one of the authenticated user's own messages as read. Use when they say they " +
+    'have read a message or ask to dismiss one, e.g. "mark that as read", "gelesen", ' +
+    '"dismiss the payslip one". Leave `match` EMPTY for "that" or "the last one" -- it ' +
+    'then marks their most recent unread message, which is almost always what is meant. ' +
+    'Set `match` only when they name a specific message, and then to words FROM that ' +
+    'message ("payslip", "shift"), never to words from their own instruction. Returns ' +
+    'which message was marked.',
   tier: 'LOW_RISK_WRITE',
   confirm: false,
 
@@ -750,10 +785,21 @@ export const markMyNotificationRead = registerTool<MarkNotificationReadArgs>({
   scopeCheck: 'self',
 
   invoke: async (args, actor) => {
-    return notificationService.markAsRead(args.notification_id, toServiceActor(actor).userId);
+    const resolved = await resolveNotificationReference(actor, args.match);
+    if (resolved.status !== 'RESOLVED') {
+      return { refused: describeNotificationMiss(resolved) };
+    }
+    await notificationService.markAsRead(resolved.value.id, toServiceActor(actor).userId);
+    return { marked: resolved.value.label };
   },
 
-  compress: () => ({ summary: 'Marked as read.', data: null }),
+  compress: (raw: unknown) => {
+    const r = raw as { refused?: string; marked?: string } | null;
+    if (r?.refused) return { summary: r.refused, data: null };
+    // Names WHICH message, because "marked as read" on its own leaves a
+    // person unsure whether the assistant picked the one they meant.
+    return { summary: `Marked as read: ${r?.marked ?? 'message'}.`, data: null };
+  },
   maxResultTokens: 40,
 });
 
