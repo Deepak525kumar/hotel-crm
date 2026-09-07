@@ -201,19 +201,26 @@ describe('high-risk write confirmation flow', () => {
     expect(second.reply).toMatch(/already done/i);
   });
 
-  it('REGRESSION: a confirmed write that THROWS still leaves an audit row', async () => {
-    // Found in review. executeTool deliberately lets invoke() errors
-    // propagate, so recordToolCall was never reached -- a high-risk write
-    // the user explicitly approved could fail leaving no record at all. The
-    // handoff is explicit that "this was denied" carries at least as much
-    // audit value as "this succeeded"; a throw was a third outcome nobody
-    // recorded.
+  it('REGRESSION: a confirmed write that FAILS still leaves an audit row', async () => {
+    // Found in review. executeTool once let invoke() errors propagate, so
+    // recordToolCall was never reached -- a high-risk write the user
+    // explicitly approved could fail leaving no record at all. "This was
+    // denied" carries at least as much audit value as "this succeeded"; a
+    // failure was a third outcome nobody recorded.
+    //
+    // Updated 2026-09-08 when tool errors became STRUCTURED. The failure is
+    // now classified and returned rather than thrown, and this test broke --
+    // correctly, because classifying inside the executor had silently skipped
+    // the audit row again. The row is the invariant; whether the failure
+    // arrives as a throw or a return value is an implementation detail.
     const proposal = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'clean room 204' });
     writeInvoke.mockRejectedValueOnce(new Error('database exploded'));
 
-    await expect(
-      runTurn({ conversationId: 'conv_1', actor: ACTOR, confirmToken: proposal.pendingConfirmation!.token })
-    ).rejects.toThrow('database exploded');
+    const result = await runTurn({
+      conversationId: 'conv_1',
+      actor: ACTOR,
+      confirmToken: proposal.pendingConfirmation!.token,
+    });
 
     // The attempt is on record...
     expect(mockPrisma.chatbotToolCall.create).toHaveBeenCalled();
@@ -222,7 +229,29 @@ describe('high-risk write confirmation flow', () => {
     expect(recorded.confirmed).toBe(true);
     expect(recorded.denial_reason).toBe('EXECUTION_FAILED');
 
-    // ...and the error still reaches the caller. Nothing is swallowed.
+    // ...the user is told something happened, and told what to do about it...
+    expect(result.reply).toMatch(/went wrong/i);
+    expect(result.reply).toMatch(/administrator/i);
+
+    // ...but the RAW fault never reaches them. An unclassified error can
+    // carry a stack trace, a connection string or a driver message, and none
+    // of that belongs in a conversation.
+    expect(result.reply).not.toMatch(/database exploded/i);
+  });
+
+  it('does not present an unknown failure as something to retry', async () => {
+    // An unrecognised fault fails to the SAFE side: not retryable, escalated.
+    // Treating an unknown error as transient is how one bug becomes a retry
+    // storm against a dependency that is already broken.
+    const proposal = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'clean room 204' });
+    writeInvoke.mockRejectedValueOnce(new Error('something unrecognised'));
+
+    const result = await runTurn({
+      conversationId: 'conv_1',
+      actor: ACTOR,
+      confirmToken: proposal.pendingConfirmation!.token,
+    });
+    expect(result.reply).not.toMatch(/try again/i);
   });
 
   it('a failed write does not leave a replayable confirmation', async () => {
@@ -230,9 +259,7 @@ describe('high-risk write confirmation flow', () => {
     // cannot leave a token that still works.
     const proposal = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'clean room 204' });
     writeInvoke.mockRejectedValueOnce(new Error('boom'));
-    await expect(
-      runTurn({ conversationId: 'conv_1', actor: ACTOR, confirmToken: proposal.pendingConfirmation!.token })
-    ).rejects.toThrow();
+    await runTurn({ conversationId: 'conv_1', actor: ACTOR, confirmToken: proposal.pendingConfirmation!.token });
     expect((sessionState as any).pending_confirmation).toBeUndefined();
   });
 

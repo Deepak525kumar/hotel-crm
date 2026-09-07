@@ -385,7 +385,8 @@ export const listMyRoomsToday = registerTool<MyRoomsArgs>({
   description:
     'List the rooms the authenticated user has logged as cleaned, for today or a ' +
     'given day. Use for "how many rooms have I done", "which rooms did I log", ' +
-    '"wie viele Zimmer habe ich geschafft". Also reports any room sent back for rework.',
+    '"wie viele Zimmer habe ich geschafft". Defaults to today; give another day as ' +
+    'YYYY-MM-DD. Returns the room numbers logged and reports any sent back for rework.',
   tier: 'READ_ONLY',
   confirm: false,
 

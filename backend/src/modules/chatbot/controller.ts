@@ -47,6 +47,32 @@ export async function invokeTool(
       return;
     }
 
+    if (outcome.status === 'FAILED') {
+      // A structured failure, not a 500: the owning service refused or a
+      // dependency was unavailable, and the caller needs the CODE to decide
+      // whether retrying is sensible. 409 for a business-rule conflict, 503
+      // for something transient, 422 for bad arguments -- so a client can act
+      // on the status line without parsing prose.
+      const status =
+        outcome.error.code === 'TEMPORARY' ? 503
+        : outcome.error.code === 'INVALID_INPUT' ? 422
+        : outcome.error.code === 'NOT_FOUND' ? 404
+        : outcome.error.code === 'FORBIDDEN' ? 403
+        : outcome.error.code === 'CONFLICT' ? 409
+        : 500;
+      res.status(status).json({
+        status: 'error',
+        error: {
+          code: outcome.error.code,
+          message: outcome.error.message,
+          retryable: outcome.error.retryable,
+          next_action: outcome.error.nextAction,
+        },
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+      return;
+    }
+
     sendSuccess(res, outcome.result, { requestId: req.requestId });
   } catch (error) {
     next(error);

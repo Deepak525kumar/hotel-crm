@@ -105,7 +105,11 @@ function compressAssignments(raw: unknown): CompactResult {
 
 export const listMyAssignments = registerTool<ListMineArgs>({
   name: 'assignments.list_mine',
-  description: "List the authenticated worker's own shift assignments.",
+  description:
+    "List the authenticated worker's OWN upcoming or past shift assignments. Use for " +
+    '"what are my shifts", "am I working tomorrow", "wann arbeite ich", "show my ' +
+    'schedule". Returns the day, hotel and status of each shift, and only ever the ' +
+    "caller's own -- never another worker's.",
   tier: 'READ_ONLY',
   confirm: false,
 
@@ -669,7 +673,9 @@ export const assignReworkTool = registerTool<AssignReworkArgs>({
   name: 'quality.assign_rework',
   description:
     'Send an inspected room back to the worker for rework, with a note explaining what ' +
-    'needs redoing. Use when a checker says a room must be done again.',
+    'needs redoing. Use when a checker says a room must be redone, e.g. "send 214 back", ' +
+    '"Zimmer 214 nochmal machen". Requires an existing inspection and a note. Returns ' +
+    'confirmation that the rework was assigned and the worker notified.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 
@@ -793,7 +799,8 @@ export const markMyAbsence = registerTool<MarkMyAbsenceArgs>({
   description:
     "Record one of the authenticated user's OWN sick or vacation days. Use for " +
     '"I am sick today", "ich bin krank", "book me off on the 12th". A vacation day ' +
-    'requires a reason; a sick day does not.',
+    'requires a reason; a sick day does not. Give the day as YYYY-MM-DD. Returns ' +
+    'confirmation of the day and kind recorded.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 
