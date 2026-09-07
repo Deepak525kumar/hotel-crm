@@ -138,10 +138,11 @@ genuinely needs to ask about one person. The honest resolution is a free-text `q
 worker/hotel names *inside the scope the owning service has already narrowed to*
 (`assignments.list_for_my_team`). Do NOT add an id argument "just for managers": an id supplied by
 a model is an authorization input wearing a semantic costume, and the forbidden-key list exists
-precisely to stop that. **The same problem is unsolved for manager WRITES** — `placeOnCalendar`
-requires `worker_id` and `hotel_id`, so a "put Anna on Tuesday" tool needs name→id resolution
-performed server-side within the caller's scope, with explicit ambiguity handling. That is a
-design task, not a wiring one.
+precisely to stop that. **SOLVED for manager WRITES too (2026-09-07):** `worker-reference.ts`
+resolves a worker NAME and a hotel NAME server-side, scoping candidates before matching and
+refusing on ambiguity. An admin or RM naming a hotel is now served; a hotel-scoped manager naming
+someone *else's* hotel is refused rather than silently given their own, because substituting would
+place a worker where nobody asked.
 
 **Verify your base branch is current before concluding anything about the repo.** A stale working branch made `prisma migrate dev` report drift for columns that a migration on `origin/main` already created, which was briefly mistaken for a missing-migration defect. Confirm against `origin/main`, not whatever branch happens to be checked out.
 
