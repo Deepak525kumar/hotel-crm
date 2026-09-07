@@ -24,6 +24,7 @@ import retentionRoutes from '../../modules/retention/routes.js';
 import complianceRoutes from '../../modules/compliance/routes.js';
 import employeeManagementRoutes from '../../modules/employee-management/routes.js';
 import chatbotRoutes from '../../modules/chatbot/routes.js';
+import reportRoutes from '../../modules/reports/routes.js';
 
 const router = Router();
 
@@ -79,6 +80,8 @@ router.use('/employees', (req, res, next) => {
 // individually under ADR-053 item 4. When enabled, this serves the tool
 // registry, the L0 command path (no model, zero tokens) and the L1 model
 // path, all behind per-user rate limits and token budgets.
+router.use('/reports', reportRoutes);
+
 router.use('/chatbot', (req, res, next) => {
   if (!isChatbotEnabled()) {
     next();
