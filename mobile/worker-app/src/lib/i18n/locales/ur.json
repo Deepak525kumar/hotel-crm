@@ -1223,5 +1223,22 @@
     "suggestions": "Suggestions:",
     "goToCheckIn": "چیک اِن پر جائیں",
     "loggedCount": "{{n}} کمرے"
+  },
+  "chatbot": {
+    "title": "اسسٹنٹ",
+    "subtitle": "آپ کی اپنی شفٹوں، معاہدے، تنخواہ کی پرچیوں اور پیغامات کے جوابات۔",
+    "greeting": "میں کیسے مدد کر سکتا ہوں؟",
+    "greetingHint": "سوال پوچھیں یا نیچے سے منتخب کریں۔",
+    "placeholder": "اپنی شفٹوں، معاہدے یا پیغامات کے بارے میں پوچھیں…",
+    "inputLabel": "پیغام",
+    "send": "بھیجیں",
+    "close": "بند کریں",
+    "openFull": "مکمل صفحہ کھولیں",
+    "transcript": "گفتگو",
+    "thinking": "سوچ رہا ہے…",
+    "confirm": "تصدیق کریں",
+    "cancel": "منسوخ کریں",
+    "confirmed": "تصدیق ہو گئی",
+    "cancelled": "منسوخ"
   }
 }
