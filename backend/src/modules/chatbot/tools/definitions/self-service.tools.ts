@@ -3,7 +3,12 @@ import { assignmentService } from '../../../assignments/service.js';
 import { hrService } from '../../../hr/service.js';
 import { qualityService } from '../../../quality/service.js';
 import { calendarService } from '../../../calendar/service.js';
-import { describeUnresolved, resolveWorkerReference } from '../worker-reference.js';
+import {
+  describeUnresolved,
+  describeUnresolvedHotel,
+  resolveHotelReference,
+  resolveWorkerReference,
+} from '../worker-reference.js';
 import { notificationService } from '../../../notifications/service.js';
 import type { AssignmentDto } from '../../../assignments/types.js';
 import { toServiceActor } from '../actor.js';
@@ -950,6 +955,11 @@ const PlaceWorkerArgs = z
     // roster, and because a 500-character "name" is not a name.
     worker_name: z.string().trim().min(2).max(80),
     day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+    // Optional, and a NAME rather than an id (`hotel_id` is forbidden). A
+    // hotel-scoped manager never needs it -- they have exactly one hotel. An
+    // admin or regional manager covers several and must say which, since
+    // guessing one would place a worker somewhere nobody asked for.
+    hotel_name: z.string().trim().min(2).max(120).optional(),
   })
   .strict();
 
@@ -978,7 +988,14 @@ export const placeWorkerOnCalendar = registerTool<PlaceWorkerArgs>({
   scopeCheck: 'none',
 
   invoke: async (args, actor) => {
-    const resolved = await resolveWorkerReference(args.worker_name, actor);
+    // Hotel FIRST: the worker roster is a property of a hotel, so there is
+    // nothing to search until we know which one.
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') {
+      return { refused: describeUnresolvedHotel(hotel) };
+    }
+
+    const resolved = await resolveWorkerReference(args.worker_name, actor, hotel.hotelId);
     if (resolved.status !== 'RESOLVED') {
       // A refusal, not an exception: "there are two Annas" is a normal
       // answer a manager can act on, and throwing would turn it into a
@@ -987,19 +1004,22 @@ export const placeWorkerOnCalendar = registerTool<PlaceWorkerArgs>({
     }
 
     const result = await assignmentService.placeOnCalendar(
-      { worker_id: resolved.workerId, hotel_id: resolved.hotelId, day: args.day },
+      { worker_id: resolved.workerId, hotel_id: hotel.hotelId, day: args.day },
       toServiceActor(actor)
     );
-    return { placed: { worker: resolved.fullName, day: args.day }, result };
+    return { placed: { worker: resolved.fullName, day: args.day, hotel: hotel.name }, result };
   },
 
   compress: (raw: unknown) => {
-    const out = raw as { refused?: string; placed?: { worker: string; day: string } } | null;
+    const out = raw as { refused?: string; placed?: { worker: string; day: string; hotel?: string } } | null;
     if (out?.refused) return { summary: out.refused, data: null };
     if (out?.placed) {
+      // The hotel is named back because an admin or RM may cover several and
+      // needs to see which one this landed on.
+      const where = out.placed.hotel ? ` at ${out.placed.hotel}` : '';
       return {
-        summary: `${out.placed.worker} is on the calendar for ${out.placed.day}.`,
-        data: { worker: out.placed.worker, day: out.placed.day },
+        summary: `${out.placed.worker} is on the calendar for ${out.placed.day}${where}.`,
+        data: { worker: out.placed.worker, day: out.placed.day, hotel: out.placed.hotel ?? null },
       };
     }
     return { summary: 'Done.', data: null };
@@ -1038,6 +1058,11 @@ const MAX_PLACEMENTS = 30;
 
 const PlaceManyArgs = z
   .object({
+    // ONE hotel for the whole batch, not one per entry. A manager plans a
+    // week at a hotel; letting each row name a different one would multiply
+    // the resolution surface and make the confirmation summary far harder to
+    // check at a glance. Cross-hotel planning is two instructions.
+    hotel_name: z.string().trim().min(2).max(120).optional(),
     placements: z
       .array(
         z
@@ -1088,11 +1113,17 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
   invoke: async (args, actor) => {
     const serviceActor = toServiceActor(actor);
 
+    // ---- Pass 0: the hotel, once for the batch ----------------------------
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') {
+      return { refused: [describeUnresolvedHotel(hotel)], placed: [] as PlacementOutcome[] };
+    }
+
     // ---- Pass 1: resolve every name. Write nothing yet. -------------------
     const resolutions = await Promise.all(
       args.placements.map(async (p) => ({
         placement: p,
-        resolved: await resolveWorkerReference(p.worker_name, actor),
+        resolved: await resolveWorkerReference(p.worker_name, actor, hotel.hotelId),
       }))
     );
 
@@ -1110,7 +1141,7 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
       if (resolved.status !== 'RESOLVED') continue; // narrowed above; keeps TS honest
       try {
         await assignmentService.placeOnCalendar(
-          { worker_id: resolved.workerId, hotel_id: resolved.hotelId, day: placement.day },
+          { worker_id: resolved.workerId, hotel_id: hotel.hotelId, day: placement.day },
           serviceActor
         );
         outcomes.push({ worker: resolved.fullName, day: placement.day, ok: true });

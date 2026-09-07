@@ -2,6 +2,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockPlace = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
 const mockResolve = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+const mockResolveHotel = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
 
 jest.mock('../modules/assignments/service.js', () => ({
   assignmentService: { list: jest.fn(), placeOnCalendar: mockPlace },
@@ -9,8 +10,13 @@ jest.mock('../modules/assignments/service.js', () => ({
 }));
 jest.mock('../modules/chatbot/tools/worker-reference.js', () => ({
   resolveWorkerReference: mockResolve,
+  resolveHotelReference: mockResolveHotel,
   describeUnresolved: (r: any) =>
     r.status === 'AMBIGUOUS' ? `More than one worker matches "${r.query}".` : `No worker matching "${r.query}" is on your team.`,
+  describeUnresolvedHotel: (r: any) =>
+    r.status === 'NEEDS_NAME' ? 'Which hotel? Please name it, since you cover more than one.'
+    : r.status === 'AMBIGUOUS' ? `More than one hotel matches "${r.query}".`
+    : `No hotel matching "${r.query}" is in your scope.`,
 }));
 
 import { placeManyOnCalendar } from '../modules/chatbot/tools/definitions/self-service.tools.js';
@@ -32,6 +38,7 @@ const WEEK = [
 describe('assignments.place_many — a whole week in one instruction', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockResolveHotel.mockResolvedValue({ status: 'RESOLVED', hotelId: 'h1', name: 'Premier Inn' });
     mockResolve.mockImplementation(async (name: string) =>
       name === 'Anna' ? resolved('w1', 'Anna Schmidt') : resolved('w2', 'Tomasz Nowak'));
     mockPlace.mockResolvedValue({ assignment: { id: 'a' }, calendar_entry: { id: 'c' } });
@@ -96,6 +103,28 @@ describe('assignments.place_many — a whole week in one instruction', () => {
     expect(placeManyOnCalendar.args.safeParse(many(30)).success).toBe(true);
     expect(placeManyOnCalendar.args.safeParse(many(31)).success).toBe(false);
     expect(placeManyOnCalendar.args.safeParse({ placements: [] }).success).toBe(false);
+  });
+
+  it('resolves the hotel ONCE for the batch, not per entry', async () => {
+    // One hotel for a week. Letting each row name a different one would
+    // multiply the resolution surface and make the confirmation summary far
+    // harder to check at a glance.
+    await placeManyOnCalendar.invoke({ placements: WEEK } as any, mgr());
+    expect(mockResolveHotel).toHaveBeenCalledTimes(1);
+    for (const call of mockPlace.mock.calls) expect(call[0]).toMatchObject({ hotel_id: 'h1' });
+  });
+
+  it('writes nothing and asks which hotel when the actor covers several', async () => {
+    mockResolveHotel.mockResolvedValue({ status: 'NEEDS_NAME' });
+    const out = await placeManyOnCalendar.invoke({ placements: WEEK } as any, mgr());
+    expect(mockResolve).not.toHaveBeenCalled();
+    expect(mockPlace).not.toHaveBeenCalled();
+    expect(placeManyOnCalendar.compress(out).summary).toMatch(/Which hotel\?/);
+  });
+
+  it('accepts a hotel NAME for the batch, never an id', () => {
+    expect(placeManyOnCalendar.args.safeParse({ hotel_name: 'Essen', placements: WEEK }).success).toBe(true);
+    expect(placeManyOnCalendar.args.safeParse({ hotel_id: 'h1', placements: WEEK }).success).toBe(false);
   });
 
   it('is HIGH_RISK_WRITE with confirmation forced', () => {
