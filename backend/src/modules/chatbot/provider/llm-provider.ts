@@ -88,3 +88,22 @@ export function getProvider(): LlmProvider | null {
 export function setProvider(provider: LlmProvider | null): void {
   configuredProvider = provider;
 }
+
+
+/**
+ * Install the configured provider.
+ *
+ * Called once at startup. Returns whichever provider `CHATBOT_PROVIDER`
+ * names, or leaves none installed -- "no provider" stays a supported runtime
+ * state, because L0 answers the highest-frequency questions without one and
+ * the orchestrator degrades to the confirmed fallback.
+ */
+export async function installConfiguredProvider(): Promise<LlmProvider | null> {
+  const [{ buildBedrockProvider }, { buildMantleProvider }] = await Promise.all([
+    import('./bedrock-provider.js'),
+    import('./mantle-provider.js'),
+  ]);
+  const provider = buildBedrockProvider() ?? buildMantleProvider();
+  setProvider(provider);
+  return provider;
+}

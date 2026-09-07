@@ -2,6 +2,7 @@ import './instrument.js';
 import { loadEnv, getEnv } from './config/env.js';
 import { createApp } from './app.js';
 import { connectDb, disconnectDb } from './lib/db.js';
+import { installConfiguredProvider } from './modules/chatbot/provider/llm-provider.js';
 import { logger } from './lib/logger.js';
 import { captureException } from './lib/error-tracker.js';
 
@@ -15,6 +16,30 @@ async function main() {
     // process fails fast (and the orchestrator restarts it) instead of
     // accepting requests against an unconfirmed connection.
     await connectDb();
+
+    // Install the configured LLM provider, if any.
+    //
+    // This call did NOT exist before 2026-09-07, which meant `getProvider()`
+    // always returned null and the chatbot's L1 route could never run --
+    // even with a provider fully configured. The scaffold degraded to the
+    // confirmed fallback so nothing failed loudly, and it would have looked
+    // like a model problem the first time the feature was switched on.
+    //
+    // Deliberately non-fatal: "no provider" is a supported runtime state (L0
+    // answers the highest-frequency questions without one), so a
+    // misconfigured or unreachable provider must not stop the API booting.
+    try {
+      const provider = await installConfiguredProvider();
+      logger.info('chatbot_provider_installed', {
+        provider: env.CHATBOT_PROVIDER,
+        model_id: provider?.modelId ?? null,
+      });
+    } catch (error) {
+      logger.error('chatbot_provider_install_failed', {
+        provider: env.CHATBOT_PROVIDER,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     // Create app
     const app = createApp();
