@@ -276,6 +276,7 @@ export class AssignmentService extends BaseService {
       shiftStartTime?: string | null;
       shiftEndTime?: string | null;
       assignedByName?: string | null;
+      workerName?: string | null;
     } = {}
   ): AssignmentDto {
     return {
@@ -301,6 +302,7 @@ export class AssignmentService extends BaseService {
       shift_start_time: context.shiftStartTime ?? null,
       shift_end_time: context.shiftEndTime ?? null,
       assigned_by_name: context.assignedByName ?? null,
+      worker_name: context.workerName ?? null,
     };
   }
 
@@ -359,6 +361,7 @@ export class AssignmentService extends BaseService {
     shiftStartTime: string | null;
     shiftEndTime: string | null;
     assignedByName: string | null;
+    workerName?: string | null;
   }> {
     const requestId = assignment.job_request_id ?? assignment.work_request_id;
     const [hotel, request, assigner] = await Promise.all([
@@ -501,7 +504,16 @@ export class AssignmentService extends BaseService {
     const jobRequestIdsOnPage = [
       ...new Set(records.map((r) => r.job_request_id ?? r.work_request_id).filter((v): v is string => !!v)),
     ];
-    const assignerIds = [...new Set(records.map((r) => r.assigned_by_id))];
+    // Worker ids resolved in the SAME query as assigner ids: the DTO carried
+    // no worker name, so every consumer had to look it up, and the reports
+    // module -- which must not reach into Users -- could not, and emitted
+    // nulls. One union of ids, one findMany, no extra round trip.
+    const assignerIds = [
+      ...new Set([
+        ...records.map((r) => r.assigned_by_id),
+        ...records.map((r) => r.worker_id),
+      ].filter((v): v is string => Boolean(v))),
+    ];
 
     const [hotelsOnPage, jobRequestsOnPage, assigners] = await Promise.all([
       hotelIdsOnPage.length
@@ -539,6 +551,7 @@ export class AssignmentService extends BaseService {
           shiftStartTime: request?.shift_start_time ?? null,
           shiftEndTime: request?.shift_end_time ?? null,
           assignedByName: AssignmentService.fullName(assignerById.get(r.assigned_by_id) ?? null),
+          workerName: AssignmentService.fullName(assignerById.get(r.worker_id) ?? null),
         });
       }),
       total,
