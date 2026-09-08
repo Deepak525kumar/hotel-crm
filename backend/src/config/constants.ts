@@ -180,6 +180,14 @@ const MANAGER_PERMISSIONS = Object.freeze([
     // the capability, and every role holds it because the route admits every
     // role. It denies nobody -- it makes the capability nameable.
     'assignments:status-write',
+    // Accepting an open shift broadcast for yourself, added 2026-09-09.
+    // POST /job-requests/broadcasts/:id/accept carries no requireRole -- it is
+    // a worker-initiated action and the service enforces role targeting,
+    // roster eligibility, skill match and daily exclusivity itself. Held by
+    // every role because the route admits every role; it denies nobody and
+    // exists so the capability is nameable, exactly like
+    // `calendar:absence:write-own`.
+    'job_requests:accept-own',
     // Reporting and export over arbitrary date ranges, added 2026-09-08.
     // Manager/RM/admin only: a team report contains other people's hours,
     // absences and names, so it is a management capability and gated like one.
@@ -271,6 +279,14 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // the capability, and every role holds it because the route admits every
     // role. It denies nobody -- it makes the capability nameable.
     'assignments:status-write',
+    // Accepting an open shift broadcast for yourself, added 2026-09-09.
+    // POST /job-requests/broadcasts/:id/accept carries no requireRole -- it is
+    // a worker-initiated action and the service enforces role targeting,
+    // roster eligibility, skill match and daily exclusivity itself. Held by
+    // every role because the route admits every role; it denies nobody and
+    // exists so the capability is nameable, exactly like
+    // `calendar:absence:write-own`.
+    'job_requests:accept-own',
     // Reporting and export over arbitrary date ranges, added 2026-09-08.
     // Manager/RM/admin only: a team report contains other people's hours,
     // absences and names, so it is a management capability and gated like one.
@@ -370,6 +386,14 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // the capability, and every role holds it because the route admits every
     // role. It denies nobody -- it makes the capability nameable.
     'assignments:status-write',
+    // Accepting an open shift broadcast for yourself, added 2026-09-09.
+    // POST /job-requests/broadcasts/:id/accept carries no requireRole -- it is
+    // a worker-initiated action and the service enforces role targeting,
+    // roster eligibility, skill match and daily exclusivity itself. Held by
+    // every role because the route admits every role; it denies nobody and
+    // exists so the capability is nameable, exactly like
+    // `calendar:absence:write-own`.
+    'job_requests:accept-own',
     // Exporting YOUR OWN data as a spreadsheet, added 2026-09-08. Held by
     // EVERY role including worker and checker, and it denies nobody -- this is
     // the GDPR Article 15/20 right of access and portability, which the
@@ -457,6 +481,14 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // the capability, and every role holds it because the route admits every
     // role. It denies nobody -- it makes the capability nameable.
     'assignments:status-write',
+    // Accepting an open shift broadcast for yourself, added 2026-09-09.
+    // POST /job-requests/broadcasts/:id/accept carries no requireRole -- it is
+    // a worker-initiated action and the service enforces role targeting,
+    // roster eligibility, skill match and daily exclusivity itself. Held by
+    // every role because the route admits every role; it denies nobody and
+    // exists so the capability is nameable, exactly like
+    // `calendar:absence:write-own`.
+    'job_requests:accept-own',
     // Exporting YOUR OWN data as a spreadsheet, added 2026-09-08. Held by
     // EVERY role including worker and checker, and it denies nobody -- this is
     // the GDPR Article 15/20 right of access and portability, which the
