@@ -271,17 +271,33 @@ describe('field encryption', () => {
   });
 
   it('refuses a tampered ciphertext rather than returning garbage', () => {
-    const good = encryptField('original', key);
+    const good = encryptField('original text worth tampering with', key);
     const parts = good.split('.');
-    // Flip the last character of the payload.
-    const tampered = [
-      parts[0],
-      parts[1],
-      parts[2],
-      parts[3].slice(0, -1) + (parts[3].endsWith('A') ? 'B' : 'A'),
-    ].join('.');
 
+    // A BYTE is flipped, not a character. The first version flipped the last
+    // base64url character, which encodes fewer than six significant bits when
+    // the payload length is not a multiple of three -- the discarded padding
+    // bits changed, the decoded ciphertext did not, and the test failed
+    // roughly a third of the time. Decoding, mutating and re-encoding is
+    // deterministic regardless of length.
+    const bytes = Buffer.from(parts[3], 'base64url');
+    bytes[0] ^= 0xff;
+    const tampered = [parts[0], parts[1], parts[2], bytes.toString('base64url')].join('.');
+
+    expect(tampered).not.toBe(good);
     expect(() => decryptField(tampered, key)).toThrow(EncryptionError);
+  });
+
+  it('refuses a tampered auth tag', () => {
+    // The tag is what makes the cipher authenticated; altering it must fail
+    // just as loudly as altering the payload.
+    const parts = encryptField('original', key).split('.');
+    const tag = Buffer.from(parts[2], 'base64url');
+    tag[0] ^= 0xff;
+
+    expect(() =>
+      decryptField([parts[0], parts[1], tag.toString('base64url'), parts[3]].join('.'), key)
+    ).toThrow(EncryptionError);
   });
 
   it('refuses the wrong key', () => {

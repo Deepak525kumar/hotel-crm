@@ -48,6 +48,25 @@ These remain exactly as open as before `ADR-053`. None is touched by the orchest
 
 ---
 
+## 2a. G2 SPECIFICATION FREEZE — GRANTED 2026-09-09
+
+`SPEC-CHATBOT-001@0.3.0` is **FROZEN**. The commissioning human granted G2 on 2026-09-09,
+after all three standing blockers closed: `OD-CHAT-005` (`ADR-073`, 2026-09-04),
+`OD-CHAT-006` (`ADR-074`, 2026-09-08) and `OD-CHAT-013` (owner assigned, 2026-09-04).
+Constitution §12 reserves this gate to human authority; the freeze records that authority
+being exercised.
+
+The freeze was preceded by a synchronisation pass, because the specification still described
+`OD-CHAT-005` as blocking G2 and transcript persistence as unresolved — both false by then.
+Freezing a document that says those things would have frozen false statements. `MODULE_SPEC`
+§0 now carries the resolution table and is authoritative over the ~59 inline annotations
+below it, which are retained rather than rewritten: the reasoning that produced each decision
+is the useful part, and in-place edits across a frozen document are how contradictions get
+introduced.
+
+Fourteen `OD-CHAT-*` items remain open (§3). None blocked G2. A frozen specification is not a
+complete one.
+
 ## 2b. Tool approvals under `ADR-053` item 4
 
 `ADR-053` item 4 approves the tool-registry **architecture** and explicitly not any
