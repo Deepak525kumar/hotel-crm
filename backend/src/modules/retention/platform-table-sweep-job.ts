@@ -42,9 +42,13 @@ export interface PlatformTableSweepJobConfig {
  * old when this was caught, so nothing had yet become eligible -- but
  * notifications would have begun being deleted around 2026-11-09.
  *
- * The capacity concern for `AuditLog` is real and remains unsolved. It must
- * be solved by something that does not destroy the record: archival to cold
- * storage, or table partitioning. Not deletion.
+ * The capacity concern for `AuditLog` was real and is now addressed --
+ * `audit-archive-job.ts` (2026-09-09) moves rows older than two years to
+ * durable object storage and deletes them from the hot table only after
+ * reading the archive back and verifying it. That is archival, not deletion:
+ * "retained indefinitely" does not mean "in Postgres forever", and the record
+ * still exists and is still readable. This job still does not touch AuditLog
+ * and must not start to.
  *
  * Batched -- select a bounded page of ids, delete exactly those ids, repeat --
  * so a large first run cannot lock the table. `Notification.created_at` is

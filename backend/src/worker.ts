@@ -18,6 +18,7 @@ import { SessionSweepJob } from './modules/auth/session-sweep-job.js';
 import { GeoRetentionSweepJob } from './modules/geo/retention-sweep-job.js';
 import { RetentionSweepJob } from './modules/retention/sweep-job.js';
 import { PlatformTableSweepJob } from './modules/retention/platform-table-sweep-job.js';
+import { AuditArchiveJob } from './modules/retention/audit-archive-job.js';
 import { JobRequestAutoCloseJob } from './modules/job-requests/auto-close-job.js';
 import { HrContractExpiryReminderJob } from './modules/hr/expiry-reminder-job.js';
 import { AssignmentNoShowJob } from './modules/assignments/no-show-job.js';
@@ -143,6 +144,18 @@ async function main() {
           notificationRetentionDays: env.PLATFORM_NOTIFICATION_RETENTION_DAYS,
           operationalRetentionDays: env.PLATFORM_OPERATIONAL_RETENTION_DAYS,
           transcriptRetentionDays: env.CHATBOT_TRANSCRIPT_RETENTION_DAYS,
+        })
+      )
+      .register(
+        // Archival, not retention. ADR-033 keeps AuditLog indefinitely; this
+        // moves old rows to durable storage so the table stops growing without
+        // the record ever ceasing to exist. It refuses to run when storage is
+        // stubbed, because deleting after a no-op upload would destroy audit
+        // history while reporting success.
+        new AuditArchiveJob(prisma, {
+          intervalMs: env.AUDIT_ARCHIVE_INTERVAL_MS,
+          archiveAfterDays: env.AUDIT_ARCHIVE_AFTER_DAYS,
+          batchSize: env.AUDIT_ARCHIVE_BATCH_SIZE,
         })
       )
       .register(
