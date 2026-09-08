@@ -400,6 +400,18 @@ const envSchema = z.object({
   // them too early is an unanswerable audit.
   PLATFORM_OPERATIONAL_RETENTION_DAYS: z.coerce.number().int().positive().default(3653),
 
+  // AuditLog ARCHIVAL, not retention. ADR-033 excludes AuditLog from all three
+  // tiers and requires it retained indefinitely; this moves old rows to
+  // durable object storage so "indefinitely" does not have to mean "in
+  // Postgres forever". Nothing is deleted until the archive is read back and
+  // verified, and the job refuses to run at all without real storage.
+  //
+  // Two years keeps the hot table covering the window investigations actually
+  // use, while anything older stays retrievable from the archive.
+  AUDIT_ARCHIVE_AFTER_DAYS: z.coerce.number().int().positive().default(730),
+  AUDIT_ARCHIVE_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
+  AUDIT_ARCHIVE_BATCH_SIZE: z.coerce.number().int().positive().max(5000).default(1000),
+
   // PLATFORM_AUDIT_LOG_RETENTION_DAYS was REMOVED (2026-09-04). ADR-033
   // excludes AuditLog from all three tiers and retains it INDEFINITELY: it is
   // the platform's own accountability record under CRR §30, and deleting it
