@@ -188,6 +188,18 @@ const MANAGER_PERMISSIONS = Object.freeze([
     // exists so the capability is nameable, exactly like
     // `calendar:absence:write-own`.
     'job_requests:accept-own',
+    // Reading the pending-application review queue, added 2026-09-09.
+    // GET /employee-management/review-queue gates on requireRole(admin|
+    // manager|regional_manager) and NO token, and getReviewQueue refuses any
+    // other role itself.
+    //
+    // A dedicated token rather than reusing `employees:read`: that one is held
+    // by WORKER and CHECKER too, so a chatbot tool declaring it would appear
+    // in a worker's manifest while listing other people's employment records.
+    // The service would refuse them, so nothing leaked -- but a capability
+    // every role can see is not least privilege, and the registry's own
+    // design-rule test says so.
+    'employees:review-queue-read',
     // Reporting and export over arbitrary date ranges, added 2026-09-08.
     // Manager/RM/admin only: a team report contains other people's hours,
     // absences and names, so it is a management capability and gated like one.
@@ -287,6 +299,18 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // exists so the capability is nameable, exactly like
     // `calendar:absence:write-own`.
     'job_requests:accept-own',
+    // Reading the pending-application review queue, added 2026-09-09.
+    // GET /employee-management/review-queue gates on requireRole(admin|
+    // manager|regional_manager) and NO token, and getReviewQueue refuses any
+    // other role itself.
+    //
+    // A dedicated token rather than reusing `employees:read`: that one is held
+    // by WORKER and CHECKER too, so a chatbot tool declaring it would appear
+    // in a worker's manifest while listing other people's employment records.
+    // The service would refuse them, so nothing leaked -- but a capability
+    // every role can see is not least privilege, and the registry's own
+    // design-rule test says so.
+    'employees:review-queue-read',
     // Reporting and export over arbitrary date ranges, added 2026-09-08.
     // Manager/RM/admin only: a team report contains other people's hours,
     // absences and names, so it is a management capability and gated like one.
