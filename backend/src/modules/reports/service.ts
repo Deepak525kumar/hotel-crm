@@ -140,7 +140,10 @@ export class ReportService extends BaseService {
 
     return (rows as Array<Record<string, any>>).map((a) => ({
       day: String(a.day ?? '').slice(0, 10),
-      worker: personName(a.worker),
+      // `worker_name` is supplied by the owning module (added 2026-09-09 for
+      // exactly this): the DTO previously carried only `worker_id`, and this
+      // column was a run of nulls.
+      worker: a.worker_name ?? personName(a.worker),
       hotel: a.hotel?.name ?? null,
       status: a.status ?? null,
       started_at: a.started_at ?? null,
@@ -198,10 +201,11 @@ export class ReportService extends BaseService {
       })
       .map((a) => ({
         day: String(a.day ?? '').slice(0, 10),
-        worker: personName(a.worker),
+        // CalendarAbsenceDto carries ids, not names, for both of these.
+        worker: a.worker_name ?? personName(a.worker),
         kind: a.kind ?? null,
         reason: a.reason ?? null,
-        marked_by: personName(a.marked_by),
+        marked_by: a.marked_by_name ?? personName(a.marked_by),
       }));
   }
 

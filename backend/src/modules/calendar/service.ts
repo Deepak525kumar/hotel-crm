@@ -50,6 +50,12 @@ export class CalendarService extends BaseService {
     const rows = await this.prisma.calendarAbsence.findMany({
       where: { worker_id: workerId },
       orderBy: { day: 'asc' },
+      // Names for the report/UI layers, which carry ids they cannot resolve
+      // themselves. Two small joins rather than a second round trip.
+      include: {
+        worker: { select: { first_name: true, last_name: true } },
+        marked_by: { select: { first_name: true, last_name: true } },
+      },
     });
     return rows.map((r) => this.toDto(r));
   }
@@ -426,6 +432,12 @@ export class CalendarService extends BaseService {
     const rows = await this.prisma.calendarAbsence.findMany({
       where,
       orderBy: { day: 'asc' },
+      // Names for the report/UI layers, which carry ids they cannot resolve
+      // themselves. Two small joins rather than a second round trip.
+      include: {
+        worker: { select: { first_name: true, last_name: true } },
+        marked_by: { select: { first_name: true, last_name: true } },
+      },
     });
     return rows.map((r) => this.toDto(r));
   }
@@ -659,6 +671,11 @@ export class CalendarService extends BaseService {
     });
   }
 
+  private static personName(u?: { first_name?: string | null; last_name?: string | null } | null) {
+    if (!u) return null;
+    return [u.first_name, u.last_name].filter(Boolean).join(' ') || null;
+  }
+
   private toDto(a: {
     id: string;
     worker_id: string;
@@ -668,6 +685,8 @@ export class CalendarService extends BaseService {
     marked_by_id: string | null;
     created_at: Date;
     updated_at: Date;
+    worker?: { first_name?: string | null; last_name?: string | null } | null;
+    marked_by?: { first_name?: string | null; last_name?: string | null } | null;
   }): CalendarAbsenceDto {
     return {
       id: a.id,
@@ -676,6 +695,8 @@ export class CalendarService extends BaseService {
       kind: a.kind,
       reason: a.reason,
       marked_by_id: a.marked_by_id,
+      worker_name: CalendarService.personName(a.worker),
+      marked_by_name: CalendarService.personName(a.marked_by),
       created_at: a.created_at.toISOString(),
       updated_at: a.updated_at.toISOString(),
     };

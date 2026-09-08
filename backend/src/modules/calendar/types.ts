@@ -60,6 +60,17 @@ export interface CalendarAbsenceDto {
   // manager/RM/admin acting on their behalf (2026-08-08 feature). Null for
   // pre-migration rows with no recorded actor.
   marked_by_id: string | null;
+  /**
+   * Display names, added 2026-09-09.
+   *
+   * The DTO carried ids and no names, so any consumer wanting to show a person
+   * had to resolve them itself -- and the reports module, which must not reach
+   * into Users, emitted a column of nulls instead. Populated by the list paths
+   * that load the relations; null elsewhere, exactly as the ids' own callers
+   * already tolerate.
+   */
+  worker_name?: string | null;
+  marked_by_name?: string | null;
   created_at: string;
   updated_at: string;
 }

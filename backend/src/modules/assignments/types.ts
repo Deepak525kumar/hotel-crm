@@ -177,6 +177,21 @@ export interface AssignmentDto {
   shift_end_time: string | null; // HH:mm
   /** Display name of the manager who assigned the shift, for "assigned by". */
   assigned_by_name: string | null;
+  /**
+   * The assigned worker's display name.
+   *
+   * Added 2026-09-09. The DTO carried `worker_id` and no name, so every
+   * consumer that wanted to show a person had to resolve it themselves --
+   * and the reports module, which cannot reach into Users, silently produced
+   * a column of nulls where the worker belongs. Found by running a report
+   * against real data; a report with blank names and a report with no rows
+   * look identical to any assertion about row counts.
+   *
+   * Populated by `list()`, which already batch-loads assigner names and now
+   * resolves both in the same query. Null on the single-record paths that do
+   * not load it, exactly as `assigned_by_name` already is.
+   */
+  worker_name: string | null;
 }
 
 /**
