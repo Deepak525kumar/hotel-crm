@@ -5,6 +5,7 @@ import { APP_COMMIT_SHA, APP_NAME, APP_OWNER, APP_VERSION } from "@/lib/config";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { LanguageSelect } from "@/components/i18n/LanguageSwitcher";
+import { ExportMyDataCard } from "@/components/settings/ExportMyDataCard";
 import { useTranslation } from "react-i18next";
 import {
   Card,
@@ -79,6 +80,11 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Placed above Appearance on purpose: this is a legal right, not a
+          preference, and it belongs with the account rather than below the
+          theme picker. Rendered for every role -- see the component. */}
+      <ExportMyDataCard />
 
       <Card>
         <CardHeader>

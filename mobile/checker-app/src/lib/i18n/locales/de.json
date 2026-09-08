@@ -86,7 +86,8 @@
     "change": "Ändern",
     "submit": "Absenden",
     "pass": "Pass",
-    "fail": "Fail"
+    "fail": "Fail",
+    "unknownError": "Etwas ist schiefgelaufen."
   },
   "fields": {
     "name": "Name",
@@ -343,7 +344,17 @@
     "resetPasswordFailed": "Zurücksetzen konnte nicht gestartet werden. Bitte erneut versuchen.",
     "title": "Einstellungen",
     "appearanceHint": "Wählen Sie das Erscheinungsbild der App. „Gerät folgen“ übernimmt Ihre Telefoneinstellungen.",
-    "storedOnDevice": "Diese Einstellungen werden auf diesem Gerät gespeichert. Ihre Sprache wird zusätzlich mit Ihrem Konto synchronisiert."
+    "storedOnDevice": "Diese Einstellungen werden auf diesem Gerät gespeichert. Ihre Sprache wird zusätzlich mit Ihrem Konto synchronisiert.",
+    "exportData": "Ihre Daten",
+    "exportDataDescription": "Laden Sie alles herunter, was die Plattform über Sie gespeichert hat, als Excel-Datei: Ihre Schichten, Anwesenheit, Abwesenheiten, erfasste Zimmer und Ihre Nachrichten mit dem Assistenten. Umfasst die letzten 12 Monate.",
+    "exportDataAction": "Meine Daten exportieren",
+    "exportDataWorking": "Ihre Datei wird vorbereitet…",
+    "exportDataReady": "Ihre Datei ist fertig",
+    "exportDataRows": "Zeilen",
+    "exportDataExpires": "Der Link läuft in Kürze ab.",
+    "exportDataNoStorage": "Ihre Datei wurde erstellt, aber auf diesem Server ist kein Dateispeicher eingerichtet, daher gibt es keinen Download-Link. Bitte informieren Sie einen Administrator.",
+    "exportDataShort": "Ihre Schichten, Anwesenheit, Abwesenheiten und Zimmer als Tabelle",
+    "exportDataCannotOpen": "Ihre Datei ist fertig, aber dieses Gerät konnte den Link nicht öffnen."
   },
   "auth": {
     "login": "Anmelden",

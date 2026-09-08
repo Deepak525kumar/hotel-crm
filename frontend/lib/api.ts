@@ -101,6 +101,7 @@ import type {
   DeleteEmploymentInput,
   SetBlocklistInput,
   SubjectRightsBundle,
+  GeneratedReport,
 } from "@/lib/types";
 
 /** Error thrown by {@link apiFetch} for any non-2xx response. */
@@ -1441,6 +1442,41 @@ export const complianceApi = {
   exportMyData: () =>
     apiFetch<SubjectRightsBundle>("/compliance/subject-rights-export", {
       method: "POST",
+    }),
+};
+
+/**
+ * Reporting and export (`/reports/*`).
+ *
+ * TWO EXPORTS EXIST AND THEY ARE NOT THE SAME THING, which matters because
+ * both could reasonably be called "export my data":
+ *
+ *   - `complianceApi.exportMyData()` returns the formal GDPR subject-rights
+ *     BUNDLE as JSON: documents, consent history, audit trail. It is the
+ *     legal artefact, and it is not readable by a normal person.
+ *   - `reportsApi.exportMine()` returns a link to an .xlsx WORKBOOK of the
+ *     operational record a person actually recognises -- their shifts,
+ *     attendance, absences, rooms logged, and assistant messages.
+ *
+ * The settings page offers the spreadsheet, because that is what somebody
+ * means when they ask for their data. The JSON bundle stays available for a
+ * formal request.
+ */
+export const reportsApi = {
+  /**
+   * The caller's own data as a spreadsheet. Available to EVERY role including
+   * worker and checker -- this is the Article 15/20 right of access and
+   * portability, not a management feature.
+   *
+   * Returns a SHORT-LIVED presigned link rather than bytes: the file is built
+   * server-side and stored, so the browser is handed a URL instead of holding
+   * a workbook in memory. `url` is null when file storage is unconfigured,
+   * which callers must render as "unavailable" rather than as a broken link.
+   */
+  exportMine: (range?: { from: string; to: string }) =>
+    apiFetch<GeneratedReport>("/reports/export/mine", {
+      method: "POST",
+      body: range ?? {},
     }),
 };
 
