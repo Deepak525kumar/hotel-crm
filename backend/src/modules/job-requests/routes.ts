@@ -69,7 +69,11 @@ router.get('/broadcasts/:id/eligibility', (req, res, next) => {
 // worker roster-eligibility, skill match, and daily-exclusivity itself
 // (same shape as getBroadcastEligibility()'s own no-requireRole route
 // above, and getWorkRequest()'s worker-facing read below).
-router.post('/broadcasts/:id/accept', (req, res, next) => {
+// @requiresPermission job_requests:accept-own
+// Added 2026-09-09 with the token. A NO-OP for HTTP callers: every role holds
+// it, matching a route that admits every authenticated caller. The service
+// remains the real boundary -- it decides who may accept what.
+router.post('/broadcasts/:id/accept', requirePermission('job_requests:accept-own'), (req, res, next) => {
   if (!isJobDispatchPhase2Enabled()) {
     next();
     return;
