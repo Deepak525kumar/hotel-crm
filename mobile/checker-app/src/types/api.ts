@@ -701,3 +701,19 @@ export interface ChatbotTurnDto {
     toolName: string;
   };
 }
+
+/**
+ * A generated report or personal export.
+ *
+ * `url` is a short-lived presigned link, and is `null` when file storage is
+ * unconfigured on the server -- a real state, not an error, which callers
+ * must render rather than turning into a dead link.
+ */
+export interface GeneratedReportDto {
+  filename: string;
+  url: string | null;
+  format: 'xlsx' | 'pdf';
+  rowCount: number;
+  truncated: boolean;
+}
+

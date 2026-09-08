@@ -86,7 +86,8 @@
     "change": "Change",
     "submit": "Submit",
     "pass": "Pass",
-    "fail": "Fail"
+    "fail": "Fail",
+    "unknownError": "Something went wrong."
   },
   "fields": {
     "name": "Name",
@@ -343,7 +344,17 @@
     "resetPasswordFailed": "Could not start a password reset. Please try again.",
     "title": "Settings",
     "appearanceHint": "Choose how the app looks. \"Match device\" follows your phone settings.",
-    "storedOnDevice": "These preferences are saved on this device. Your language also syncs to your account."
+    "storedOnDevice": "These preferences are saved on this device. Your language also syncs to your account.",
+    "exportData": "Your data",
+    "exportDataDescription": "Download everything the platform holds about you as an Excel file: your shifts, attendance, absences, rooms you logged, and your messages with the assistant. It covers the last 12 months.",
+    "exportDataAction": "Export my data",
+    "exportDataWorking": "Preparing your file…",
+    "exportDataReady": "Your file is ready",
+    "exportDataRows": "rows",
+    "exportDataExpires": "The link expires shortly.",
+    "exportDataNoStorage": "Your file was prepared, but file storage is not set up on this server, so there is no download link. Please tell an administrator.",
+    "exportDataShort": "Your shifts, attendance, absences and rooms, as a spreadsheet",
+    "exportDataCannotOpen": "Your file is ready but this device could not open the link."
   },
   "auth": {
     "login": "Log in",
@@ -1068,7 +1079,6 @@
     "checklistEmpty": "Score at least one item",
     "checklistItemRange": "Each item must be a whole number from 0 to 100",
     "overallScore": "Overall score {{score}}",
-    "overallScoreTitle": "Overall Score (0-100)",
     "photoEvidence": "Photo evidence",
     "comment": "Comment",
     "commentPlaceholder": "Anything the worker should know",
@@ -1091,6 +1101,7 @@
     "noInspectableWorkers": "No workers to check",
     "noInspectableWorkersBody": "Nobody is on shift today at the hotels you are working.",
     "workerUnavailable": "Worker unavailable",
+    "overallScoreTitle": "Overall Score (0-100)",
     "searchChecksPlaceholder": "Search by room, note or outcome",
     "searchChecksNoMatch": "No checks match that search.",
     "checkerEvidenceTitle": "Checker's evidence",

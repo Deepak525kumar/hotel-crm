@@ -86,7 +86,8 @@
     "change": "Modifier",
     "submit": "Envoyer",
     "pass": "Pass",
-    "fail": "Fail"
+    "fail": "Fail",
+    "unknownError": "Une erreur s'est produite."
   },
   "fields": {
     "name": "Nom",
@@ -343,7 +344,17 @@
     "resetPasswordFailed": "Impossible de lancer la réinitialisation. Veuillez réessayer.",
     "title": "Réglages",
     "appearanceHint": "Choisissez l’apparence de l’app. « Suivre l’appareil » suit les réglages de votre téléphone.",
-    "storedOnDevice": "Ces préférences sont enregistrées sur cet appareil. Votre langue est aussi synchronisée avec votre compte."
+    "storedOnDevice": "Ces préférences sont enregistrées sur cet appareil. Votre langue est aussi synchronisée avec votre compte.",
+    "exportData": "Vos données",
+    "exportDataDescription": "Téléchargez au format Excel tout ce que la plateforme conserve à votre sujet : vos services, présences, absences, chambres enregistrées et vos messages avec l'assistant. Couvre les 12 derniers mois.",
+    "exportDataShort": "Vos services, présences, absences et chambres, sous forme de tableur",
+    "exportDataAction": "Exporter mes données",
+    "exportDataWorking": "Préparation de votre fichier…",
+    "exportDataReady": "Votre fichier est prêt",
+    "exportDataRows": "lignes",
+    "exportDataExpires": "Le lien expire sous peu.",
+    "exportDataNoStorage": "Votre fichier a été préparé, mais le stockage de fichiers n'est pas configuré sur ce serveur, il n'y a donc pas de lien de téléchargement. Veuillez prévenir un administrateur.",
+    "exportDataCannotOpen": "Votre fichier est prêt mais cet appareil n'a pas pu ouvrir le lien."
   },
   "auth": {
     "login": "Se connecter",

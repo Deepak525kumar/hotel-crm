@@ -38,6 +38,7 @@ import type {
   ChatbotCommandDto,
   ChatbotConversationDto,
   ChatbotTurnDto,
+  GeneratedReportDto,
 } from '@/types/api';
 import type { UiLocale } from '@/lib/locales';
 import type { InspectionOutcome } from '@/lib/inspection-outcome';
@@ -384,6 +385,25 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  /**
+   * The caller's own data as a spreadsheet -- the GDPR Article 15/20 right of
+   * access and portability, available to every role.
+   *
+   * Returns a SHORT-LIVED presigned link rather than bytes. A phone should not
+   * hold a year of somebody's history in memory, and handing the OS a URL lets
+   * the platform's own download and share sheet do the work.
+   *
+   * `url` is null when file storage is unconfigured server-side. That is a
+   * real state and callers must render it as such, never as a dead link.
+   */
+  reports: {
+    exportMine: (range?: { from: string; to: string }) =>
+      request<GeneratedReportDto>('/reports/export/mine', {
+        method: 'POST',
+        body: JSON.stringify(range ?? {}),
+      }),
+  },
+
   /**
    * Chatbot. Every route 404s while FEATURE_CHATBOT is off, which is its
    * state in production — `isAvailable()` exists so the app can decide

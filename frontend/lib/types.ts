@@ -1946,3 +1946,19 @@ export interface ChatMessage {
   resolved?: "confirmed" | "cancelled";
   failed?: boolean;
 }
+
+/**
+ * A generated report or personal export.
+ *
+ * `url` is a SHORT-LIVED presigned link, and is `null` when file storage is
+ * unconfigured on the server. That is a real state, not an error: callers
+ * must render the absence rather than a link that leads nowhere.
+ */
+export interface GeneratedReport {
+  filename: string;
+  url: string | null;
+  format: "xlsx" | "pdf";
+  rowCount: number;
+  truncated: boolean;
+}
+

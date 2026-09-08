@@ -9,6 +9,7 @@ import { ThemedView } from '@/components/themed-view';
 import { NotificationBell } from '@/components/NotificationBell';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Badge, Button, Card, ListRow, SectionHeader } from '@/components/ui';
+import { ExportMyDataRow } from '@/components/settings/ExportMyDataRow';
 import { useAuthStore } from '@/stores/auth-store';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -160,6 +161,10 @@ export default function ProfileScreen() {
               onPress={() => router.push('/consent')}
               right={<ThemedText themeColor="textSecondary">›</ThemedText>}
             />
+            {/* Last in the list and marked so: a data-access right belongs
+                with the account's own affairs, after the navigation rows. No
+                role gate -- see the component. */}
+            <ExportMyDataRow last />
           </Card>
 
           <Button
