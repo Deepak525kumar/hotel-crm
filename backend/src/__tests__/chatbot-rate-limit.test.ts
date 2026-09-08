@@ -182,3 +182,45 @@ describe('the single-process assumption the in-memory store depends on', () => {
     expect(config).not.toMatch(/exec_mode:\s*'cluster'/);
   });
 });
+
+/**
+ * REGRESSION: the key generator must use `ipKeyGenerator` for its IP fallback.
+ *
+ * A raw IPv6 address is per-DEVICE -- an attacker holding a /64 has billions
+ * of them -- so keying on the bare address is barely a limit at all for anyone
+ * on IPv6. The helper normalises to the subnet.
+ *
+ * Found by booting the compiled server with FEATURE_CHATBOT=true, not by this
+ * suite: express-rate-limit LOGS `ERR_ERL_KEY_GEN_IPV6` and continues rather
+ * than throwing, so nothing failed anywhere -- every start simply printed a
+ * ValidationError that any reader would treat as a fault.
+ *
+ * Because construction cannot throw, the guard asserts the same SOURCE SHAPE
+ * the library itself checks for. That is a source-text assertion, which is
+ * usually a smell; here it is exactly the contract, because the library's rule
+ * is literally "the function's source mentions ipKeyGenerator".
+ */
+describe('the IP fallback is IPv6-safe', () => {
+  const source = readFileSync('src/modules/chatbot/guardrails/rate-limit.ts', 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
+  it('routes the address through ipKeyGenerator', () => {
+    const fn = source.slice(source.indexOf('function keyByUser'));
+    const body = fn.slice(0, fn.indexOf('\n}'));
+
+    expect(body).toContain('req.ip');
+    // The exact condition express-rate-limit enforces.
+    expect(body).toContain('ipKeyGenerator');
+  });
+
+  it('still keys authenticated callers by user, not by address', async () => {
+    // The IPv6 helper applies to the FALLBACK only. The property the limiter
+    // exists for -- one worker's burst not throttling a colleague behind the
+    // same office NAT -- must be untouched by that fix.
+    const app = makeApp(chatbotTurnRateLimit());
+    await fire(app, 'worker-a', TURN_MAX + 1);
+    const colleague = await request(app).post('/go').set('x-test-user', 'worker-b');
+    expect(colleague.status).toBe(200);
+  });
+});

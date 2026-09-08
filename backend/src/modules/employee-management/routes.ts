@@ -12,9 +12,15 @@ router.post('/', requireRole(['admin', 'regional_manager', 'manager']), requireP
 router.post('/bulk-import', requireRole('admin'), requirePermission('employees:write'), ...controller.bulkImport);
 
 // Review Queue (ADR-065 §6 item 7)
+// @requiresPermission employees:review-queue-read
 router.get(
   '/review-queue',
   requireRole(['admin', 'manager', 'regional_manager']),
+  // Added 2026-09-09 with the token. A NO-OP for HTTP callers: it is held by
+  // exactly the three roles requireRole already admits. It exists so the
+  // capability is nameable without borrowing `employees:read`, which workers
+  // and checkers also hold.
+  requirePermission('employees:review-queue-read'),
   (req, res, next) => controller.getReviewQueue(req, res, next)
 );
 

@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import type { Request } from 'express';
 import { getEnv } from '../../../config/env.js';
 import { TooManyRequestsError } from '../../../lib/errors.js';
@@ -60,7 +60,28 @@ import { TooManyRequestsError } from '../../../lib/errors.js';
  */
 function keyByUser(req: Request): string {
   const userId = req.auth?.userId;
-  return userId ? `user:${userId}` : `ip:${req.ip ?? 'unknown'}`;
+  if (userId) return `user:${userId}`;
+
+  // `ipKeyGenerator`, not `req.ip` directly.
+  //
+  // A raw IPv6 address is per-DEVICE: an attacker holding a /64 has billions
+  // of them, so keying on the bare address is barely a limit at all against
+  // anyone on IPv6. The helper normalises to the subnet, which is the unit a
+  // rate limit is meaningful over.
+  //
+  // Found by BOOTING the compiled server with FEATURE_CHATBOT=true. The whole
+  // test suite passed while every start printed
+  // `ValidationError ... ERR_ERL_KEY_GEN_IPV6` from express-rate-limit's own
+  // checks. Precisely stated: it LOGS and continues -- the server does start,
+  // and an earlier note here claiming it died was wrong. What was real is the
+  // IPv6 weakness and an error at every boot that anybody reading the log
+  // would reasonably treat as a fault.
+  //
+  // The library detects this by reading the key generator's SOURCE for
+  // `ipKeyGenerator`, which is why the test guarding it asserts the same
+  // shape: a constructed limiter cannot throw here, so there is nothing else
+  // to assert against.
+  return `ip:${ipKeyGenerator(req.ip ?? 'unknown')}`;
 }
 
 function chatbotLimiter(max: number, what: string) {
