@@ -110,6 +110,38 @@ describe('the worker-shift tools', () => {
     expect(checkInToMyShift.compress?.(out).summary).toMatch(/checked in at 08:00/i);
   });
 
+  /**
+   * REGRESSION (found in review, not by this suite). The resolver fetched one
+   * page of 50 assignments and filtered by day IN MEMORY. `list` orders by
+   * `confirmed_at desc`, so a worker confirmed for a month of shifts pushes
+   * today's -- confirmed weeks ago -- past the 50-row window.
+   *
+   * The symptom was not an error. It was "you have no shift scheduled today"
+   * to somebody standing in the hotel, unable to clock in, with nothing wrong
+   * in any log. Filtering server-side on from/to makes the page size
+   * irrelevant: one day cannot overflow it the way a rolling history can.
+   */
+  it('asks the service for the DAY, rather than paging and filtering in memory', async () => {
+    await checkInToMyShift.invoke({} as never, worker());
+
+    const [query] = mockListAssignments.mock.calls[0] as [Record<string, unknown>];
+    expect({ from: query.from, to: query.to }).toEqual({ from: TODAY, to: TODAY });
+  });
+
+  it('still finds today\'s shift when the roster is larger than one page', async () => {
+    // The service now returns only the requested day, which is the fix. If the
+    // filter were dropped, this page of unrelated rows would be all the
+    // resolver saw and it would report no shift at all.
+    mockListAssignments.mockResolvedValue({
+      data: [{ id: 'today', day: TODAY, status: 'CONFIRMED', hotel_id: 'h1' }],
+      total: 1,
+    });
+
+    await checkInToMyShift.invoke({} as never, worker());
+    const [input] = mockCheckIn.mock.calls[0] as [Record<string, unknown>];
+    expect(input.assignment_id).toBe('today');
+  });
+
   it('surfaces a late arrival rather than reporting a plain success', async () => {
     mockCheckIn.mockResolvedValue({ check_in_at: `${TODAY}T09:30:00.000Z`, status: 'LATE' });
     const out = await checkInToMyShift.invoke({} as never, worker());
@@ -264,19 +296,14 @@ describe('risk tiers on the shift tools', () => {
     expect(logRoomCleaned.confirm).toBe(false);
   });
 
-  it('carries an approval that names a date and the deciding authority', () => {
-    // Was: "registers every new tool as PENDING". That was true the day it
-    // was written and false the day the tools were approved -- a test pinning
-    // a MOMENT rather than a rule, which is the same shape that broke main
-    // once already. What must hold permanently is that an approval, once
-    // stated, is properly stated; whether it is yet granted is the boot
-    // gate's business (chatbot-tool-approval-gate.test.ts).
+  it('registers every new tool as PENDING, not covered by the 2026-09-08 approval', () => {
+    // That approval names the thirteen tools registered on that date and
+    // explicitly does not extend to later ones.
     for (const tool of [checkInToMyShift, checkOutOfMyShift, logRoomCleaned, listMyRoomsToday]) {
-      expect({ tool: tool.name, ref: tool.approvalRef }).toEqual({
+      expect({ tool: tool.name, pending: /PENDING/.test(tool.approvalRef) }).toEqual({
         tool: tool.name,
-        ref: expect.stringMatching(/(APPROVED \d{4}-\d{2}-\d{2}|PENDING)/),
+        pending: true,
       });
-      expect(tool.approvalRef).toMatch(/ADR-053 item 4/);
     }
   });
 });

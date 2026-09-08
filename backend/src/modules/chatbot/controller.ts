@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { ERROR_CODES } from '../../config/constants.js';
 import { ForbiddenError, ValidationError } from '../../lib/errors.js';
 import { sendSuccess } from '../../lib/http-envelope.js';
 import { actorFromRequest } from './tools/actor.js';
@@ -53,17 +54,33 @@ export async function invokeTool(
       // whether retrying is sensible. 409 for a business-rule conflict, 503
       // for something transient, 422 for bad arguments -- so a client can act
       // on the status line without parsing prose.
-      const status =
-        outcome.error.code === 'TEMPORARY' ? 503
-        : outcome.error.code === 'INVALID_INPUT' ? 422
-        : outcome.error.code === 'NOT_FOUND' ? 404
-        : outcome.error.code === 'FORBIDDEN' ? 403
-        : outcome.error.code === 'CONFLICT' ? 409
-        : 500;
-      res.status(status).json({
+      // TRANSLATED AT THE BOUNDARY. The tool error codes are an INTERNAL
+      // vocabulary; the HTTP API has its own (ERROR_CODES) and clients switch
+      // on it. Emitting 'FORBIDDEN' where every other endpoint emits
+      // 'INSUFFICIENT_PERMISSION' would be a breaking change to this
+      // endpoint's contract, introduced by an internal refactor -- exactly the
+      // kind of leak a boundary exists to prevent.
+      //
+      // `retryable` and `next_action` are ADDITIVE: a client reading only
+      // `error.code` and `error.message` sees the shape it always saw.
+      const MAPPING: Record<string, { status: number; code: string }> = {
+        TEMPORARY: { status: 503, code: ERROR_CODES.SERVICE_UNAVAILABLE },
+        INVALID_INPUT: { status: 422, code: ERROR_CODES.VALIDATION_ERROR },
+        NOT_FOUND: { status: 404, code: ERROR_CODES.RESOURCE_NOT_FOUND },
+        AMBIGUOUS: { status: 409, code: ERROR_CODES.VALIDATION_ERROR },
+        FORBIDDEN: { status: 403, code: ERROR_CODES.INSUFFICIENT_PERMISSION },
+        CONFLICT: { status: 409, code: ERROR_CODES.OPERATION_NOT_ALLOWED },
+        INTERNAL: { status: 500, code: ERROR_CODES.INTERNAL_ERROR },
+      };
+      const mapped = MAPPING[outcome.error.code] ?? {
+        status: 500,
+        code: ERROR_CODES.INTERNAL_ERROR,
+      };
+
+      res.status(mapped.status).json({
         status: 'error',
         error: {
-          code: outcome.error.code,
+          code: mapped.code,
           message: outcome.error.message,
           retryable: outcome.error.retryable,
           next_action: outcome.error.nextAction,
