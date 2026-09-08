@@ -1465,39 +1465,39 @@ model RoomsCompletedEntry {
 // their source (see QualityVerification's own rework mirror comments), so
 // there is exactly one authority for a room's quality state.
 model RoomLog {
-  id            String   @id @default(cuid())
+  id              String               @id @default(cuid())
   // The shift this room was cleaned on. Carries hotel/worker/day, so every
   // scope check and attribution question resolves through it.
-  assignment_id String
-  assignment    WorkerAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  assignment_id   String
+  assignment      WorkerAssignment     @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
   // Denormalised from the assignment, matching the Attendance/
   // QualityVerification/RoomsCompletedEntry precedent -- the uniqueness
   // constraint below has to be expressible without a join.
-  hotel_id      String
-  hotel         Hotel    @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
-  worker_id     String
-  worker        User     @relation("room_log_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  hotel_id        String
+  hotel           Hotel                @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  worker_id       String
+  worker          User                 @relation("room_log_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   // @db.Date, same convention as WorkerAssignment.day: the calendar day the
   // room was cleaned, not an instant.
-  day           DateTime @db.Date
+  day             DateTime             @db.Date
   // As the worker typed it -- "412a", "Suite 3", "Penthouse". This is what
   // every screen displays.
-  room_number   String
+  room_number     String
   // The collision key: room_number trimmed and upper-cased. Deliberately NOT
   // more aggressive than that (owner decision): stripping leading zeros or
   // dashes would merge "012" and "12" at hotels where those are genuinely
   // different rooms. The worker-facing input offers a typeahead of room
   // numbers already used at that hotel, so spellings converge by suggestion
   // rather than by lossy normalisation.
-  room_key      String
+  room_key        String
   // The inspection that covered this room, once one exists. Null = still
   // awaiting a check. Also the lock: a log may be edited or removed by its
   // worker only while this is null, so an inspection can never be orphaned
   // from the room it inspected.
-  verification_id String?         @unique
+  verification_id String?              @unique
   verification    QualityVerification? @relation(fields: [verification_id], references: [id], onDelete: SetNull)
-  logged_at     DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  logged_at       DateTime             @default(now())
+  updated_at      DateTime             @updatedAt
 
   // The hard block: one log per room per hotel per day, across ALL workers
   // (owner decision) -- the second worker to claim room 412 is refused and
@@ -2177,9 +2177,49 @@ model ChatbotConversation {
   closed_at     DateTime?
 
   tool_calls ChatbotToolCall[]
+  messages   ChatbotMessage[]
 
   @@index([worker_id, status])
   @@index([created_at])
+}
+
+/// Conversation transcript (OD-CHAT-008 / OD-CHAT-018, owner decision
+/// 2026-09-08: stored, encrypted, kept 30 days).
+///
+/// SEPARATE FROM session_state ON PURPOSE. That column is structured state and
+/// its own comment forbids raw message content -- transcripts have different
+/// retention, different sensitivity, and a different lawful basis, so mixing
+/// them would put free text a person typed under state's rules.
+///
+/// `content` is AES-256-GCM ciphertext (lib/field-encryption.ts), never
+/// plaintext: it is free text that may name colleagues, describe illness, or
+/// quote somebody else's message.
+///
+/// ONLY `USER` ROWS ARE EVER REPLAYED INTO A PROMPT. Assistant rows are
+/// stored for audit, support and data-subject access, and are deliberately
+/// never fed back -- they contain tool output, which carries other people's
+/// data. See ADR-074 §5: that separation is the compensating control which
+/// preserves control 8 while allowing memory at all.
+model ChatbotMessage {
+  id              String              @id @default(cuid())
+  conversation_id String
+  conversation    ChatbotConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  /// Which turn this belongs to, so history replays in the order it happened.
+  turn_index      Int
+  role            ChatbotMessageRole
+  /// AES-256-GCM ciphertext, format `v1.<iv>.<tag>.<data>`.
+  content         String
+  created_at      DateTime            @default(now())
+
+  /// The replay query: one conversation, USER rows, most recent turns.
+  @@index([conversation_id, role, turn_index])
+  /// The retention sweep.
+  @@index([created_at])
+}
+
+enum ChatbotMessageRole {
+  USER
+  ASSISTANT
 }
 
 model ChatbotToolCall {

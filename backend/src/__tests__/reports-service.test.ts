@@ -36,6 +36,13 @@ jest.mock('../modules/calendar/service.js', () => ({
 jest.mock('../modules/rooms/service.js', () => ({
   roomService: { listMyRooms: mockListMyRooms },
 }));
+// Transcripts are part of a personal export now (Article 15). Mocked to empty
+// by default so the dataset-sheet assertions below stay about the datasets.
+const mockExportTranscripts = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
+jest.mock('../modules/chatbot/memory/transcript.js', () => ({
+  exportTranscripts: mockExportTranscripts,
+}));
+
 jest.mock('../modules/documents/storage.js', () => ({
   getStorageClient: async () => ({
     upload: mockUpload,
@@ -104,6 +111,7 @@ describe('who may report on a team', () => {
     mockListMyRooms.mockResolvedValue({ rooms: [], needs_rework: [] });
     mockUpload.mockResolvedValue(undefined);
     mockPresign.mockResolvedValue('https://example.test/report.xlsx');
+    mockExportTranscripts.mockResolvedValue([]);
   });
 
   it.each([['admin'], ['manager'], ['regional_manager']])('admits %s', (role) => {
@@ -158,6 +166,7 @@ describe('reading through the owning modules', () => {
     mockListMyRooms.mockResolvedValue({ rooms: [], needs_rework: [] });
     mockUpload.mockResolvedValue(undefined);
     mockPresign.mockResolvedValue('https://example.test/report.xlsx');
+    mockExportTranscripts.mockResolvedValue([]);
   });
 
   it('passes the date range down rather than filtering after the fact', async () => {
@@ -270,6 +279,7 @@ describe('the generated files', () => {
     mockListMyRooms.mockResolvedValue({ rooms: [], needs_rework: [] });
     mockUpload.mockResolvedValue(undefined);
     mockPresign.mockResolvedValue('https://example.test/report.xlsx');
+    mockExportTranscripts.mockResolvedValue([]);
   });
 
   it('produces a real, openable workbook', async () => {
@@ -424,5 +434,63 @@ describe('the reports date range is validated semantically', () => {
 
   it('still accepts a real leap day', () => {
     expect(DateRangeSchema.safeParse({ from: '2024-02-29', to: '2024-03-01' }).success).toBe(true);
+  });
+});
+
+/**
+ * Storing transcripts creates an Article 15 obligation the same day. An export
+ * that omits them would answer a data-access request incompletely while
+ * presenting itself as complete.
+ */
+describe('a personal export includes chatbot transcripts', () => {
+  let service: ReportService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new ReportService();
+    mockListAssignments.mockResolvedValue({ data: [], total: 0 });
+    mockListAttendance.mockResolvedValue({ data: [], total: 0 });
+    mockOwnAbsences.mockResolvedValue([]);
+    mockListAbsences.mockResolvedValue([]);
+    mockListMyRooms.mockResolvedValue({ rooms: [], needs_rework: [] });
+    mockUpload.mockResolvedValue(undefined);
+    mockPresign.mockResolvedValue('https://example.test/report.xlsx');
+    mockExportTranscripts.mockResolvedValue([
+      { role: 'USER', content: 'am I working tomorrow', turnIndex: 0, createdAt: new Date('2026-09-01') },
+      { role: 'ASSISTANT', content: 'Yes, at Premier Inn.', turnIndex: 0, createdAt: new Date('2026-09-01') },
+    ]);
+  });
+
+  it('adds a messages sheet carrying BOTH sides of the conversation', async () => {
+    await service.exportOwnData({ actor: actor('worker'), range: RANGE });
+
+    const [, body] = mockUpload.mock.calls[0] as [string, Buffer];
+    const read = new ExcelJS.Workbook();
+    await read.xlsx.load(body as unknown as ArrayBuffer);
+
+    const sheet = read.getWorksheet('Assistant Messages');
+    expect(sheet).toBeDefined();
+
+    let text = '';
+    sheet?.eachRow((row) => { text += JSON.stringify(row.values); });
+    // The person's own words, and what they were told. Only the REPLAY path
+    // excludes the assistant side; an export must not.
+    expect(text).toContain('am I working tomorrow');
+    expect(text).toContain('Yes, at Premier Inn.');
+  });
+
+  it('asks only for the requesting worker\'s transcripts', async () => {
+    await service.exportOwnData({ actor: actor('worker'), range: RANGE });
+    expect(mockExportTranscripts).toHaveBeenCalledWith('u1');
+  });
+
+  it('omits the sheet entirely when there are no transcripts', async () => {
+    mockExportTranscripts.mockResolvedValue([]);
+    await service.exportOwnData({ actor: actor('worker'), range: RANGE });
+
+    const [, body] = mockUpload.mock.calls[0] as [string, Buffer];
+    const read = new ExcelJS.Workbook();
+    await read.xlsx.load(body as unknown as ArrayBuffer);
+    expect(read.getWorksheet('Assistant Messages')).toBeUndefined();
   });
 });

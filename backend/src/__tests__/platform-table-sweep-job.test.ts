@@ -41,13 +41,18 @@ const mkPrisma = () => ({
     findMany: jest.fn(async () => []) as jest.MockedFunction<(...args: any[]) => any>,
     deleteMany: jest.fn(async () => ({ count: 0 })) as jest.MockedFunction<(...args: any[]) => any>,
   },
+  chatbotMessage: {
+    findMany: jest.fn(async () => []) as jest.MockedFunction<(...args: any[]) => any>,
+    deleteMany: jest.fn(async () => ({ count: 0 })) as jest.MockedFunction<(...args: any[]) => any>,
+  },
 });
 
 const CONFIG = {
   intervalMs: 86_400_000,
   batchSize: 2,
   maxBatchesPerRun: 3,
-  operationalRetentionDays: 3653,
+  transcriptRetentionDays: 30,
+      operationalRetentionDays: 3653,
       notificationRetentionDays: 90,
 };
 
@@ -173,10 +178,15 @@ describe('ADR-033 retention policy', () => {
         findMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue([]),
         deleteMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({ count: 0 }),
       },
+      chatbotMessage: {
+        findMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue([]),
+        deleteMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({ count: 0 }),
+      },
     };
     await new PlatformTableSweepJob(prisma as never, {
       intervalMs: 1000,
       batchSize: 10,
+      transcriptRetentionDays: 30,
       operationalRetentionDays: 3653,
       notificationRetentionDays: 1825,
     }).run();
@@ -287,5 +297,45 @@ describe('operational records (WorkerAssignment and its cascade)', () => {
     expect(prisma.attendance).toBeUndefined();
     expect(prisma.roomLog).toBeUndefined();
     // If either is ever added to this mock, the job must still not call it.
+  });
+});
+
+/**
+ * Transcripts are swept on THEIR OWN thirty-day clock, not the conversation's.
+ * The conversation row is structured metadata and carries no free text; the
+ * transcript is the sensitive part with the short window.
+ */
+describe('chatbot transcripts (30 days)', () => {
+  it('uses the transcript window, not the notification or operational one', async () => {
+    const prisma = mkPrisma();
+    prisma.notification.findMany.mockResolvedValue([]);
+    prisma.workerAssignment.findMany.mockResolvedValue([]);
+    prisma.chatbotMessage.findMany.mockResolvedValueOnce([{ id: 'm1' }]).mockResolvedValue([]);
+    prisma.chatbotMessage.deleteMany.mockResolvedValue({ count: 1 });
+
+    await new PlatformTableSweepJob(prisma as never, CONFIG).run();
+
+    const cutoff = prisma.chatbotMessage.findMany.mock.calls[0][0].where.created_at.lt as Date;
+    expect(Math.round((Date.now() - cutoff.getTime()) / 86_400_000)).toBe(30);
+  });
+
+  it('deletes by explicit id list, never by the date predicate', async () => {
+    const prisma = mkPrisma();
+    prisma.notification.findMany.mockResolvedValue([]);
+    prisma.workerAssignment.findMany.mockResolvedValue([]);
+    prisma.chatbotMessage.findMany.mockResolvedValueOnce([{ id: 'm1' }]).mockResolvedValue([]);
+    prisma.chatbotMessage.deleteMany.mockResolvedValue({ count: 1 });
+
+    await new PlatformTableSweepJob(prisma as never, CONFIG).run();
+    expect(prisma.chatbotMessage.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ['m1'] } },
+    });
+  });
+
+  it('does not touch the conversation row, which has a different clock', async () => {
+    const prisma = mkPrisma() as Record<string, unknown>;
+    // Deleting conversations here would destroy token accounting and session
+    // state on the transcript's much shorter window.
+    expect(prisma.chatbotConversation).toBeUndefined();
   });
 });
