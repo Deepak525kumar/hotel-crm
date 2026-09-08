@@ -14,6 +14,7 @@ import {
   verifyConfirmToken,
 } from '../guardrails/confirm-token.js';
 import { recordInjectionAttempt } from '../guardrails/injection-tripwire.js';
+import { recordTurn, replayableHistory } from '../memory/transcript.js';
 import { redact } from '../guardrails/redaction.js';
 import { getProvider, ProviderUnavailableError } from '../provider/llm-provider.js';
 import { matchL0, resolveCommandId } from './router-l0.js';
@@ -64,7 +65,60 @@ export interface TurnResult {
   fallbackReason?: string;
 }
 
+/**
+ * One turn, with its transcript recorded.
+ *
+ * WRAPS the turn rather than calling `recordTurn` at each return point.
+ * `executeTurn` has many exits -- L0, L1, confirmation, denial, failure,
+ * fallback -- and a call placed at each one is a list that the next branch
+ * forgets to join. Recording here means a path cannot be added that silently
+ * skips the transcript.
+ *
+ * The reply is recorded on the SUCCESS path only. A turn that threw produced
+ * no reply to store, and the user's own message is still written, so a failed
+ * turn leaves the half that exists rather than nothing.
+ */
 export async function runTurn(params: {
+  conversationId: string;
+  actor: ActorContext;
+  text?: string;
+  commandId?: string;
+  confirmToken?: string;
+  requestId?: string;
+}): Promise<TurnResult> {
+  // Read BEFORE the turn: executeTurn increments turn_count, so reading after
+  // would file the message under the following turn and break replay order.
+  const turnIndex = await currentTurnIndex(params.conversationId);
+
+  try {
+    const result = await executeTurn(params);
+    await recordTurn({
+      conversationId: params.conversationId,
+      turnIndex,
+      userText: params.text,
+      assistantText: result.reply,
+    });
+    return result;
+  } catch (error) {
+    await recordTurn({
+      conversationId: params.conversationId,
+      turnIndex,
+      userText: params.text,
+    });
+    throw error;
+  }
+}
+
+/** The conversation's current turn count, or 0 if it cannot be read. */
+async function currentTurnIndex(conversationId: string): Promise<number> {
+  const row = await getPrisma().chatbotConversation.findUnique({
+    where: { id: conversationId },
+    select: { turn_count: true },
+  });
+  return row?.turn_count ?? 0;
+}
+
+async function executeTurn(params: {
   conversationId: string;
   actor: ActorContext;
   /** Free text from the worker. Untrusted. */
@@ -430,11 +484,18 @@ export async function runTurn(params: {
   const tools = visibleTools(params.actor);
   const turnIndex = conversation.turn_count;
 
+  // The caller's OWN prior messages, for follow-ups like "no, make that
+  // Tuesday". Never assistant turns: those carry tool output, which carries
+  // other people's data (ADR-074 §5). `replayableHistory` filters on role in
+  // the QUERY rather than afterwards, so the boundary cannot be refactored
+  // away silently.
+  const history = await replayableHistory(params.conversationId, turnIndex);
+
   let completion;
   try {
     completion = await provider.completeWithTools({
       system: buildSystemPrompt(params.actor, tools),
-      messages: buildMessages(params.text ?? ''),
+      messages: buildMessages(params.text ?? '', history),
       tools: tools.map(toolSpec),
       // Reads and chat run on the fast model. The planning tier is reserved
       // for the write path, which does not exist yet.

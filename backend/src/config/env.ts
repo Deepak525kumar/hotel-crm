@@ -645,6 +645,22 @@ const envSchema = z.object({
   //
   // 20 model turns/minute is far above human typing cadence (a person sends
   // one every few seconds at most) and still bounds a runaway client loop.
+  // Conversation transcripts (OD-CHAT-008 / OD-CHAT-018, owner decision
+  // 2026-09-08). 64 hex characters = a 32-byte AES-256 key.
+  //
+  // ABSENT MEANS MEMORY IS OFF, not "store it in plaintext". Transcripts are
+  // free text a person typed and may name colleagues or describe illness;
+  // there is no configuration in which writing them unencrypted is the
+  // intended behaviour, so the feature disables itself instead.
+  CHATBOT_TRANSCRIPT_KEY: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/, 'must be 64 hex characters (a 32-byte key)')
+    .optional(),
+  // How long a transcript is kept. Thirty days by owner decision: long enough
+  // to support a person asking "what did I tell it last week", short enough
+  // that a store of free text does not accumulate indefinitely.
+  CHATBOT_TRANSCRIPT_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+
   CHATBOT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000),
   CHATBOT_TURN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
   // Direct tool invocation and conversation creation put no model in the

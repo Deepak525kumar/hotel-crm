@@ -10,6 +10,8 @@ export interface PlatformTableSweepJobConfig {
   notificationRetentionDays: number;
   /** WorkerAssignment and everything cascading from it. Ten years by policy. */
   operationalRetentionDays: number;
+  /** Chatbot transcripts. Thirty days by owner decision (OD-CHAT-008). */
+  transcriptRetentionDays: number;
 }
 
 /**
@@ -55,6 +57,7 @@ export class PlatformTableSweepJob implements ScheduledJob {
   private readonly maxBatchesPerRun: number;
   private readonly notificationRetentionDays: number;
   private readonly operationalRetentionDays: number;
+  private readonly transcriptRetentionDays: number;
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -65,17 +68,21 @@ export class PlatformTableSweepJob implements ScheduledJob {
     this.maxBatchesPerRun = config.maxBatchesPerRun ?? 50;
     this.notificationRetentionDays = config.notificationRetentionDays;
     this.operationalRetentionDays = config.operationalRetentionDays;
+    this.transcriptRetentionDays = config.transcriptRetentionDays;
   }
 
   async run(): Promise<void> {
     const notificationsDeleted = await this.sweepNotifications();
     const assignmentsDeleted = await this.sweepOperationalRecords();
+    const transcriptsDeleted = await this.sweepTranscripts();
 
     logger.info('platform_table_sweep_completed', {
       notifications_deleted: notificationsDeleted,
       notification_retention_days: this.notificationRetentionDays,
       assignments_deleted: assignmentsDeleted,
       operational_retention_days: this.operationalRetentionDays,
+      transcripts_deleted: transcriptsDeleted,
+      transcript_retention_days: this.transcriptRetentionDays,
     });
   }
 
@@ -143,6 +150,41 @@ export class PlatformTableSweepJob implements ScheduledJob {
       if (stale.length === 0) break;
 
       const { count } = await this.prisma.workerAssignment.deleteMany({
+        where: { id: { in: stale.map((row) => row.id) } },
+      });
+      total += count;
+
+      if (stale.length < this.batchSize) break;
+    }
+
+    return total;
+  }
+
+  /**
+   * Chatbot transcripts. Thirty days, per the owner decision of 2026-09-08.
+   *
+   * Deleted on their OWN clock, not the conversation's. A conversation row is
+   * structured metadata -- token counts, status, session state -- and carries
+   * no free text; the transcript is the sensitive part and is the part with a
+   * short window. Tying the two together would either keep messages as long as
+   * metadata or destroy metadata as fast as messages, and neither is the
+   * decision that was made.
+   *
+   * Filtered on `created_at`, which for a message IS when it was said.
+   */
+  private async sweepTranscripts(): Promise<number> {
+    const cutoff = this.cutoff(this.transcriptRetentionDays);
+    let total = 0;
+
+    for (let batch = 0; batch < this.maxBatchesPerRun; batch++) {
+      const stale = await this.prisma.chatbotMessage.findMany({
+        where: { created_at: { lt: cutoff } },
+        select: { id: true },
+        take: this.batchSize,
+      });
+      if (stale.length === 0) break;
+
+      const { count } = await this.prisma.chatbotMessage.deleteMany({
         where: { id: { in: stale.map((row) => row.id) } },
       });
       total += count;

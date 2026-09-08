@@ -101,6 +101,37 @@ replayed, this record requires that a compensating control be decided in the sam
 minimum, that tool output re-entering a prompt is fenced as untrusted data with its own boundary,
 and that the decision names what replaces control 8.
 
+### 5.1 That decision was made on 2026-09-08. The compensating control is role separation.
+
+`OD-CHAT-008` and `OD-CHAT-018` are **resolved**: transcripts are stored, encrypted at rest
+(AES-256-GCM), and retained 30 days. History **is** replayed, so this section's requirement is
+now live, and the control that replaces control 8 is:
+
+> **Only the user's own messages are replayed. Assistant messages are stored and never fed back.**
+
+The reasoning, stated so a future reader can check it rather than trust it:
+
+- Replaying the **user's own** words grants no new authority. They could retype any of it in the
+  next message. Nothing becomes reachable through history that was not already reachable directly,
+  so the authority boundary is unchanged.
+- Replaying **assistant** messages would. Those contain tool OUTPUT, and tool output carries text
+  authored by other people — a colleague's name from a roster, a notification somebody else wrote.
+  That is third-party content entering a prompt, which is exactly what control 8 prevents.
+
+So the property control 8 actually guarantees — *no text authored elsewhere reaches the model* —
+survives intact. What is given up is only the weaker "the user's own earlier text cannot reach the
+model", which was never the security-relevant half.
+
+**Enforced structurally, not by convention.** `replayableHistory` filters on `role: 'USER'` in the
+WHERE clause rather than after the query, because a post-filter is one refactor from being dropped
+and the failure would be silent. `buildMessages` takes `string[]`, not `LlmMessage[]`, so a caller
+cannot pass an assistant turn even by mistake — the role is applied inside. Both have negative-case
+tests in `chatbot-memory.test.ts`, per §6.1.
+
+Alternatives rejected: fencing replayed assistant text as "data, not instructions" with a
+delimiter — that is a prompt-level defence, and this record's entire position is that prompt-level
+defences are not the boundary.
+
 ## 6. Verification
 
 This record is satisfied when, and only while:
@@ -109,8 +140,16 @@ This record is satisfied when, and only while:
    actually prevented, not merely that the happy path works.
 2. The registry hygiene test continues to fail the build on a write tool with no real permission
    token, and on any forbidden argument key.
-3. No code path returns tool output to a model, and no code path replays conversation history.
-   Both are currently true by construction and should be asserted, not assumed.
+3. No code path returns tool output to a model. Still true by construction, and asserted.
+
+4. **Amended 2026-09-08.** Conversation history IS replayed, under §5.1's control. This condition
+   is therefore restated: no code path replays an ASSISTANT message into a prompt, and the
+   restriction is enforced by the query's own WHERE clause and by `buildMessages`' signature rather
+   than by reviewer memory. `chatbot-memory.test.ts` asserts the negative case.
+
+5. Transcripts are never written unencrypted. A missing key disables memory entirely rather than
+   degrading to plaintext — there is no configuration in which storing them in the clear is the
+   intended behaviour.
 
 ## 7. Alternatives considered
 

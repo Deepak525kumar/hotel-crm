@@ -6,6 +6,7 @@ import { attendanceService } from '../attendance/service.js';
 import { calendarService } from '../calendar/service.js';
 import { roomService } from '../rooms/service.js';
 import { getStorageClient } from '../documents/storage.js';
+import { exportTranscripts } from '../chatbot/memory/transcript.js';
 import { BaseService } from '../../lib/base-service.js';
 import { ForbiddenError, ValidationError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
@@ -286,6 +287,31 @@ export class ReportService extends BaseService {
         scope: 'self',
       });
       sheets.push({ name: dataset, result });
+    }
+
+    // TRANSCRIPTS ARE PART OF "ALL MY DATA" the moment they are stored. A
+    // person's chatbot messages are free text they authored; omitting them
+    // from a data-access export would answer an Article 15 request
+    // incompletely while presenting it as complete. Added in the same change
+    // that started storing them, deliberately -- a right implemented later is
+    // a period during which the right did not exist.
+    const transcripts = await exportTranscripts(params.actor.userId);
+    if (transcripts.length > 0) {
+      sheets.push({
+        name: 'assistant-messages',
+        result: {
+          dataset: 'assistant-messages' as ReportDataset,
+          from: params.range.from,
+          to: params.range.to,
+          columns: ['when', 'who', 'message'],
+          rows: transcripts.map((m) => ({
+            when: m.createdAt.toISOString(),
+            who: m.role === 'USER' ? 'you' : 'assistant',
+            message: m.content,
+          })),
+          truncated: false,
+        },
+      });
     }
 
     const buffer = await buildWorkbook(

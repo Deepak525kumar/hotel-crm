@@ -124,7 +124,15 @@ All twenty registered tools are now approved, and `assertAllToolsApproved()` pas
 ### Partially resolved
 - **`OD-CHAT-003`** (file-byte handling) — mechanism settled by `ADR-053`: if file upload ever becomes a chatbot tool, it wraps Documents' `IF-DOC-UploadDocument`, never a direct S3 write. **Open:** whether this specific tool is ever registered, and its risk-tier/confirmation classification (likely high-risk write).
 - **`OD-CHAT-005`** — see §2.
-- **`OD-CHAT-008`** (persistence & consent) — consent-requirement portion RESOLVED via `GD-17`/`ADR-037` (chatbot engagement requires consent; decline routes to manual onboarding, doesn't block). **Open:** transcript-persistence question.
+- **`OD-CHAT-008` / `OD-CHAT-018` — RESOLVED 2026-09-08** (owner decision). Transcripts are
+  stored, encrypted at rest with AES-256-GCM, and retained 30 days. Because history is replayed,
+  `ADR-074` §5 required a compensating control decided in the same change; it is **role
+  separation** — only the user's own messages are replayed, assistant messages are stored and
+  never fed back, because those carry tool output and therefore other people's text. See
+  `ADR-074` §5.1. Transcripts are included in the personal data export and are reached by a
+  deletion request through the existing cascade (User → conversation → message).
+
+- **`OD-CHAT-008`** (persistence & consent, original entry) — consent-requirement portion RESOLVED via `GD-17`/`ADR-037` (chatbot engagement requires consent; decline routes to manual onboarding, doesn't block). **Open:** transcript-persistence question.
 - **`OD-CHAT-019`** (retention tier) — metadata/spend counters RESOLVED (provisional) as Tier 2, via `GD-09`/`ADR-033`. **Open:** transcript tier (contingent on `OD-CHAT-008`); tax-advisor sign-off (`OD-RETENTION-01`) tracked separately, non-blocking.
 
 ### Fully open (untouched by any decision to date)

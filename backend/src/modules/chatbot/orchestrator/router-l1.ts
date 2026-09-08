@@ -175,10 +175,24 @@ export function buildSystemPrompt(actor: ActorContext, tools: ToolRegistration<a
 }
 
 /** The messages array for one turn. */
-export function buildMessages(userText: string): LlmMessage[] {
-  // Single user turn. Conversation transcripts are deliberately NOT stored
-  // (OD-CHAT-008 / OD-CHAT-018 are open), so there is no history to replay;
-  // `session_state` carries structured continuity instead. An empty array
-  // is refused by the provider, which is why this always yields one message.
-  return [{ role: 'user', content: userText }];
+export function buildMessages(userText: string, history: string[] = []): LlmMessage[] {
+  // The current turn, optionally preceded by the caller's OWN prior messages.
+  //
+  // EVERY ENTRY IN `history` IS A USER MESSAGE, and this signature is why:
+  // it takes `string[]`, not `LlmMessage[]`, so there is no way for a caller
+  // to pass an assistant turn even by mistake. The role is applied here.
+  //
+  // That restriction is `ADR-074` §5's compensating control, not a
+  // simplification. Assistant messages contain tool OUTPUT, which carries
+  // other people's text -- a colleague's name from a roster, a notification
+  // somebody else wrote -- and replaying it would put third-party content
+  // into a prompt, which is precisely what control 8 prevents. Replaying the
+  // user's own words grants no new authority: they could retype any of it.
+  //
+  // An empty array is refused by the provider, which is why the current turn
+  // is always appended last and unconditionally.
+  return [
+    ...history.map((content) => ({ role: 'user' as const, content })),
+    { role: 'user', content: userText },
+  ];
 }
