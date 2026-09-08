@@ -125,8 +125,8 @@ specifications:
     spec: SPEC-ONBOARDING-001@1.1.0
     status: REVIEW  # Added 2026-08-22 (documentation synchronization pass). The specification existed and was cited as a governing specification by ADR-030, ADR-065, and the E2E suite, but had neither a Document Control block of its own nor a row in this index or MODULE_REGISTRY.yaml. NOT frozen: no G4 independent-review round and no G2 Specification Freeze has ever been run for it. No code module -- backend-onboarding was never built (ADR-030 note 3); the lifecycle transitions live in backend/src/modules/employee-management behind assertLifecycleAuthority(). Outstanding: ADR-030's change table asks that this spec's section 1/6.6/6.7 ownership claims be reconciled against ADR-030 at its next revision.
   - module: backend-chatbot
-    spec: SPEC-CHATBOT-001@0.2.0
-    status: REVIEW  # G4 round complete, zero Critical/High findings anywhere; NOT FROZEN -- G2 blocked on OD-CHAT-005/006/013 (SYNC-029)
+    spec: SPEC-CHATBOT-001@0.3.0
+    status: FROZEN  # G2 granted by the commissioning human 2026-09-09. All three standing blockers closed first: OD-CHAT-005 (ADR-073), OD-CHAT-006 (ADR-074), OD-CHAT-013 (owner assigned). Version 0.2.0 -> 0.3.0 for the freeze-time synchronisation pass (MODULE_SPEC section 0), which also records OD-CHAT-008/018 closed. Items still open are listed in GD-19 section 3 and none blocked G2.
   - module: backend-geo
     spec: SPEC-GEO-001@0.1.3
     status: FROZEN  # FROZEN at G2 2026-07-27 following GD-14 ratification; implemented 2026-07-28, acceptance-audit remediation merged 2026-07-30 (PR #291). Corrected from @0.1.1/REVIEW (2026-07-30, Geo repository synchronization pass) -- see MODULE_REGISTRY.yaml's backend-geo entry for the full evidence trail. Amended 0.1.2->0.1.3 (2026-08-10) per OD-GEO-010: additive WorkerGeoCheckin.attendance_id link. See SIR-GEO-011.
