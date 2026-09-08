@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDate } from '../../lib/zod-primitives.js';
 
 /**
  * Reporting: arbitrary date-range reads across the platform, and downloadable
@@ -35,7 +36,12 @@ export type ReportDataset = z.infer<typeof ReportDatasetSchema>;
 export const ReportFormatSchema = z.enum(['json', 'xlsx', 'pdf']);
 export type ReportFormat = z.infer<typeof ReportFormatSchema>;
 
-const DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');
+// The SEMANTIC validator, not a shape regex. The HTTP path had the same
+// defect the tool arguments did: `2026-02-30` passed, JavaScript rolled it to
+// March 2, and a report came back for a day nobody asked about. Fixing the
+// tools and leaving the API accepting it would have been a worse state than
+// either -- two front doors with different rules.
+const DAY = isoDate;
 
 /**
  * A date range, bounded on both ends and capped in width.

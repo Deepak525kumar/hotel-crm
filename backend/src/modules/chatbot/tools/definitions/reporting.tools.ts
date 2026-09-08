@@ -1,30 +1,8 @@
 import { z } from 'zod';
-import { isoDate } from '../schema-primitives.js';
+import { plausibleDate } from '../schema-primitives.js';
 import { reportService } from '../../../reports/service.js';
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
-
-/**
- * The commissioning human's approval of the seven tools added after the
- * 2026-09-08 batch, granted the same day under `ADR-053` item 4 and recorded
- * separately because it is a separate decision about a separate set.
- *
- * Granted after a LIVE routing test against the real model rather than on the
- * code alone: 32 realistic phrases in English and German, covering tool
- * selection, argument extraction, permission filtering and prompt injection.
- * All 32 routed correctly -- including a worker asking to "export the whole
- * team attendance", which selected no tool at all because the manifest is
- * filtered by permission before the model ever sees it.
- *
- * Same scope limit as the first approval: it covers these tools AS REGISTERED
- * on this date. Widening a tool's scope, risk tier or permission makes it a
- * different capability and returns it to PENDING.
- */
-const APPROVED_2026_09_08_SHIFT_AND_REPORTS =
-  'APPROVED 2026-09-08 by the commissioning human under ADR-053 item 4, after a ' +
-  'live routing test against the real model (32/32 phrases routed correctly). ' +
-  'Covers this tool as registered on that date; a later change to its scope, ' +
-  'risk tier or permission requires re-approval.';
 
 /**
  * Asking about data over a date range, and taking it away as a file.
@@ -49,7 +27,13 @@ const APPROVED_2026_09_08_SHIFT_AND_REPORTS =
  * the conversation and gets decided from.
  */
 
-const DAY = isoDate;
+// `plausibleDate`, not bare `isoDate`: a report range is the one place a
+// wildly wrong year does real damage. "2026" mistyped as "2016" is inside the
+// 366-day cap, parses, and returns an EMPTY report -- which a manager reads as
+// "nobody worked", not as "you asked about the wrong decade". Ten years back
+// also matches the operational retention window: there is nothing older left
+// to report on, so admitting such a range could only ever mislead.
+const DAY = plausibleDate;
 
 const DATASETS = ['assignments', 'attendance', 'absences', 'rooms'] as const;
 
@@ -76,9 +60,9 @@ export const queryTeamData = registerTool<QueryArgs>({
 
   interfaceRef: 'IF-RPT-QueryDataset (reports/service.ts queryDataset())',
   approvalRef:
-    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
-    ' Registration note: ' +
-    "Reads other people's rows; the first READ tool gated on a management token rather than self-scope.",
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. Reads ' +
+    "other people's rows, so it is the first READ tool gated on a management token " +
+    'rather than self-scope.',
 
   args: QueryArgs,
   permission: 'reports:read-team',
@@ -143,9 +127,9 @@ export const exportTeamReport = registerTool<ExportArgs>({
 
   interfaceRef: 'IF-RPT-GenerateReport (reports/service.ts generateReport())',
   approvalRef:
-    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
-    ' Registration note: ' +
-    "Produces a file containing other people's personal data and a link that leaves the platform. HIGH_RISK despite being read-shaped, because a shared link cannot be recalled.",
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It ' +
+    "produces a file containing other people's personal data and a link that leaves " +
+    'the platform, so it warrants the closest review of any read-shaped tool here.',
 
   args: ExportArgs,
   permission: 'reports:export-team',
@@ -188,9 +172,8 @@ export const exportMyData = registerTool<ExportMineArgs>({
 
   interfaceRef: 'IF-RPT-ExportOwnData (reports/service.ts exportOwnData())',
   approvalRef:
-    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
-    ' Registration note: ' +
-    "Self-scoped: it can only ever produce the caller's own records. Held by every role because GDPR Article 15/20 is a right, not a feature.",
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    'Self-scoped: it can only ever produce the caller\'s own records.',
 
   args: ExportMineArgs,
   permission: 'reports:export-own',

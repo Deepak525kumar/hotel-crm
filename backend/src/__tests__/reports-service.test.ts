@@ -408,3 +408,21 @@ describe('eachDay', () => {
     expect(MAX_REPORT_ROWS).toBeGreaterThan(0);
   });
 });
+
+/**
+ * The HTTP path must reject an impossible date exactly as the tool does. It
+ * did not, before review: `2026-02-30` passed the shape regex, JavaScript
+ * rolled it to March 2, and a report came back for a day nobody asked about.
+ */
+describe('the reports date range is validated semantically', () => {
+  it('rejects dates that exist only as strings', () => {
+    for (const bad of ['2026-13-45', '2026-02-30', '2026-04-31']) {
+      expect({ date: bad, ok: DateRangeSchema.safeParse({ from: bad, to: '2026-12-31' }).success })
+        .toEqual({ date: bad, ok: false });
+    }
+  });
+
+  it('still accepts a real leap day', () => {
+    expect(DateRangeSchema.safeParse({ from: '2024-02-29', to: '2024-03-01' }).success).toBe(true);
+  });
+});

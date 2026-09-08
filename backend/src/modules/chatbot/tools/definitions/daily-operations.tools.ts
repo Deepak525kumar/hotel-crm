@@ -5,28 +5,7 @@ import { attendanceService } from '../../../attendance/service.js';
 import { roomService } from '../../../rooms/service.js';
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
-
-/**
- * The commissioning human's approval of the seven tools added after the
- * 2026-09-08 batch, granted the same day under `ADR-053` item 4 and recorded
- * separately because it is a separate decision about a separate set.
- *
- * Granted after a LIVE routing test against the real model rather than on the
- * code alone: 32 realistic phrases in English and German, covering tool
- * selection, argument extraction, permission filtering and prompt injection.
- * All 32 routed correctly -- including a worker asking to "export the whole
- * team attendance", which selected no tool at all because the manifest is
- * filtered by permission before the model ever sees it.
- *
- * Same scope limit as the first approval: it covers these tools AS REGISTERED
- * on this date. Widening a tool's scope, risk tier or permission makes it a
- * different capability and returns it to PENDING.
- */
-const APPROVED_2026_09_08_SHIFT_AND_REPORTS =
-  'APPROVED 2026-09-08 by the commissioning human under ADR-053 item 4, after a ' +
-  'live routing test against the real model (32/32 phrases routed correctly). ' +
-  'Covers this tool as registered on that date; a later change to its scope, ' +
-  'risk tier or permission requires re-approval.';
+import { CALENDAR_TIMEZONE } from '../../../../lib/utils.js';
 import type { ActorContext } from '../actor.js';
 
 /**
@@ -88,9 +67,30 @@ type ShiftResolution =
   | { status: 'NONE'; day: string }
   | { status: 'AMBIGUOUS'; day: string; count: number };
 
-/** Today, in the platform's calendar convention (YYYY-MM-DD). */
+/**
+ * Today, in the platform's OWN calendar timezone -- not UTC.
+ *
+ * THIS WAS A DEFECT. The first version sliced `toISOString()`, which is UTC,
+ * and the platform's calendar day is Europe/Berlin. At 00:30 Berlin on the
+ * 9th it is still 22:30 UTC on the 8th, so every tool here resolved
+ * YESTERDAY's shift: a night-shift worker clocking in just after midnight
+ * would have been checked in against the wrong day, and their rooms logged
+ * against it, with no error anywhere -- a plausible wrong answer.
+ *
+ * That population is exactly who these tools were built for. `utils.ts`
+ * already had `todayInCalendarTimezone()` for precisely this reason; the
+ * duplicate here repeated the shape without the lesson, the same way the date
+ * regex did.
+ *
+ * Equivalent to `todayInCalendarTimezone()` for the current instant; that
+ * helper takes no clock, which is why this formats directly.
+ */
 export function todayIso(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
+  // Takes an explicit instant so the timezone behaviour is TESTABLE at a
+  // fixed moment. Comparing today's value against another helper only
+  // detects the defect during the two hours a day when UTC and Berlin
+  // actually differ -- a test that passes 22 hours out of 24 is not a guard.
+  return new Intl.DateTimeFormat('en-CA', { timeZone: CALENDAR_TIMEZONE }).format(now);
 }
 
 /**
@@ -114,8 +114,21 @@ export async function resolveMyShift(
 
   // The service narrows to the caller's own rows for any self-scoped role --
   // this tool never passes a worker id, and could not: it is a forbidden key.
+  //
+  // FILTERED SERVER-SIDE, on `from`/`to`. The first version fetched one page
+  // of 50 and filtered by day in memory, which was a latent inability to
+  // clock in: `list` orders by `confirmed_at desc`, so a worker confirmed for
+  // a month of shifts would push today's -- confirmed weeks ago -- past the
+  // 50-row window. They would be told "you have no shift scheduled today" and
+  // could not start work, with nothing wrong anywhere in the logs.
+  //
+  // A single day cannot overflow a page the way a rolling history can. The
+  // query gained `from`/`to` in this same change set; not using it here was
+  // the oversight.
   const { data } = await assignmentService.list(
-    { page: 1, per_page: 50 } as Parameters<typeof assignmentService.list>[0],
+    { from: day, to: day, page: 1, per_page: 50 } as Parameters<
+      typeof assignmentService.list
+    >[0],
     serviceActor
   );
 
@@ -192,9 +205,10 @@ export const checkInToMyShift = registerTool<CheckInArgs>({
 
   interfaceRef: 'IF-ATT-CheckIn (attendance/service.ts checkIn())',
   approvalRef:
-    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
-    ' Registration note: ' +
-    'Writes a timestamped payroll record the worker cannot themselves retract, which is why it is HIGH_RISK. Refuses at a geofenced hotel, correctly -- a chatbot has no GPS.',
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. The ' +
+    "2026-09-08 blanket approval covers the thirteen tools registered on that date " +
+    'and explicitly does not extend to later ones. Writes a timestamped payroll ' +
+    'record the worker cannot themselves retract, which is why it is HIGH_RISK.',
 
   args: CheckInArgs,
   permission: 'attendance:write-own',
@@ -260,9 +274,8 @@ export const checkOutOfMyShift = registerTool<CheckOutArgs>({
 
   interfaceRef: 'IF-ATT-UpdateAttendance (attendance/service.ts update())',
   approvalRef:
-    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
-    ' Registration note: ' +
-    'Closes a payroll record with a timestamp the worker cannot themselves change afterwards.',
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. Closes a ' +
+    'payroll record with a timestamp the worker cannot themselves change afterwards.',
 
   args: CheckOutArgs,
   // The SELF token, even though PATCH /attendance/:id enforces none: this tool
@@ -353,9 +366,9 @@ export const logRoomCleaned = registerTool<LogRoomArgs>({
 
   interfaceRef: 'IF-ROOM-LogRoom (rooms/service.ts logRoom())',
   approvalRef:
-    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
-    ' Registration note: ' +
-    'The one unconfirmed write: a worker logs rooms many times a shift, and can correct or delete their own log.',
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. The one ' +
+    'unconfirmed write in this batch; the reversibility argument for that is at the ' +
+    'tier declaration above.',
 
   args: LogRoomArgs,
   permission: 'rooms:write',
@@ -412,9 +425,8 @@ export const listMyRoomsToday = registerTool<MyRoomsArgs>({
 
   interfaceRef: 'IF-ROOM-ListMyRooms (rooms/service.ts listMyRooms())',
   approvalRef:
-    APPROVED_2026_09_08_SHIFT_AND_REPORTS +
-    ' Registration note: ' +
-    'Self-scoped + READ_ONLY.',
+    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    'Self-scoped + READ_ONLY, the same envelope as assignments.list_mine.',
 
   args: MyRoomsArgs,
   permission: 'rooms:read',
