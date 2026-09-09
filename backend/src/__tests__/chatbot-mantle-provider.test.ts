@@ -203,3 +203,157 @@ describe('buildMantleProvider', () => {
     expect(buildMantleProvider()?.modelId).toBe('qwen.fast');
   });
 });
+
+/**
+ * THE FALLBACK MODEL.
+ *
+ * A second model a turn can be served by when the primary fails in a way a
+ * different model might not. Most of these tests are about when it must NOT
+ * fire: a fallback that retries everything turns one fast, honest failure
+ * into two slow ones, and hides misconfiguration (a 403 from a missing IAM
+ * grant would look like a flaky model rather than a broken policy).
+ */
+describe('MantleProvider fallback model', () => {
+  const withFallback = () =>
+    new MantleProvider({
+      region: 'eu-central-1',
+      fastModelId: 'qwen.fast',
+      planningModelId: 'qwen.planning',
+      fallbackModelId: 'openai.fallback',
+      timeoutMs: 20000,
+    });
+
+  const turn = { system: 's', messages: [{ role: 'user' as const, content: 'x' }], tools: [] };
+
+  /** First call fails with `status`, second succeeds. */
+  function mockFetchThen(status: number, body: unknown) {
+    let n = 0;
+    global.fetch = jest.fn(async () => {
+      n += 1;
+      if (n === 1) {
+        return {
+          ok: false,
+          status,
+          json: async () => ({}),
+          text: async () => 'upstream detail',
+        };
+      }
+      return { ok: true, status: 200, json: async () => body, text: async () => '' };
+    }) as unknown as typeof fetch;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    envValue = {};
+    mockSign.mockResolvedValue({ headers: { authorization: 'AWS4-HMAC-SHA256 ...' } });
+  });
+
+  it.each([
+    ['throttling', 429],
+    ['model not served', 404],
+    ['service fault', 503],
+  ])('retries on the fallback model when the primary returns %s', async (_label, status) => {
+    mockFetchThen(status, okBody());
+
+    const result = await withFallback().completeWithTools(turn);
+
+    expect(result.text).toBe('hello');
+    expect(sentBody(0).model).toBe('qwen.fast');
+    expect(sentBody(1).model).toBe('openai.fallback');
+  });
+
+  it.each([
+    ['a malformed request', 400],
+    ['an authorization failure', 403],
+    ['an unauthenticated call', 401],
+  ])('does NOT retry on %s -- the second model would fail identically', async (_label, status) => {
+    mockFetchThen(status, okBody());
+
+    await expect(withFallback().completeWithTools(turn)).rejects.toBeInstanceOf(
+      ProviderUnavailableError
+    );
+    // One call only. Falling back here would hide a broken IAM policy behind
+    // a slower error and double the cost of every misconfigured request.
+    expect((global.fetch as unknown as jest.Mock).mock.calls).toHaveLength(1);
+  });
+
+  it('never calls twice when no fallback is configured', async () => {
+    mockFetchThen(503, okBody());
+
+    await expect(provider().completeWithTools(turn)).rejects.toBeInstanceOf(
+      ProviderUnavailableError
+    );
+    expect((global.fetch as unknown as jest.Mock).mock.calls).toHaveLength(1);
+  });
+
+  it('does not fall back to the model that just failed', async () => {
+    mockFetchThen(503, okBody());
+    const same = new MantleProvider({
+      region: 'eu-central-1',
+      fastModelId: 'qwen.fast',
+      planningModelId: 'qwen.planning',
+      fallbackModelId: 'qwen.fast', // same id
+      timeoutMs: 20000,
+    });
+
+    await expect(same.completeWithTools(turn)).rejects.toBeInstanceOf(ProviderUnavailableError);
+    expect((global.fetch as unknown as jest.Mock).mock.calls).toHaveLength(1);
+  });
+
+  it('treats an empty fallback id as "no fallback", so it can be switched off by config', async () => {
+    mockFetchThen(503, okBody());
+    const off = new MantleProvider({
+      region: 'eu-central-1',
+      fastModelId: 'qwen.fast',
+      planningModelId: 'qwen.planning',
+      fallbackModelId: '   ',
+      timeoutMs: 20000,
+    });
+
+    await expect(off.completeWithTools(turn)).rejects.toBeInstanceOf(ProviderUnavailableError);
+    expect((global.fetch as unknown as jest.Mock).mock.calls).toHaveLength(1);
+  });
+
+  /**
+   * THE BUDGET RULE. The turn has one timeout, shared by both attempts. A
+   * fallback started after the primary spent it would double the worst case
+   * and answer into a request the client has already abandoned.
+   */
+  it('does not start a fallback when the turn budget is already spent', async () => {
+    mockFetchThen(503, okBody());
+    const noBudget = new MantleProvider({
+      region: 'eu-central-1',
+      fastModelId: 'qwen.fast',
+      planningModelId: 'qwen.planning',
+      fallbackModelId: 'openai.fallback',
+      timeoutMs: 1, // deadline passes during the first attempt
+    });
+
+    await expect(noBudget.completeWithTools(turn)).rejects.toBeInstanceOf(
+      ProviderUnavailableError
+    );
+    expect((global.fetch as unknown as jest.Mock).mock.calls).toHaveLength(1);
+  });
+
+  it('passes the same tools and system prompt to the fallback', async () => {
+    mockFetchThen(503, okBody());
+    await withFallback().completeWithTools({
+      system: 'the system prompt',
+      messages: [{ role: 'user', content: 'x' }],
+      tools: [{ name: 'a.b', description: 'd', input_schema: { type: 'object' } }],
+    });
+
+    // A fallback that dropped the manifest would answer without any tool and
+    // look like a model that simply chose not to act.
+    expect(sentBody(1).tools[0].function.name).toBe('a.b');
+    expect(sentBody(1).messages[0]).toEqual({ role: 'system', content: 'the system prompt' });
+  });
+
+  it('uses the fallback for the planning tier too, not just the fast one', async () => {
+    mockFetchThen(503, okBody());
+    await withFallback().completeWithTools({ ...turn, tier: 'planning' });
+
+    expect(sentBody(0).model).toBe('qwen.planning');
+    expect(sentBody(1).model).toBe('openai.fallback');
+  });
+});

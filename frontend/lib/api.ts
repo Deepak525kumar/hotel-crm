@@ -955,8 +955,11 @@ export const notificationsApi = {
 /**
  * Chatbot API, matching the backend `/chatbot/*` routes.
  *
- * EVERY ROUTE 404s WHEN `FEATURE_CHATBOT` IS OFF, which is its state in
- * production today. That is a supported condition, not an error: callers use
+ * EVERY ROUTE 404s WHEN `FEATURE_CHATBOT` IS OFF. That was production's state
+ * until 2026-09-09, when the flag was enabled after all three G2 blockers
+ * closed; it remains the state of any environment with the flag off, so the
+ * probe below is still how availability is decided rather than assumed.
+ * A 404 is a supported condition, not an error: callers use
  * `isAvailable()` to decide whether to render the assistant at all, rather
  * than surfacing a failed request to a worker who never asked for it.
  */

@@ -645,6 +645,35 @@ const envSchema = z.object({
   CHATBOT_MANTLE_MODEL_FAST: z.string().default('qwen.qwen3-235b-a22b-2507'),
   CHATBOT_MANTLE_MODEL_PLANNING: z.string().default('qwen.qwen3-235b-a22b-2507'),
 
+  /**
+   * The model a turn falls back to when the primary one fails in a way a
+   * different model might not (capacity, model withdrawn, transport). Empty
+   * string disables the fallback without a deploy.
+   *
+   * CHOSEN BY MEASUREMENT, not reputation. Every model mantle serves in
+   * eu-central-1 was listed and the plausible ones were run against the live
+   * routing suite (`scripts/chatbot-routing-check.ts`, 54 cases) on
+   * 2026-09-09:
+   *
+   *   qwen.qwen3-235b-a22b-2507    54/54  (primary)
+   *   openai.gpt-oss-120b          50/54
+   *   zai.glm-4.6                  did not finish the suite in 10 minutes
+   *   minimax.minimax-m2.5         did not finish in 9 minutes
+   *   nvidia.nemotron-super-3-120b did not finish in 8 minutes
+   *
+   * Latency disqualified the rest outright: a fallback that cannot answer
+   * inside CHATBOT_TURN_TIMEOUT_MS is not a fallback. GPT-OSS 120B is also a
+   * DIFFERENT VENDOR from the primary, so a family-wide regression or
+   * capacity event does not take both down -- which is the main thing a
+   * fallback is for.
+   *
+   * Its four misses are all manager-scoped tools it declines to call at all
+   * (returning no tool rather than the wrong one). That is the safe direction
+   * to be worse in: a degraded turn asks the user to rephrase; it does not
+   * act on the wrong thing.
+   */
+  CHATBOT_MANTLE_MODEL_FALLBACK: z.string().default('openai.gpt-oss-120b'),
+
   CHATBOT_MAX_TOOL_CALLS_PER_TURN: z.coerce.number().int().positive().default(5),
   CHATBOT_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(20000),
   // Request-RATE limits for the chatbot, distinct from the token budgets

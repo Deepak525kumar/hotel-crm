@@ -11,8 +11,10 @@ import { ChatPanel } from "./ChatPanel";
 /**
  * The floating assistant, available on every authenticated page.
  *
- * RENDERS NOTHING AT ALL when the backend does not serve the chatbot routes,
- * which is its state in production today (`FEATURE_CHATBOT` is off). The
+ * RENDERS NOTHING AT ALL when the backend does not serve the chatbot routes.
+ * That was production's state until 2026-09-09, when `FEATURE_CHATBOT` was
+ * enabled; it still holds wherever the flag is off, and for any user the
+ * backend does not serve the routes to. The
  * probe runs once per session and failure is silent — a worker who cannot use
  * the assistant should not see a button that errors, and should not be told
  * an unreleased feature exists.
