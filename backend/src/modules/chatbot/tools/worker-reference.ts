@@ -45,12 +45,23 @@ function hotelIdFromScope(actor: ActorContext): string | null {
   return scope.hotel_id;
 }
 
-/** Case- and diacritic-insensitive, so "anna" finds "Anna" and "Ünal" finds "unal". */
+/**
+ * Case-, diacritic- and separator-insensitive, so "anna" finds "Anna",
+ * "Ünal" finds "unal", and "hotel 1" finds "hotel_1_group_1".
+ *
+ * The separator rule was added 2026-09-10 after a manager typing "hotel 1"
+ * was told no such hotel was in their scope while `hotel_1_group_1` sat in
+ * it. Underscores and hyphens are how systems write names; spaces are how
+ * people type them, and the difference is not something a user should have
+ * to guess. Runs of separators collapse to ONE space so "hotel__1" and
+ * "hotel - 1" fold the same way.
+ */
 function fold(value: string): string {
   return value
     .toLowerCase()
     .normalize('NFKD')
     .replace(/\p{M}+/gu, '')
+    .replace(/[_\-\s]+/g, ' ')
     .trim();
 }
 
