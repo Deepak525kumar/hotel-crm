@@ -228,8 +228,10 @@ export const checkInToMyShift = registerTool<CheckInArgs>({
   name: 'attendance.check_in',
   description:
     "Clock the authenticated user IN to their own shift for today. Use for \"I'm " +
-    'starting work", "clock me in", "ich fange jetzt an", "I have arrived". Only ever ' +
-    "acts on the caller's own shift, and only for today.",
+    'starting work", "clock me in", "ich fange jetzt an", "I have arrived", "im ' +
+    'here", "ich bin da" -- a worker announcing that they have turned up is asking ' +
+    "to be clocked in, not making conversation. Only ever acts on the caller's own " +
+    'shift, and only for today.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 
@@ -299,8 +301,9 @@ export const checkOutOfMyShift = registerTool<CheckOutArgs>({
   description:
     "Clock the authenticated user OUT of their own shift for today -- the TIME CLOCK, " +
     'which is what a worker does at the end of every shift. Use for "I am done for ' +
-    'today", "I am finished", "clock me out", "Feierabend", "going home now", and ' +
-    'anything else about leaving or ending the working day. Only ever acts on the ' +
+    'today", "I am finished", "clock me out", "Feierabend", "going home now", "im ' +
+    'off now", "ich gehe jetzt", and anything else about leaving or ending the ' +
+    "working day. Only ever acts on the " +
     "caller's own shift. Returns the time recorded.\n\n" +
     'Prefer this whenever someone means they have stopped working. Only if they ' +
     'explicitly say they want the shift RECORD marked complete does ' +
@@ -508,4 +511,127 @@ export const listMyRoomsToday = registerTool<MyRoomsArgs>({
     };
   },
   maxResultTokens: 300,
+});
+
+
+/* ------------------------------------------------------------------ *
+ * attendance.my_hours
+ * ------------------------------------------------------------------ */
+
+/**
+ * HOW LONG THE WORKER ACTUALLY WORKED.
+ *
+ * FOUND 2026-09-10 by probing with the words workers use. "how many hours did
+ * i do this week" selected `analytics.my_stats`, which is the closest thing on
+ * offer and returns completed shifts, rooms cleaned and a rating -- and no
+ * hours at all. `WorkerStats` has no hours field. So the worker asked about
+ * hours and was answered, confidently, about something else.
+ *
+ * That is a missing capability, not a routing mistake: the minutes are in
+ * `Attendance.minutes_worked` and nothing exposed them. Hours are also the
+ * question most likely to be asked in the first place -- they are what people
+ * are paid for.
+ *
+ * SELF-SCOPED WITH NO TOKEN, like the rest of this file's reads. `GET
+ * /attendance` enforces none: the service narrows `where.worker_id` to the
+ * caller for a self-scoped role, and that narrowing IS the control. Declared
+ * honestly as `null` with a rationale rather than inventing a token the route
+ * does not check -- which `assertValidRegistration` permits only for a
+ * READ_ONLY, self-scoped tool, and this is both.
+ */
+const MyHoursArgs = z
+  .object({
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+  })
+  .strict()
+  .refine((v) => (v.from == null) === (v.to == null), {
+    message: 'from and to must be given together',
+    path: ['to'],
+  });
+
+type MyHoursArgs = z.infer<typeof MyHoursArgs>;
+
+export const myHours = registerTool<MyHoursArgs>({
+  name: 'attendance.my_hours',
+  description:
+    'Add up the hours the authenticated worker actually worked, from their own ' +
+    'clock-in and clock-out records. Use for "how many hours did I do this week", ' +
+    '"how long did I work today", "wie viele Stunden habe ich gearbeitet", "how ' +
+    'much have I worked this month". Pass from and to as YYYY-MM-DD -- both, or ' +
+    'neither, in which case it answers for today. Returns the total hours and how ' +
+    'many shifts they came from.\n\n' +
+    'This is TIME WORKED. For how many shifts or rooms were completed, or a ' +
+    'rating, use analytics.my_stats instead -- that one does not report hours.',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef: 'IF-ATT-List (attendance/service.ts list())',
+  approvalRef:
+    APPROVED_2026_09_09 +
+    ' Registration note: READ_ONLY over the caller\'s OWN attendance rows; adds no field the worker cannot already read.',
+
+  args: MyHoursArgs,
+  permission: null,
+  permissionRationale:
+    'GET /attendance enforces no permission token; authentication plus the ' +
+    "service's own self-scoping (isSelfScopedRole narrows where.worker_id to the " +
+    'caller) is the control. READ_ONLY and self-scoped, which assertValidRegistration ' +
+    'requires for any token-less tool.',
+  scopeCheck: 'self',
+
+  invoke: async (args, actor) => {
+    const day = args.from ?? todayIso();
+    const to = args.to ?? day;
+
+    const { data } = await attendanceService.list(
+      { from: day, to, page: 1, per_page: 100 } as never,
+      toServiceActor(actor)
+    );
+
+    const rows = (data ?? []) as Array<{ minutes_worked?: number | null }>;
+    // Only rows that actually recorded time. A no-show or a shift still in
+    // progress has no minutes, and counting it as zero would be honest about
+    // the total but misleading about the shift count.
+    const worked = rows.filter((r) => typeof r.minutes_worked === 'number' && r.minutes_worked > 0);
+    const minutes = worked.reduce((sum, r) => sum + (r.minutes_worked ?? 0), 0);
+
+    return { from: day, to, minutes, shifts: worked.length, open: rows.length - worked.length };
+  },
+
+  compress: (raw: unknown): CompactResult => {
+    const result = raw as
+      | { from?: string; to?: string; minutes?: number; shifts?: number; open?: number }
+      | null;
+    if (!result) return { summary: 'Nothing was found.', data: null };
+    const refusal = asRefusal(result);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+
+    const minutes = result.minutes ?? 0;
+    const period =
+      result.from === result.to ? `on ${result.from}` : `between ${result.from} and ${result.to}`;
+
+    if ((result.shifts ?? 0) === 0) {
+      return {
+        summary: `No finished shifts ${period}, so no hours are recorded yet.`,
+        data: { from: result.from, to: result.to, hours: 0, shifts: 0 },
+      };
+    }
+
+    // One decimal: "7.5 hours" is how people say it. Minutes kept in the data
+    // for anything that needs to be exact.
+    const hours = Math.round((minutes / 60) * 10) / 10;
+    const stillOpen =
+      (result.open ?? 0) > 0
+        ? ` ${result.open} shift${result.open === 1 ? ' is' : 's are'} not clocked out yet and ${result.open === 1 ? 'is' : 'are'} not counted.`
+        : '';
+
+    return {
+      summary:
+        `${hours} hours across ${result.shifts} shift${result.shifts === 1 ? '' : 's'} ` +
+        `${period}.${stillOpen}`,
+      data: { from: result.from, to: result.to, hours, minutes, shifts: result.shifts },
+    };
+  },
+  maxResultTokens: 120,
 });

@@ -542,3 +542,122 @@ export const findTeamMember = registerTool<FindTeamMemberArgs>({
   },
   maxResultTokens: 300,
 });
+
+/* ------------------------------------------------------------------ *
+ * calendar.team_absences
+ * ------------------------------------------------------------------ */
+
+/**
+ * WHO IS OFF -- the read that was missing, and whose absence was dangerous.
+ *
+ * FOUND 2026-09-10 by probing with the words managers actually use. Asked
+ * "who called in sick", the assistant selected `calendar.mark_worker_absence`
+ * and proposed `{worker_name: "Anna", kind: "SICK"}` -- inventing a worker and
+ * offering to MARK HER SICK in answer to a question about who already was.
+ * "wer ist heute krank" fared no better: `list_for_my_team` with
+ * `status: CANCELLED`, which means nothing of the sort.
+ *
+ * Neither is really a model failure. The registry had exactly one
+ * absence-shaped tool and it was a WRITE, so a question about absence had
+ * nowhere correct to go. A manifest that offers only a write for a subject
+ * people ask read questions about is a manifest that invites this, and no
+ * amount of description tuning fixes it -- the missing capability has to
+ * exist. The confirmation gate would have caught the write before it landed,
+ * but "the safety net holds" is not the standard: the assistant should not
+ * have been proposing it.
+ *
+ * `GET /calendar/absences` already existed, already restricted to
+ * manager/RM/admin, and already resolves worker names. Nothing needed
+ * building except the tool.
+ */
+const TeamAbsencesArgs = z
+  .object({
+    // Optional: "who is off" means today, and making a manager say so would
+    // be worse than defaulting.
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+  })
+  .strict()
+  .refine((v) => (v.from == null) === (v.to == null), {
+    message: 'from and to must be given together',
+    path: ['to'],
+  });
+
+type TeamAbsencesArgs = z.infer<typeof TeamAbsencesArgs>;
+
+const ABSENCE_LIMIT = 40;
+
+export const teamAbsences = registerTool<TeamAbsencesArgs>({
+  name: 'calendar.team_absences',
+  description:
+    'Show which of the team is OFF -- sick or on holiday. Use for "who called in ' +
+    'sick?", "who is off today?", "is anyone away this week?", "wer ist heute ' +
+    'krank?", "wer hat Urlaub?". Defaults to today; pass from and to as YYYY-MM-DD ' +
+    'for another day or a period. Returns each absent person, whether it is sick ' +
+    'leave or holiday, and the day.\n\n' +
+    'This only READS. It never records anything -- to record that someone is off, ' +
+    'use calendar.mark_worker_absence, and only when you are told they ARE off ' +
+    'rather than asked who is.',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef: 'IF-CAL-ListAbsences (calendar/service.ts listAbsences())',
+  approvalRef:
+    APPROVED_2026_09_09_PLANNING +
+    ' Registration note: READ_ONLY over GET /calendar/absences, which is already manager/RM/admin only and scope-filtered in-service.',
+
+  args: TeamAbsencesArgs,
+  permission: 'staffing:read',
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    const day = args.from ?? todayIso();
+    const rows = await calendarService.listAbsences(
+      { from: day, to: args.to ?? day },
+      toServiceActor(actor)
+    );
+    return { from: day, to: args.to ?? day, rows: rows.slice(0, ABSENCE_LIMIT), total: rows.length };
+  },
+
+  compress: (raw: unknown) => {
+    const result = raw as
+      | {
+          from?: string;
+          to?: string;
+          total?: number;
+          rows?: Array<{ worker_name?: string | null; kind?: string; day?: string }>;
+        }
+      | null;
+    if (!result) return { summary: 'Nothing was found.', data: null };
+    const refusal = asRefusal(result);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+
+    const rows = result.rows ?? [];
+    const sameDay = result.from === result.to;
+    const period = sameDay ? `on ${result.from}` : `between ${result.from} and ${result.to}`;
+
+    if (rows.length === 0) {
+      return {
+        summary: `Nobody on your team is recorded as off ${period}.`,
+        data: { from: result.from, to: result.to, count: 0 },
+      };
+    }
+
+    const described = rows.map((r) => {
+      const who = r.worker_name ?? 'unnamed worker';
+      const what = String(r.kind ?? '').toUpperCase() === 'VACATION' ? 'holiday' : 'sick';
+      return sameDay ? `${who} (${what})` : `${who} (${what}, ${r.day})`;
+    });
+
+    const capped =
+      (result.total ?? 0) > rows.length ? ` Showing ${rows.length} of ${result.total}.` : '';
+
+    return {
+      summary: `${result.total} off ${period}:${capped} ${described.join(', ')}.`,
+      // Deliberately no reason: why somebody is off is their business, and a
+      // sick-leave reason is health data.
+      data: { from: result.from, to: result.to, count: result.total },
+    };
+  },
+  maxResultTokens: 300,
+});
