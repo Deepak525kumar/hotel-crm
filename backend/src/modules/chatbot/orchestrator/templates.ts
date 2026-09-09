@@ -56,6 +56,102 @@ export function renderUnrecognized(): string {
  * would have to omit something to stay readable, and the omitted field is
  * precisely where a substituted value would hide.
  */
+/**
+ * Human labels for the argument keys a confirmation shows.
+ *
+ * The keys are internal names; the person approving is a hotel manager on a
+ * phone. `worker_name` and `day` mean nothing to them, and the production
+ * screen of 2026-09-10 showed exactly that, under the heading
+ * `This will run: assignments.place_worker`.
+ *
+ * Anything not listed falls back to the key with underscores removed, so a
+ * new argument degrades to something readable rather than disappearing --
+ * which matters, because EVERY argument must stay visible (see below).
+ */
+const ARG_LABELS: Record<string, string> = {
+  worker_name: 'Worker',
+  hotel_name: 'Hotel',
+  day: 'Day',
+  from: 'From',
+  to: 'To',
+  kind: 'Type',
+  reason: 'Reason',
+  status: 'Status',
+  position: 'Position',
+  workers_needed: 'Workers needed',
+  shift_date: 'Date',
+  shift_start_time: 'Starts',
+  shift_end_time: 'Ends',
+  room_number: 'Room',
+  note: 'Note',
+  notes: 'Note',
+  dataset: 'Data',
+  format: 'Format',
+  staff_type: 'Staff type',
+  count: 'Count',
+};
+
+/**
+ * What each tool is about to do, in the words of the person approving it.
+ *
+ * A tool NAME is not an answer to "what am I agreeing to". Anything missing
+ * from this map falls back to a plain sentence built from the tool's own
+ * name, so an unmapped tool still never prints a dotted identifier.
+ */
+const TOOL_ACTIONS: Record<string, string> = {
+  'assignments.place_worker': 'Put a worker on the schedule',
+  'assignments.place_many': 'Put several workers on the schedule',
+  'assignments.complete_my_shift': 'Mark your shift complete',
+  'calendar.mark_worker_absence': 'Record a worker as away',
+  'calendar.mark_my_absence': 'Record you as away',
+  'calendar.withdraw_my_absence': 'Cancel your day off',
+  'quality.assign_rework': 'Send a room back for rework',
+  'employees.approve_application': 'Approve a job application',
+  'employees.reject_application': 'Reject a job application',
+  'employees.assign_to_hotel': 'Assign an employee to a hotel',
+  'job_requests.accept': 'Accept an open shift',
+  'job_requests.create_broadcast': 'Draft a staffing request',
+  'reports.export_team': 'Export a team report',
+  'reports.export_my_data': 'Export your own data',
+  'attendance.check_in': 'Clock you in',
+  'attendance.check_out': 'Clock you out',
+  'rooms.log_cleaned': 'Log a room as cleaned',
+  'hr.request_payslip': 'Request your payslip',
+  'notifications.mark_read': 'Mark a message as read',
+};
+
+/** "assignments.place_worker" -> "Place worker", as a last resort. */
+function describeToolAction(toolName: string): string {
+  const mapped = TOOL_ACTIONS[toolName];
+  if (mapped) return mapped;
+  const tail = toolName.includes('.') ? toolName.slice(toolName.indexOf('.') + 1) : toolName;
+  const words = tail.replace(/_/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * What the user is asked to approve.
+ *
+ * Rendered DETERMINISTICALLY from the same parsed arguments the confirmation
+ * token hashes -- never phrased by a second model call. That equality is
+ * what makes the confirmation meaningful: whatever a person reads here is
+ * exactly what the token authorises, so an argument cannot change between
+ * the sentence they approved and the call that runs.
+ *
+ * EVERY ARGUMENT IS STILL LISTED, and that has not changed. A prose summary
+ * would have to omit something to stay readable, and the omitted field is
+ * precisely where a substituted value would hide. What changed on
+ * 2026-09-10 is only the WORDS AROUND the values: a manager was shown
+ *
+ *     This will run: assignments.place_worker
+ *       worker_name: worker 1
+ *       day: 2023-04-10
+ *
+ * which names an internal tool, uses internal keys, and reads like a stack
+ * trace. The values are identical in both versions; only the labels differ,
+ * so the property above is untouched while the screen becomes something a
+ * person on a phone can actually check.
+ */
 export function renderConfirmationRequest(toolName: string, args: unknown): string {
   const entries =
     args && typeof args === 'object' && !Array.isArray(args)
@@ -64,11 +160,15 @@ export function renderConfirmationRequest(toolName: string, args: unknown): stri
 
   const lines = entries
     .filter(([, value]) => value !== undefined)
-    .map(([key, value]) => `  ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
+    .map(([key, value]) => {
+      const label = ARG_LABELS[key] ?? key.replace(/_/g, ' ');
+      const shown = typeof value === 'string' ? value : JSON.stringify(value);
+      return `  ${label}: ${shown}`;
+    });
 
   return [
-    `This will run: ${toolName}`,
-    ...(lines.length > 0 ? lines : ['  (no arguments)']),
+    `${describeToolAction(toolName)}:`,
+    ...(lines.length > 0 ? lines : ['  (nothing to change)']),
     '',
     'Nothing has been changed yet. Confirm to go ahead, or cancel.',
   ].join('\n');

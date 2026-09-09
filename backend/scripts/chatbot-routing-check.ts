@@ -116,6 +116,25 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['manager', 'I need 3 cleaners on 2026-09-17 from 08:00 to 16:00', 'create_broadcast', picks('job_requests.create_broadcast')],
   ['manager', 'ich brauche zwei Reinigungskraefte am 2026-09-17 von 08:00 bis 16:00', 'create_broadcast (de)', picks('job_requests.create_broadcast')],
 
+  // Added 2026-09-10 after probing with ordinary phrasing found two missing
+  // capabilities. Both cases below are REGRESSION guards on a specific
+  // wrong answer, not new happy paths:
+  //   "who called in sick" selected calendar.mark_worker_absence and proposed
+  //   marking an invented "Anna" sick -- a question answered with a write.
+  //   "how many hours did i do" selected analytics.my_stats, which reports
+  //   shifts, rooms and a rating, and no hours at all.
+  ['manager', 'who called in sick', 'team_absences', picks('calendar.team_absences')],
+  ['manager', 'wer ist heute krank', 'team_absences (de)', picks('calendar.team_absences')],
+  ['manager', 'is anyone off this week', 'team_absences (week)', picks('calendar.team_absences')],
+  // Still a WRITE when they are TELLING you, not asking.
+  ['manager', 'Anna called in sick today', 'telling = write', picks('calendar.mark_worker_absence')],
+  ['worker', 'how many hours did I work this week', 'my_hours', picks('attendance.my_hours')],
+  ['worker', 'wie viele Stunden habe ich gearbeitet', 'my_hours (de)', picks('attendance.my_hours')],
+  // The arrival/leaving phrasings that produced prose instead of a clock action.
+  ['worker', 'im here', 'im here = check in', picks('attendance.check_in')],
+  ['worker', 'im off now', 'im off = check out', picks('attendance.check_out')],
+
+
   ['manager', 'who is waiting for approval?', 'review_queue', picks('employees.review_queue')],
   ['manager', 'approve Anna', 'approve_application', picks('employees.approve_application')],
   ['manager', 'which hotels do I look after?', 'my_hotels', picks('hotels.my_hotels')],
