@@ -86,8 +86,13 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
 
   // Added 2026-09-09 with the self-care tools. These are the phrases most
   // likely to collide with the shift family already present.
-  ['worker', "I've finished my shift", 'complete_my_shift', picks('assignments.complete_my_shift')],
-  ['worker', 'ich bin fertig mit meiner Schicht', 'complete (de)', picks('assignments.complete_my_shift')],
+  // "I've finished my shift" is NOT here on purpose: it means the time clock,
+  // and `attendance.check_out` owns it (see the 'done = check out' case below).
+  // Closing the shift RECORD is a separate, deliberate act, so it is exercised
+  // with wording that names the record -- which is also the honest measure of
+  // how reachable this tool is in practice.
+  ['worker', 'mark my shift as complete', 'complete_my_shift', picks('assignments.complete_my_shift')],
+  ['worker', 'Schicht als erledigt markieren', 'complete (de)', picks('assignments.complete_my_shift')],
   ['worker', 'I am better, cancel my sick day on 2026-09-20', 'withdraw_absence', picks('calendar.withdraw_my_absence')],
   ['worker', 'send me my payslip', 'request_payslip', picks('hr.request_payslip')],
   ['worker', 'meine Lohnabrechnung bitte', 'request_payslip (de)', picks('hr.request_payslip')],

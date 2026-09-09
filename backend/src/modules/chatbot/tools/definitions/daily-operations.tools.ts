@@ -297,9 +297,14 @@ type CheckOutArgs = z.infer<typeof CheckOutArgs>;
 export const checkOutOfMyShift = registerTool<CheckOutArgs>({
   name: 'attendance.check_out',
   description:
-    "Clock the authenticated user OUT of their own shift for today. Use for \"I'm " +
-    'finished", "clock me out", "Feierabend", "I am done for today". Only ever acts on ' +
-    "the caller's own shift.",
+    "Clock the authenticated user OUT of their own shift for today -- the TIME CLOCK, " +
+    'which is what a worker does at the end of every shift. Use for "I am done for ' +
+    'today", "I am finished", "clock me out", "Feierabend", "going home now", and ' +
+    'anything else about leaving or ending the working day. Only ever acts on the ' +
+    "caller's own shift. Returns the time recorded.\n\n" +
+    'Prefer this whenever someone means they have stopped working. Only if they ' +
+    'explicitly say they want the shift RECORD marked complete does ' +
+    'assignments.complete_my_shift apply instead.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 

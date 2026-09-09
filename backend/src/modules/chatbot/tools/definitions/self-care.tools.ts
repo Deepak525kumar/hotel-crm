@@ -52,11 +52,14 @@ type NoArgs = z.infer<typeof NoArgs>;
 export const completeMyShift = registerTool<NoArgs>({
   name: 'assignments.complete_my_shift',
   description:
-    "Mark the authenticated user's own shift for today as finished. Use for \"I'm done " +
-    'for the day", "shift finished", "ich bin fertig", "mark my shift complete". Only ' +
-    "ever acts on the caller's own shift. Returns confirmation that the shift is closed.",
-  // It closes the record a manager and payroll both read, and a worker cannot
-  // reopen it themselves.
+    'Close the shift RECORD for the caller\'s own shift today, marking the work itself ' +
+    'as complete. Use for "mark my shift complete", "close my shift record", "set my ' +
+    'shift to completed", "Schicht als erledigt markieren" -- phrasings that name the ' +
+    'shift or the record explicitly. Returns confirmation that the shift is closed.\n\n' +
+    'This is NOT clocking out and does not record a time. "I am done for today", "I am ' +
+    'finished", "Feierabend" and anything about leaving, going home or stopping work ' +
+    'mean the time clock: use attendance.check_out. A worker clocks out every shift; ' +
+    'closing the record is a separate, deliberate act.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 
