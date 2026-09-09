@@ -3,7 +3,8 @@ import { employeeManagementService } from '../../../employee-management/service.
 import { crmService } from '../../../crm/service.js';
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
-import { resolveHotelReference, describeUnresolvedHotel } from '../worker-reference.js';
+import { asRefusal, refuse } from '../tool-errors.js';
+import { resolveHotelReference, refuseUnresolvedHotel } from '../worker-reference.js';
 import type { ActorContext } from '../actor.js';
 
 /**
@@ -116,6 +117,13 @@ async function resolveApplicant(
     return { status: 'AMBIGUOUS', query, candidates: matches.slice(0, 5).map(fullName) };
   }
   return { status: 'RESOLVED', applicant: matches[0], name: fullName(matches[0]) };
+}
+
+function refuseUnresolvedApplicant(result: ApplicantResolution) {
+  return refuse(
+    result.status === 'AMBIGUOUS' ? 'AMBIGUOUS' : 'NOT_FOUND',
+    describeUnresolvedApplicant(result)
+  );
 }
 
 function describeUnresolvedApplicant(result: ApplicantResolution): string {
@@ -297,7 +305,7 @@ export const approveApplication = registerTool<ApplicantArgs>({
   invoke: async (args, actor) => {
     const resolved = await resolveApplicant(actor, args.applicant_name);
     if (resolved.status !== 'RESOLVED') {
-      return { refused: describeUnresolvedApplicant(resolved) };
+      return refuseUnresolvedApplicant(resolved);
     }
 
     // assertLifecycleAuthority re-checks scope inside approve(); the queue
@@ -310,9 +318,10 @@ export const approveApplication = registerTool<ApplicantArgs>({
   },
 
   compress: (raw: unknown): CompactResult => {
-    const r = raw as { refused?: string; approved?: string } | null;
+    const r = raw as { approved?: string } | null;
     if (!r) return { summary: 'Nothing was approved.', data: null };
-    if (r.refused) return { summary: r.refused, data: null };
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
     return {
       summary: `${r.approved} is approved and their account is active.`,
       data: { approved: r.approved },
@@ -355,7 +364,7 @@ export const rejectApplication = registerTool<RejectArgs>({
   invoke: async (args, actor) => {
     const resolved = await resolveApplicant(actor, args.applicant_name);
     if (resolved.status !== 'RESOLVED') {
-      return { refused: describeUnresolvedApplicant(resolved) };
+      return refuseUnresolvedApplicant(resolved);
     }
 
     await employeeManagementService.reject(
@@ -367,9 +376,10 @@ export const rejectApplication = registerTool<RejectArgs>({
   },
 
   compress: (raw: unknown): CompactResult => {
-    const r = raw as { refused?: string; rejected?: string } | null;
+    const r = raw as { rejected?: string } | null;
     if (!r) return { summary: 'Nothing was rejected.', data: null };
-    if (r.refused) return { summary: r.refused, data: null };
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
     return {
       summary: `${r.rejected}'s application is rejected, and the reason is recorded.`,
       data: { rejected: r.rejected },
@@ -411,12 +421,12 @@ export const assignApplicantToHotel = registerTool<AssignArgs>({
   invoke: async (args, actor) => {
     const hotel = await resolveHotelReference(args.hotel_name, actor);
     if (hotel.status !== 'RESOLVED') {
-      return { refused: describeUnresolvedHotel(hotel) };
+      return refuseUnresolvedHotel(hotel);
     }
 
     const resolved = await resolveApplicant(actor, args.applicant_name);
     if (resolved.status !== 'RESOLVED') {
-      return { refused: describeUnresolvedApplicant(resolved) };
+      return refuseUnresolvedApplicant(resolved);
     }
 
     await employeeManagementService.assign(
@@ -428,9 +438,10 @@ export const assignApplicantToHotel = registerTool<AssignArgs>({
   },
 
   compress: (raw: unknown): CompactResult => {
-    const r = raw as { refused?: string; assigned?: string; hotel?: string } | null;
+    const r = raw as { assigned?: string; hotel?: string } | null;
     if (!r) return { summary: 'Nothing was assigned.', data: null };
-    if (r.refused) return { summary: r.refused, data: null };
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
     return {
       summary: `${r.assigned} is assigned to ${r.hotel}.`,
       data: { assigned: r.assigned, hotel: r.hotel },

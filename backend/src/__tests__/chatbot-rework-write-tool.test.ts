@@ -3,6 +3,21 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 const mockAssignRework = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
 const mockResolveInspection = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
 jest.mock('../modules/chatbot/tools/context-reference.js', () => ({
+  refuseInspectionMiss: (r: any) => ({
+    refused: {
+      code: r.status === 'AMBIGUOUS' ? 'AMBIGUOUS' : r.status === 'NONE_AVAILABLE' ? 'ALREADY_DONE' : 'NOT_FOUND',
+      message:
+        r.status === 'NONE_AVAILABLE'
+          ? 'That room has already been sent back for rework.'
+          : r.status === 'AMBIGUOUS'
+            ? `You inspected room ${r.query} more than once.`
+            : `You have no inspection on record for room ${r.query}.`,
+      nextAction: r.status === 'NONE_AVAILABLE' ? 'stop' : 'ask_user',
+    },
+  }),
+  refuseNotificationMiss: (r: any) => ({
+    refused: { code: 'NOT_FOUND', message: `no message: ${r.status}`, nextAction: 'ask_user' },
+  }),
   resolveInspectionReference: mockResolveInspection,
   resolveNotificationReference: jest.fn(),
   describeInspectionMiss: (r: any) =>

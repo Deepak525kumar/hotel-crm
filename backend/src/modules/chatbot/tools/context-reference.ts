@@ -1,6 +1,7 @@
 import { notificationService } from '../../notifications/service.js';
 import { qualityService } from '../../quality/service.js';
 import { toServiceActor } from './actor.js';
+import { refuse } from './tool-errors.js';
 import type { ActorContext } from './actor.js';
 
 /**
@@ -201,3 +202,22 @@ export function describeInspectionMiss(result: ContextResolution<unknown>): stri
       return 'Could not identify that inspection.';
   }
 }
+
+/** The same refusals, carrying a code (see worker-reference.ts for why). */
+export function refuseNotificationMiss(result: ContextResolution<unknown>) {
+  const code =
+    result.status === 'AMBIGUOUS' ? 'AMBIGUOUS'
+    : result.status === 'NONE_AVAILABLE' ? 'ALREADY_DONE'
+    : 'NOT_FOUND';
+  return refuse(code, describeNotificationMiss(result));
+}
+
+export function refuseInspectionMiss(result: ContextResolution<unknown>) {
+  const code =
+    result.status === 'AMBIGUOUS' ? 'AMBIGUOUS'
+    // "already sent back for rework" is the state having moved past the ask.
+    : result.status === 'NONE_AVAILABLE' ? 'ALREADY_DONE'
+    : 'NOT_FOUND';
+  return refuse(code, describeInspectionMiss(result));
+}
+

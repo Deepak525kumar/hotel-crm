@@ -4,6 +4,7 @@ import { isJobDispatchPhase2Enabled } from '../../../../config/feature-flags.js'
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
 import { isoDate } from '../schema-primitives.js';
+import { asRefusal, refuse } from '../tool-errors.js';
 import type { ActorContext } from '../actor.js';
 
 /**
@@ -95,6 +96,16 @@ async function resolveBroadcast(
   return { status: 'RESOLVED', broadcast: candidates[0] };
 }
 
+function refuseUnresolvedBroadcast(result: BroadcastResolution) {
+  // DISABLED is the platform lacking the feature, not the shift being absent:
+  // a different day will not help, so it must not read as ask_user.
+  const code =
+    result.status === 'DISABLED' ? 'UNAVAILABLE'
+    : result.status === 'AMBIGUOUS' ? 'AMBIGUOUS'
+    : 'NOT_FOUND';
+  return refuse(code, describeUnresolvedBroadcast(result));
+}
+
 function describeUnresolvedBroadcast(result: BroadcastResolution): string {
   switch (result.status) {
     case 'DISABLED':
@@ -151,7 +162,7 @@ export const listOpenShifts = registerTool<ListOpenArgs>({
 
   invoke: async (args, actor) => {
     if (!isJobDispatchPhase2Enabled()) {
-      return { refused: 'Open shifts are not available on this platform yet.' };
+      return refuse('UNAVAILABLE', 'Open shifts are not available on this platform yet.');
     }
 
     const { data } = await jobRequestService.list(
@@ -168,9 +179,10 @@ export const listOpenShifts = registerTool<ListOpenArgs>({
   },
 
   compress: (raw: unknown): CompactResult => {
-    const r = raw as { refused?: string; shifts?: BroadcastLike[] } | null;
+    const r = raw as { shifts?: BroadcastLike[] } | null;
     if (!r) return { summary: 'Could not read open shifts.', data: null };
-    if (r.refused) return { summary: r.refused, data: null };
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
 
     const shifts = r.shifts ?? [];
     if (shifts.length === 0) {
@@ -230,7 +242,7 @@ export const acceptOpenShift = registerTool<AcceptArgs>({
   invoke: async (args, actor) => {
     const resolved = await resolveBroadcast(actor, args.day, args.hotel_name);
     if (resolved.status !== 'RESOLVED') {
-      return { refused: describeUnresolvedBroadcast(resolved) };
+      return refuseUnresolvedBroadcast(resolved);
     }
 
     // WHICH SLOT. A multi-skill broadcast needs the skill named, and the
@@ -248,16 +260,16 @@ export const acceptOpenShift = registerTool<AcceptArgs>({
     );
 
     if (open.length === 0) {
-      return { refused: 'That shift has already been filled.' };
+      return refuse('ALREADY_DONE', 'That shift has already been filled.');
     }
     if (open.length > 1) {
       // Refused rather than guessed: accepting as the wrong skill puts
       // somebody on a job they are not there to do.
-      return {
-        refused:
-          'That shift has more than one role open and I cannot tell which you mean. ' +
-          'Please use the app for this one.',
-      };
+      return refuse(
+        'AMBIGUOUS',
+        'That shift has more than one role open and I cannot tell which you mean. ' +
+          'Please use the app for this one.'
+      );
     }
 
     const result = await jobRequestService.acceptBroadcast(
@@ -276,10 +288,11 @@ export const acceptOpenShift = registerTool<AcceptArgs>({
 
   compress: (raw: unknown): CompactResult => {
     const r = raw as
-      | { refused?: string; day?: string; hotel?: string; result?: { status?: string } }
+      | { day?: string; hotel?: string; result?: { status?: string } }
       | null;
     if (!r) return { summary: 'Nothing was accepted.', data: null };
-    if (r.refused) return { summary: r.refused, data: null };
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
 
     // A LOST RACE IS NOT AN ERROR. The service returns "requirement
     // fulfilled" when somebody else claimed the last slot between the read

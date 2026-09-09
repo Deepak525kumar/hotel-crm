@@ -7,14 +7,15 @@ import { calendarService } from '../../../calendar/service.js';
 import { documentService } from '../../../documents/service.js';
 import { employeeManagementService } from '../../../employee-management/service.js';
 import {
-  describeUnresolved,
-  describeUnresolvedHotel,
+  describeUnresolved as describeUnresolvedWorker,
+  refuseUnresolved,
+  refuseUnresolvedHotel,
   resolveHotelReference,
   resolveWorkerReference,
 } from '../worker-reference.js';
 import {
-  describeInspectionMiss,
-  describeNotificationMiss,
+  refuseInspectionMiss,
+  refuseNotificationMiss,
   resolveInspectionReference,
   resolveNotificationReference,
 } from '../context-reference.js';
@@ -22,6 +23,7 @@ import { notificationService } from '../../../notifications/service.js';
 import type { AssignmentDto } from '../../../assignments/types.js';
 import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
+import { asRefusal, refuse } from '../tool-errors.js';
 
 /**
  * The commissioning human's approval of every tool registered on this date,
@@ -707,7 +709,7 @@ export const assignReworkTool = registerTool<AssignReworkArgs>({
       // A refusal, not an exception: "you never inspected that room" and
       // "it is already back with the worker" are both normal answers a
       // checker can act on.
-      return { refused: describeInspectionMiss(resolved) };
+      return refuseInspectionMiss(resolved);
     }
 
     const result = await qualityService.assignRework(
@@ -718,8 +720,9 @@ export const assignReworkTool = registerTool<AssignReworkArgs>({
   },
 
   compress: (raw: unknown) => {
-    const result = raw as { refused?: string; id?: string; room_number?: string | null } | null;
-    if (result?.refused) return { summary: result.refused, data: null };
+    const result = raw as { id?: string; room_number?: string | null } | null;
+    const refusal = asRefusal(result);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
     return {
       summary: result?.room_number
         ? `Room ${result.room_number} sent back for rework.`
@@ -788,15 +791,16 @@ export const markMyNotificationRead = registerTool<MarkNotificationReadArgs>({
   invoke: async (args, actor) => {
     const resolved = await resolveNotificationReference(actor, args.match);
     if (resolved.status !== 'RESOLVED') {
-      return { refused: describeNotificationMiss(resolved) };
+      return refuseNotificationMiss(resolved);
     }
     await notificationService.markAsRead(resolved.value.id, toServiceActor(actor).userId);
     return { marked: resolved.value.label };
   },
 
   compress: (raw: unknown) => {
-    const r = raw as { refused?: string; marked?: string } | null;
-    if (r?.refused) return { summary: r.refused, data: null };
+    const r = raw as { marked?: string } | null;
+    const refusal = asRefusal(r);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
     // Names WHICH message, because "marked as read" on its own leaves a
     // person unsure whether the assistant picked the one they meant.
     return { summary: `Marked as read: ${r?.marked ?? 'message'}.`, data: null };
@@ -1072,7 +1076,7 @@ export const placeWorkerOnCalendar = registerTool<PlaceWorkerArgs>({
     // nothing to search until we know which one.
     const hotel = await resolveHotelReference(args.hotel_name, actor);
     if (hotel.status !== 'RESOLVED') {
-      return { refused: describeUnresolvedHotel(hotel) };
+      return refuseUnresolvedHotel(hotel);
     }
 
     const resolved = await resolveWorkerReference(args.worker_name, actor, hotel.hotelId);
@@ -1080,7 +1084,7 @@ export const placeWorkerOnCalendar = registerTool<PlaceWorkerArgs>({
       // A refusal, not an exception: "there are two Annas" is a normal
       // answer a manager can act on, and throwing would turn it into a
       // failed turn with no useful guidance.
-      return { refused: describeUnresolved(resolved) };
+      return refuseUnresolved(resolved);
     }
 
     const result = await assignmentService.placeOnCalendar(
@@ -1091,8 +1095,9 @@ export const placeWorkerOnCalendar = registerTool<PlaceWorkerArgs>({
   },
 
   compress: (raw: unknown) => {
-    const out = raw as { refused?: string; placed?: { worker: string; day: string; hotel?: string } } | null;
-    if (out?.refused) return { summary: out.refused, data: null };
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+    const out = raw as { placed?: { worker: string; day: string; hotel?: string } } | null;
     if (out?.placed) {
       // The hotel is named back because an admin or RM may cover several and
       // needs to see which one this landed on.
@@ -1196,7 +1201,7 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
     // ---- Pass 0: the hotel, once for the batch ----------------------------
     const hotel = await resolveHotelReference(args.hotel_name, actor);
     if (hotel.status !== 'RESOLVED') {
-      return { refused: [describeUnresolvedHotel(hotel)], placed: [] as PlacementOutcome[] };
+      return { ...refuseUnresolvedHotel(hotel), placed: [] as PlacementOutcome[] };
     }
 
     // ---- Pass 1: resolve every name. Write nothing yet. -------------------
@@ -1209,8 +1214,18 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
 
     const unresolved = resolutions.filter((r) => r.resolved.status !== 'RESOLVED');
     if (unresolved.length > 0) {
+      // ONE refusal for the batch, not an array of them. The whole placement
+      // is refused if any name is unresolvable -- placing the resolvable half
+      // would leave a manager believing they scheduled a week they did not.
+      // The code reflects the worst outcome present, because "there are two
+      // Annas" needs a person to choose while "no such worker" needs a
+      // different name.
+      const anyAmbiguous = unresolved.some((r) => r.resolved.status === 'AMBIGUOUS');
       return {
-        refused: unresolved.map((r) => describeUnresolved(r.resolved)),
+        ...refuse(
+          anyAmbiguous ? 'AMBIGUOUS' : 'NOT_FOUND',
+          unresolved.map((r) => describeUnresolvedWorker(r.resolved)).join(' ')
+        ),
         placed: [] as PlacementOutcome[],
       };
     }
@@ -1238,20 +1253,23 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
       }
     }
 
-    return { refused: [] as string[], placed: outcomes };
+    return { placed: outcomes };
   },
 
   compress: (raw: unknown) => {
-    const out = (raw ?? {}) as { refused?: string[]; placed?: PlacementOutcome[] };
-
-    if (out.refused && out.refused.length > 0) {
+    // The batch refusal is a single structured value now, not an array of
+    // strings: one unresolvable name refuses the whole placement, and the
+    // code says whether a person must choose (AMBIGUOUS) or supply a
+    // different name (NOT_FOUND).
+    const refusal = asRefusal(raw);
+    if (refusal) {
       return {
-        summary:
-          `Nothing was scheduled. ${out.refused.length} name${out.refused.length === 1 ? '' : 's'} ` +
-          `could not be matched: ${out.refused.join(' ')}`,
-        data: null,
+        summary: `Nothing was scheduled. ${refusal.message}`,
+        data: { refusal_code: refusal.code },
       };
     }
+
+    const out = (raw ?? {}) as { placed?: PlacementOutcome[] };
 
     const placed = out.placed ?? [];
     const ok = placed.filter((p) => p.ok);
@@ -1374,7 +1392,7 @@ export const markWorkerAbsence = registerTool<MarkWorkerAbsenceArgs>({
     // to search until we know which one.
     const hotel = await resolveHotelReference(args.hotel_name, actor);
     if (hotel.status !== 'RESOLVED') {
-      return { refused: describeUnresolvedHotel(hotel) };
+      return refuseUnresolvedHotel(hotel);
     }
 
     const resolved = await resolveWorkerReference(args.worker_name, actor, hotel.hotelId);
@@ -1382,7 +1400,7 @@ export const markWorkerAbsence = registerTool<MarkWorkerAbsenceArgs>({
       // A refusal, not an exception: "there are two Annas" is a normal answer
       // the manager can act on, and throwing would turn it into a failed turn
       // carrying no useful guidance.
-      return { refused: describeUnresolved(resolved) };
+      return refuseUnresolved(resolved);
     }
 
     const absence = await calendarService.markAbsenceForWorker(
@@ -1400,11 +1418,12 @@ export const markWorkerAbsence = registerTool<MarkWorkerAbsenceArgs>({
 
   compress: (raw: unknown) => {
     const result = raw as
-      | { refused?: string; worker?: string; hotel?: string; absence?: { day?: string; kind?: string } }
+      | { worker?: string; hotel?: string; absence?: { day?: string; kind?: string } }
       | null;
 
     if (!result) return { summary: 'Nothing was recorded.', data: null };
-    if (result.refused) return { summary: result.refused, data: null };
+    const refusal = asRefusal(result);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
 
     const kind = String(result.absence?.kind ?? '').toLowerCase();
     return {

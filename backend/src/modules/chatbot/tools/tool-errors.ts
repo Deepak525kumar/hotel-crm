@@ -174,3 +174,75 @@ export function describeToolError(error: ToolError): string {
       return error.message;
   }
 }
+
+/**
+ * A DELIBERATE REFUSAL — the tool ran, decided not to act, and says why.
+ *
+ * DISTINCT FROM A ToolError, which is a failure. "You have no shift today"
+ * and "the database is unreachable" are both non-success, and collapsing them
+ * loses the only thing a caller can act on. A refusal is a normal outcome: it
+ * carries a code so the next move is decided by DATA, not by parsing English.
+ *
+ * WHY THIS IS A TYPE AND NOT A CONVENTION. Refusals were previously a bare
+ * string -- `{ refused: 'No worker matching "Anna" is on your team.' }` -- and
+ * the model could not tell "ask for another name" from "ask which one" from
+ * "already done, stop" except by reading the wording. Making the shape a type
+ * means the compiler visits every site; a lint rule or a test would only
+ * visit the ones somebody remembered to write.
+ */
+export interface ToolRefusal {
+  code: RefusalCode;
+  /** Written for the person, and safe to show them verbatim. */
+  message: string;
+  /** What to do about it, from the same closed set failures use. */
+  nextAction: ToolNextAction;
+}
+
+export type RefusalCode =
+  /** Nothing matched. A different name or day might. */
+  | 'NOT_FOUND'
+  /** Several matched. Only a person can choose. */
+  | 'AMBIGUOUS'
+  /** The state already is what was asked for, or has moved past it. */
+  | 'ALREADY_DONE'
+  /** Real, but out of this caller's reach. Do not invite a retry. */
+  | 'OUT_OF_SCOPE'
+  /** The capability is not available on this platform right now. */
+  | 'UNAVAILABLE'
+  /** The caller must supply something before this can proceed. */
+  | 'NEEDS_INPUT';
+
+const REFUSAL_ACTIONS: Record<RefusalCode, ToolNextAction> = {
+  // A person can supply a better name or a different day.
+  NOT_FOUND: 'ask_user',
+  AMBIGUOUS: 'ask_user',
+  NEEDS_INPUT: 'ask_user',
+  // Nothing to fix and nothing to retry: the state is what it is.
+  ALREADY_DONE: 'stop',
+  // Deliberately NOT ask_user. Inviting a rephrase here invites somebody to
+  // talk their way around a scope boundary that exists on purpose.
+  OUT_OF_SCOPE: 'stop',
+  UNAVAILABLE: 'stop',
+};
+
+/** Builds a refusal. The only supported way to make one. */
+export function refuse(code: RefusalCode, message: string): { refused: ToolRefusal } {
+  return { refused: { code, message, nextAction: REFUSAL_ACTIONS[code] } };
+}
+
+/**
+ * Reads a refusal off a tool result, if it is one.
+ *
+ * Tolerates the legacy bare-string shape so a tool mid-migration degrades to
+ * "refused, reason unknown" rather than rendering `[object Object]` at a
+ * person. New code cannot produce that shape -- `refuse()` is typed.
+ */
+export function asRefusal(raw: unknown): ToolRefusal | null {
+  const refused = (raw as { refused?: unknown } | null)?.refused;
+  if (!refused) return null;
+  if (typeof refused === 'string') {
+    return { code: 'NOT_FOUND', message: refused, nextAction: 'ask_user' };
+  }
+  return refused as ToolRefusal;
+}
+
