@@ -73,3 +73,41 @@ export function renderConfirmationRequest(toolName: string, args: unknown): stri
     'Nothing has been changed yet. Confirm to go ahead, or cancel.',
   ].join('\n');
 }
+
+/**
+ * Strip anything that names the internal tool surface out of free model text.
+ *
+ * FOUND IN PRODUCTION 2026-09-10. Asked "what are the options", the assistant
+ * answered a hotel manager with a numbered list of `assignments.list_for_my_team`,
+ * `attendance.team_status` and `calendar.check_availability` -- identifiers the
+ * person cannot type, does not recognise, and was never meant to see.
+ *
+ * The system prompt now tells the model not to do this, but a prompt is a
+ * cooperation aid, not a control (`router-l1.ts` says so about its own
+ * authorization rules, for the same reason). This is the control: it runs on
+ * the model's text regardless of what the model intended, so a leak requires
+ * the redaction to fail rather than the model to behave.
+ *
+ * WHAT IT DOES NOT DO: invent a replacement. A tool name is removed and the
+ * sentence around it is left alone, because guessing the phrase the model
+ * "meant" would put words in its mouth that no tool result supports. If the
+ * removal leaves the reply empty or meaningless, the caller falls back to the
+ * unrecognised-input text, which at least tells the truth.
+ */
+export function redactToolNames(text: string, toolNames: readonly string[]): string {
+  if (!text) return text;
+
+  let out = text;
+  for (const name of toolNames) {
+    // Escaped: tool names contain dots, which are regex wildcards -- and a
+    // wildcard here would match far more than the name.
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Optional surrounding backticks: the model formats them as code, and
+    // leaving an empty `` pair behind looks like a rendering bug.
+    out = out.replace(new RegExp('`?' + escaped + '`?', 'g'), 'that');
+  }
+
+  // "Use that – shows all shifts" reads badly but honestly; collapse the
+  // whitespace the removals leave behind rather than the meaning.
+  return out.replace(/[ \t]{2,}/g, ' ').trim();
+}

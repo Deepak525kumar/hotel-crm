@@ -7,6 +7,7 @@ import { executeTool } from '../tools/executor.js';
 import { findPriorCall, recordToolCall } from '../tools/tool-call-log.js';
 import { describeToolError } from '../tools/tool-errors.js';
 import { resolveTool } from '../tools/registry.js';
+import { actorHotelNames, precheckReferences } from './reference-precheck.js';
 import { checkBudget, recordSpend } from '../guardrails/budget.js';
 import {
   ConfirmTokenError,
@@ -25,6 +26,7 @@ import {
   renderProviderUnavailable,
   renderToolResult,
   renderUnrecognized,
+  redactToolNames,
   renderConfirmationRequest,
 } from './templates.js';
 
@@ -491,10 +493,19 @@ async function executeTurn(params: {
   // away silently.
   const history = await replayableHistory(params.conversationId, turnIndex);
 
+  // Who this person is and what just happened -- the two things the model
+  // was missing when it asked a manager the same question four turns running
+  // (router-l1.ts PromptContext).
+  const [hotels] = await Promise.all([actorHotelNames(params.actor)]);
+  const promptContext = {
+    hotels,
+    lastAction: readLastAction(conversation.session_state),
+  };
+
   let completion;
   try {
     completion = await provider.completeWithTools({
-      system: buildSystemPrompt(params.actor, tools),
+      system: buildSystemPrompt(params.actor, tools, promptContext),
       messages: buildMessages(params.text ?? '', history),
       tools: tools.map(toolSpec),
       // Reads and chat run on the fast model. The planning tier is reserved
@@ -530,8 +541,14 @@ async function executeTurn(params: {
         tokens_output: { increment: completion.usage.completionTokens },
       },
     });
+    // Redacted before it leaves: the manifest is internal, and the model
+    // has already been observed reciting it to a user (templates.ts).
+    const spoken = redactToolNames(
+      completion.text,
+      tools.map((t) => t.name)
+    );
     return {
-      reply: completion.text || renderUnrecognized(),
+      reply: spoken || renderUnrecognized(),
       status: ChatbotConversationStatus.IN_PROGRESS,
       route: 'L1',
     };
@@ -565,9 +582,48 @@ async function executeTurn(params: {
       };
     }
 
+    // AND THE REFERENCES ARE RESOLVED SECOND.
+    //
+    // The parse above proves the arguments are well FORMED; it does not
+    // prove the things they NAME exist. "hotel 1" is a valid string and was
+    // shown to a manager for approval in production before anyone discovered
+    // no such hotel was in their scope (reference-precheck.ts). A
+    // confirmation has to state what will actually happen, so the lookup
+    // belongs on this side of it.
+    const references = await precheckReferences(
+      proposed.args,
+      parsedArgs.data as Record<string, unknown>,
+      params.actor
+    );
+
+    if (references.status === 'REFUSED') {
+      logger.info('chatbot_confirmation_reference_unresolved', {
+        tool: proposed.name,
+        requestId: params.requestId,
+      });
+      await prisma.chatbotConversation.update({
+        where: { id: params.conversationId },
+        data: {
+          turn_count: { increment: 1 },
+          tokens_input: { increment: completion.usage.promptTokens },
+          tokens_output: { increment: completion.usage.completionTokens },
+        },
+      });
+      // No pending confirmation is written: there is nothing to confirm, and
+      // parking an impossible call would let a later "yes" resurrect it.
+      return {
+        reply: references.message,
+        status: ChatbotConversationStatus.IN_PROGRESS,
+        route: 'L1',
+      };
+    }
+
+    // Canonical names from here on, so what the person reads is what runs.
+    const confirmedArgs = references.args;
+
     await writePendingConfirmation(params.conversationId, {
       toolName: proposed.name,
-      args: parsedArgs.data,
+      args: confirmedArgs,
       turnIndex,
     });
 
@@ -576,7 +632,7 @@ async function executeTurn(params: {
       conversationId: params.conversationId,
       turnIndex,
       toolName: proposed.name,
-      args: parsedArgs.data,
+      args: confirmedArgs,
     });
 
     await prisma.chatbotConversation.update({
@@ -589,12 +645,12 @@ async function executeTurn(params: {
     });
 
     return {
-      reply: renderConfirmationRequest(proposed.name, parsedArgs.data),
+      reply: renderConfirmationRequest(proposed.name, confirmedArgs),
       status: ChatbotConversationStatus.IN_PROGRESS,
       route: 'L1',
       pendingConfirmation: {
         token,
-        summary: renderConfirmationRequest(proposed.name, parsedArgs.data),
+        summary: renderConfirmationRequest(proposed.name, confirmedArgs),
         toolName: proposed.name,
       },
     };
@@ -689,6 +745,7 @@ async function executeTurn(params: {
     // The tool ran and the owning service refused or a dependency failed.
     // The person is told what happened and what to do about it; the CODE
     // decided which of those two it is (tool-errors.ts).
+    await writeLastAction(params.conversationId, { tool: completion.toolUse.name, ok: false });
     return {
     reply: describeToolError(outcome.error),
     status: ChatbotConversationStatus.IN_PROGRESS,
@@ -696,6 +753,10 @@ async function executeTurn(params: {
     toolInvoked: completion.toolUse.name,
     };
   }
+
+  // Recorded so the NEXT turn knows this already happened. Only the label and
+  // the outcome -- never the result.
+  await writeLastAction(params.conversationId, { tool: completion.toolUse.name, ok: true });
 
   const safe = redact(outcome.result);
   return {
@@ -744,6 +805,46 @@ interface PendingConfirmation {
  * rather than round-tripping it through the client is the point: there is
  * nothing for a client to alter between "here is what I will do" and "do it".
  */
+/**
+ * What the previous turn ran, read back from structured session state.
+ *
+ * Deliberately only the tool LABEL and whether it worked. The result is not
+ * stored and never reaches a prompt: that is `ADR-074` §5's boundary, and
+ * "you already did X" needs none of it to stop the model repeating X.
+ */
+function readLastAction(sessionState: unknown): { tool: string; ok: boolean } | null {
+  const state = sessionState as Record<string, unknown> | null;
+  const last = state?.['last_action'] as Record<string, unknown> | undefined;
+  if (!last) return null;
+  const tool = last['tool'];
+  const ok = last['ok'];
+  if (typeof tool !== 'string' || typeof ok !== 'boolean') return null;
+  return { tool, ok };
+}
+
+async function writeLastAction(
+  conversationId: string,
+  action: { tool: string; ok: boolean }
+): Promise<void> {
+  try {
+    const prisma = getPrisma();
+    const fresh = await prisma.chatbotConversation.findUnique({
+      where: { id: conversationId },
+      select: { session_state: true },
+    });
+    const state = (fresh?.session_state as Record<string, unknown> | null) ?? {};
+    await prisma.chatbotConversation.update({
+      where: { id: conversationId },
+      data: {
+        session_state: { ...state, last_action: { tool: action.tool, ok: action.ok } } as never,
+      },
+    });
+  } catch {
+    // Continuity is an enhancement; losing it must not fail a turn that
+    // otherwise succeeded.
+  }
+}
+
 function readPendingConfirmation(sessionState: unknown): PendingConfirmation | null {
   const state = sessionState as Record<string, unknown> | null;
   const pending = state?.['pending_confirmation'] as Record<string, unknown> | undefined;
