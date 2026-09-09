@@ -150,6 +150,53 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
  * this string is trusted, and a model that ignores every line of it cannot
  * exceed the actor's own permissions.
  */
+
+/**
+ * A small calendar the model reads off instead of computing.
+ *
+ * Weeks run Monday to Sunday, which is how they run in Germany and how every
+ * roster in this platform is drawn. Everything is Europe/Berlin, matching
+ * CALENDAR_TIMEZONE.
+ */
+export function dateReference(now: Date = new Date()): string {
+  const iso = (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: CALENDAR_TIMEZONE }).format(d);
+  const weekday = (d: Date) =>
+    new Intl.DateTimeFormat('en-GB', { timeZone: CALENDAR_TIMEZONE, weekday: 'long' }).format(d);
+
+  // Anchor on the Berlin calendar date, then move in whole days from UTC noon
+  // so a daylight-saving shift can never move a date across a boundary.
+  const parts = iso(now).split('-').map(Number);
+  const base = new Date(Date.UTC(parts[0]!, parts[1]! - 1, parts[2]!, 12));
+  const shift = (days: number) => new Date(base.getTime() + days * 86_400_000);
+
+  // Monday of this week. getUTCDay(): 0 = Sunday.
+  const dow = base.getUTCDay();
+  const monday = shift(dow === 0 ? -6 : 1 - dow);
+  const sunday = new Date(monday.getTime() + 6 * 86_400_000);
+
+  const upcoming: string[] = [];
+  for (let i = 1; i <= 7; i += 1) {
+    const day = shift(i);
+    upcoming.push(`${weekday(day)} ${iso(day)}`);
+  }
+
+  const monthStart = new Date(Date.UTC(parts[0]!, parts[1]! - 1, 1, 12));
+  const monthEnd = new Date(Date.UTC(parts[0]!, parts[1]!, 0, 12));
+  const lastMonthStart = new Date(Date.UTC(parts[0]!, parts[1]! - 2, 1, 12));
+  const lastMonthEnd = new Date(Date.UTC(parts[0]!, parts[1]! - 1, 0, 12));
+
+  return [
+    `  today ${iso(base)}, tomorrow ${iso(shift(1))}, yesterday ${iso(shift(-1))}`,
+    `  the next seven days: ${upcoming.join(', ')}`,
+    `  this week ${iso(monday)} to ${iso(sunday)}`,
+    `  last week ${iso(new Date(monday.getTime() - 7 * 86_400_000))} to ${iso(new Date(sunday.getTime() - 7 * 86_400_000))}`,
+    `  next week ${iso(new Date(monday.getTime() + 7 * 86_400_000))} to ${iso(new Date(sunday.getTime() + 7 * 86_400_000))}`,
+    `  this month ${iso(monthStart)} to ${iso(monthEnd)}`,
+    `  last month ${iso(lastMonthStart)} to ${iso(lastMonthEnd)}`,
+  ].join('\n');
+}
+
 export interface PromptContext {
   /**
    * The hotels this person covers, by name, in a stable order.
@@ -169,6 +216,17 @@ export interface PromptContext {
    * resolves and re-checks scope at execution.
    */
   hotels: string[];
+  /**
+   * The workers this person supervises, when there are few enough to name.
+   *
+   * Reported 2026-09-10: the assistant "wasn't able to properly understand
+   * which user I was talking about". It had never been told who is on the
+   * team, so it guessed -- and the resolver matches on substring, so a guess
+   * that is not a substring of a real name fails with nothing to offer.
+   * Empty for a worker (no team) and above the roster cap (a prompt is not a
+   * place to paginate).
+   */
+  workers?: string[];
   /**
    * What the previous turn actually did, if anything.
    *
@@ -219,6 +277,20 @@ export function buildSystemPrompt(
     `The person you are helping has the role ${actor.role} and ${scope}.`,
     '',
     `Today is ${today} (${todayIso}) in Europe/Berlin.`,
+    // THE DATES THEMSELVES, not an instruction to work them out.
+    //
+    // Stating today fixed the invented years, but the model still had to do
+    // calendar arithmetic and did it badly: asked "what about saturday" after
+    // a question about Friday it returned FRIDAY again, and "and last week"
+    // after "this week" returned THIS week (both 2026-09-10). Those are wrong
+    // answers that look perfectly plausible -- a valid date, right format,
+    // wrong day -- so nothing downstream can catch them.
+    //
+    // Arithmetic is the one thing a program does better than a model and
+    // costs nothing to precompute. ~90 tokens a turn against an answer about
+    // the wrong week.
+    'Use these exact dates rather than working them out:',
+    dateReference(),
     ...(context.hotels.length > 0
       ? [
           '',
@@ -229,6 +301,16 @@ export function buildSystemPrompt(
                 .join('; ')}. When they say "the first one", "hotel 1" or part of a name, match it to this list yourself and pass the FULL name. Only ask which hotel if the request genuinely could mean more than one of them.`,
         ]
       : []),
+    ...(context.workers && context.workers.length > 0
+      ? [
+          '',
+          `The workers on their team are: ${context.workers.join(', ')}. When they ` +
+            'name someone, match it to this list -- allowing for typos, a first ' +
+            'name only, or a nickname -- and pass the FULL name from the list. If ' +
+            'what they said matches nobody here, say so and show them these names ' +
+            'rather than guessing.',
+        ]
+      : []),
     ...(context.lastAction
       ? [
           '',
@@ -237,7 +319,7 @@ export function buildSystemPrompt(
           }. Do not repeat it unless they ask again; if their new message is a follow-up, build on it.`,
         ]
       : []),
-    'Work out "today", "tomorrow", "this week", "this month", "next Friday" and every other relative date FROM THAT DATE. Never use any other year.',
+    'For a date not listed above, count from today. Never use another year.',
     '',
     'Rules:',
     '- Answer only from what a tool returns. If no tool can answer, say so plainly; never guess a shift, a date, a name or a number.',
@@ -306,7 +388,21 @@ export function buildMessages(userText: string, history: string[] = []): LlmMess
   // An empty array is refused by the provider, which is why the current turn
   // is always appended last and unconditionally.
   return [
-    ...history.map((content) => ({ role: 'user' as const, content })),
+    // LABELLED AS ALREADY ANSWERED.
+    //
+    // Replayed verbatim, these are indistinguishable from the live request:
+    // the model saw two user messages and treated the FIRST as the operative
+    // one. Measured 2026-09-10 -- after "whos working this week", the
+    // follow-up "and next week?" came back with THIS week's range, and "and
+    // last week" after "this week" likewise. The model was copying the
+    // earlier message instead of reading the date table.
+    //
+    // The prefix costs a few tokens and changes nothing about WHAT is
+    // replayed: still the user's own words, still never a tool result.
+    ...history.map((content) => ({
+      role: 'user' as const,
+      content: `(earlier in this conversation, already answered) ${content}`,
+    })),
     { role: 'user', content: userText },
   ];
 }
