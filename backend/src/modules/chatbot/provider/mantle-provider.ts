@@ -54,6 +54,51 @@ import {
 const SIGNING_SERVICE = 'bedrock';
 const CHAT_PATH = '/v1/chat/completions';
 
+/**
+ * Below this many milliseconds left, a second attempt is not started.
+ *
+ * The turn has ONE budget (`CHATBOT_TURN_TIMEOUT_MS`), shared by both
+ * attempts rather than granted to each. A fallback that began after the
+ * primary had already spent the whole budget would double the worst case and
+ * answer into an HTTP request the client has given up on -- a slower failure
+ * instead of a faster recovery.
+ */
+const MIN_FALLBACK_BUDGET_MS = 3000;
+
+/**
+ * A failure that a DIFFERENT MODEL might not have.
+ *
+ * The distinction is the whole point of the fallback: retrying a malformed
+ * request or an account-level authorization failure on a second model costs
+ * another round trip and fails identically. Only capacity, model-specific,
+ * and transport failures are worth a second attempt.
+ */
+class MantleCallError extends ProviderUnavailableError {
+  constructor(
+    message: string,
+    readonly retryable: boolean
+  ) {
+    super(message);
+    Object.setPrototypeOf(this, MantleCallError.prototype);
+  }
+}
+
+/**
+ * Which HTTP statuses justify trying the fallback model.
+ *
+ *   429 -- throttling/capacity on this model.
+ *   404 -- the model id is not served (withdrawn, or not in this region).
+ *   5xx -- the service's own fault, which may be per-model.
+ *
+ * Deliberately NOT 400 (our request shape is wrong -- the fallback would
+ * reject it too) and NOT 401/403 (account authorization, identical for every
+ * model; falling back would hide a misconfigured IAM policy behind a slower
+ * error).
+ */
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status === 404 || status >= 500;
+}
+
 interface OpenAiToolCall {
   function?: { name?: string; arguments?: string };
 }
@@ -69,6 +114,7 @@ interface OpenAiResponse {
 export class MantleProvider implements LlmProvider {
   readonly modelId: string;
   private readonly planningModelId: string;
+  private readonly fallbackModelId: string | null;
   private readonly host: string;
   private readonly timeoutMs: number;
   private readonly signer: SignatureV4;
@@ -77,10 +123,14 @@ export class MantleProvider implements LlmProvider {
     region: string;
     fastModelId: string;
     planningModelId: string;
+    fallbackModelId?: string | null;
     timeoutMs: number;
   }) {
     this.modelId = params.fastModelId;
     this.planningModelId = params.planningModelId;
+    // Empty string means "no fallback", so the behaviour can be switched off
+    // by configuration without a deploy.
+    this.fallbackModelId = params.fallbackModelId?.trim() || null;
     this.timeoutMs = params.timeoutMs;
     this.host = `bedrock-mantle.${params.region}.api.aws`;
     this.signer = new SignatureV4({
@@ -100,7 +150,7 @@ export class MantleProvider implements LlmProvider {
     tools: LlmToolSpec[];
     tier?: LlmTier;
   }): Promise<LlmResponse> {
-    const model = params.tier === 'planning' ? this.planningModelId : this.modelId;
+    const primary = params.tier === 'planning' ? this.planningModelId : this.modelId;
 
     if (params.messages.length === 0) {
       // Same guard as the Bedrock provider, for the same reason: an empty
@@ -109,6 +159,58 @@ export class MantleProvider implements LlmProvider {
       throw new ProviderUnavailableError('cannot call the model with no messages');
     }
 
+    // ONE budget for the whole turn, not one per attempt. See
+    // MIN_FALLBACK_BUDGET_MS.
+    const deadline = Date.now() + this.timeoutMs;
+
+    try {
+      return await this.callModel(primary, params, deadline);
+    } catch (error) {
+      const fallback = this.fallbackModelId;
+
+      if (!fallback || fallback === primary) throw error;
+      if (!(error instanceof MantleCallError) || !error.retryable) throw error;
+
+      const remaining = deadline - Date.now();
+      if (remaining < MIN_FALLBACK_BUDGET_MS) {
+        logger.warn('chatbot_mantle_fallback_skipped_no_budget', {
+          primary_model_id: primary,
+          fallback_model_id: fallback,
+          remaining_ms: remaining,
+        });
+        throw error;
+      }
+
+      logger.warn('chatbot_mantle_falling_back', {
+        primary_model_id: primary,
+        fallback_model_id: fallback,
+        reason: error.message,
+        remaining_ms: remaining,
+      });
+
+      const response = await this.callModel(fallback, params, deadline);
+      // Logged at info because it is a SUCCESS that answered on the weaker
+      // model: the turn worked, and the operator should still know the
+      // primary is failing.
+      logger.info('chatbot_mantle_served_by_fallback', {
+        primary_model_id: primary,
+        fallback_model_id: fallback,
+      });
+      return response;
+    }
+  }
+
+  /**
+   * One attempt against one model.
+   *
+   * Takes the DEADLINE rather than a duration so the second attempt inherits
+   * what the first left, instead of starting a fresh clock.
+   */
+  private async callModel(
+    model: string,
+    params: { system: string; messages: LlmMessage[]; tools: LlmToolSpec[] },
+    deadline: number
+  ): Promise<LlmResponse> {
     // The system prompt is a MESSAGE in this shape, not a separate field as
     // it is in Converse. Prepended rather than merged into the first user
     // message so the model still sees the role boundary.
@@ -134,7 +236,7 @@ export class MantleProvider implements LlmProvider {
     });
 
     const abort = new AbortController();
-    const timer = setTimeout(() => abort.abort(), this.timeoutMs);
+    const timer = setTimeout(() => abort.abort(), Math.max(0, deadline - Date.now()));
 
     try {
       const signed = await this.signer.sign({
@@ -162,11 +264,15 @@ export class MantleProvider implements LlmProvider {
           status: response.status,
           detail: detail.slice(0, 300),
         });
-        throw new ProviderUnavailableError(`mantle call failed (HTTP ${response.status})`);
+        throw new MantleCallError(
+          `mantle call failed (HTTP ${response.status})`,
+          isRetryableStatus(response.status)
+        );
       }
 
       return readResponse((await response.json()) as OpenAiResponse);
     } catch (error) {
+      if (error instanceof MantleCallError) throw error;
       if (error instanceof ProviderUnavailableError) throw error;
       const name = error instanceof Error ? error.name : 'unknown';
       logger.warn('chatbot_mantle_call_failed', {
@@ -174,7 +280,10 @@ export class MantleProvider implements LlmProvider {
         error_name: name,
         message: error instanceof Error ? error.message : String(error),
       });
-      throw new ProviderUnavailableError(`mantle call failed (${name})`);
+      // Transport-level: a socket reset or an abort. Worth a second model
+      // while budget remains -- the abort case is filtered out by the
+      // remaining-budget check, since a timeout leaves none.
+      throw new MantleCallError(`mantle call failed (${name})`, true);
     } finally {
       clearTimeout(timer);
     }
@@ -227,6 +336,7 @@ export function buildMantleProvider(): MantleProvider | null {
     region: env.CHATBOT_BEDROCK_REGION,
     fastModelId: env.CHATBOT_MANTLE_MODEL_FAST,
     planningModelId: env.CHATBOT_MANTLE_MODEL_PLANNING,
+    fallbackModelId: env.CHATBOT_MANTLE_MODEL_FALLBACK,
     timeoutMs: env.CHATBOT_TURN_TIMEOUT_MS,
   });
 }
