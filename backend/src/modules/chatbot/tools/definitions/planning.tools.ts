@@ -1,0 +1,544 @@
+import { z } from 'zod';
+import { isoDate } from '../schema-primitives.js';
+import { calendarService } from '../../../calendar/service.js';
+import { attendanceService } from '../../../attendance/service.js';
+import { jobRequestService } from '../../../job-requests/service.js';
+import { userService } from '../../../users/service.js';
+import {
+  refuseUnresolved,
+  refuseUnresolvedHotel,
+  resolveHotelReference,
+  resolveWorkerReference,
+} from '../worker-reference.js';
+import { toServiceActor } from '../actor.js';
+import { registerTool } from '../registry.js';
+import { asRefusal, refuse } from '../tool-errors.js';
+import { APPROVED_2026_09_09_PLANNING } from '../approvals.js';
+// The Europe/Berlin "today", shared with the daily-operations tools rather than
+// recomputed: a UTC date here would give a night-shift manager yesterday.
+import { todayIso } from './daily-operations.tools.js';
+
+/**
+ * PLANNING TOOLS -- the four capabilities a route-by-route gap analysis
+ * (2026-09-09) found missing from a registry that could already act.
+ *
+ * Two were genuine holes in a workflow the assistant otherwise completes:
+ *
+ *   - The assistant could PLACE a worker on a day but could not first ask who
+ *     was free, so it could perform the write without the reasoning step that
+ *     precedes it.
+ *   - Workers could list and accept staffing broadcasts, but no tool created
+ *     one -- an asymmetry that left the manager's half of that workflow off
+ *     the assistant entirely.
+ *
+ * Two are the reads a manager actually asks for hour to hour, and which
+ * `assignments.list_for_my_team` only looks like it answers. Three different
+ * questions hide behind "who is working": who is SCHEDULED (that tool), who
+ * actually SHOWED UP (`attendance.team_status`), and who EXISTS at all
+ * (`users.find_team_member`). Their descriptions name each other for exactly
+ * that reason -- the 2026-09-09 check_out/complete_my_shift collision showed
+ * that two tools sharing one natural phrase cannot be separated by the model,
+ * only by the manifest.
+ *
+ * WHAT IS NOT HERE, deliberately. The same analysis listed capabilities the
+ * platform exposes over HTTP and this registry refuses: credentials and
+ * sessions, role/email mutation and user deletion, consent decisions,
+ * subject-rights exports, hotel and group creation or deletion, bulk employee
+ * import, the quality leaderboard (it rides the documented OQ-ANALYTICS-01
+ * authorization gap), the audit log, notification-outbox internals, and
+ * geolocation history. Manager timesheet correction is refused for a reason
+ * worth stating separately: it is the platform's most payroll-fraud-sensitive
+ * write, and a worker cannot reach it at all by design -- attendance
+ * `update()` forces server time on the self branch and rejects an already
+ * closed record precisely to stop time manipulation. None of that is relaxed
+ * here.
+ *
+ * Every tool below is team-scoped, never worker-reachable, and re-derives its
+ * actor from `req.auth` like the rest of the registry. The services keep
+ * their own gates: `getAvailability` re-checks `isWorkerInGroupScope`,
+ * `listUsers` is default-deny scope-resolved, `attendanceService.list`
+ * branches on role, and `jobRequestService.create` re-checks scope. Nothing a
+ * model emits is an authorization input.
+ */
+
+/* ------------------------------------------------------------------ *
+ * calendar.check_availability
+ * ------------------------------------------------------------------ */
+
+/**
+ * The read that `assignments.place_worker` always needed.
+ *
+ * `day` is a REAL argument, not decoration: `getAvailability` was today-only
+ * until 2026-09-09, and shipping a tool that accepted a date and quietly
+ * answered about today would have been the exact defect class this repository
+ * keeps finding. The service was made day-aware instead, defaulting to today
+ * so the HTTP route it also serves did not change behaviour.
+ *
+ * "Available" means what the service means by it and nothing more: no active
+ * assignment that day and no blocking absence. It is not a statement about
+ * contracted hours, working-time limits, or whether the person wants the
+ * shift -- so the description says "free to be placed", not "free".
+ */
+const CheckAvailabilityArgs = z
+  .object({
+    worker_name: z.string().trim().min(2).max(80),
+    day: isoDate,
+    // A NAME, not an id -- the roster is a property of a hotel, and an admin
+    // or regional manager covers several and must say which.
+    hotel_name: z.string().trim().min(2).max(120).optional(),
+  })
+  .strict();
+
+type CheckAvailabilityArgs = z.infer<typeof CheckAvailabilityArgs>;
+
+export const checkAvailability = registerTool<CheckAvailabilityArgs>({
+  name: 'calendar.check_availability',
+  description:
+    'Check whether ONE named worker is free to be placed on a given day. Use for ' +
+    '"is Anna free on Thursday?", "can Tomasz work Monday?", "ist Maria am Freitag ' +
+    'frei?". Give the worker\'s name as they are known at the hotel and the day as ' +
+    'YYYY-MM-DD. Returns whether that worker is free on that day, meaning they have ' +
+    'no shift already booked and no sick or vacation day recorded.\n\n' +
+    'This answers about ONE named person, not a list. It does NOT show who is ' +
+    'scheduled (use assignments.list_for_my_team), who has clocked in ' +
+    '(attendance.team_status), or who is on the team at all ' +
+    '(users.find_team_member). It books nothing -- use assignments.place_worker ' +
+    'to actually place someone.',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef: 'IF-CAL-GetAvailability (calendar/service.ts getAvailability())',
+  approvalRef:
+    APPROVED_2026_09_09_PLANNING +
+    ' Registration note: reads one in-scope worker\'s free/busy for one day; discloses no absence reason.',
+
+  args: CheckAvailabilityArgs,
+  permission: 'staffing:read',
+  // 'none' for the same reason as place_worker: there is no hotel ARGUMENT to
+  // pre-check. The hotel comes from the actor's own scope inside invoke(),
+  // and getAvailability re-checks group scope itself regardless.
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') return refuseUnresolvedHotel(hotel);
+
+    const resolved = await resolveWorkerReference(args.worker_name, actor, hotel.hotelId);
+    if (resolved.status !== 'RESOLVED') return refuseUnresolved(resolved);
+
+    const availability = await calendarService.getAvailability(
+      resolved.workerId,
+      toServiceActor(actor),
+      args.day
+    );
+
+    return { worker: resolved.fullName, day: args.day, available: availability.available };
+  },
+
+  compress: (raw: unknown) => {
+    const result = raw as { worker?: string; day?: string; available?: boolean } | null;
+    if (!result) return { summary: 'Nothing was found.', data: null };
+    const refusal = asRefusal(result);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+
+    return {
+      summary: result.available
+        ? `${result.worker} is free to be placed on ${result.day}.`
+        : `${result.worker} is not free on ${result.day} -- already booked, or away.`,
+      // Deliberately no reason for the "not free": whether it is a shift, a
+      // sick day or a holiday is the worker's business, and the manager can
+      // read their calendar directly if they need it.
+      data: { worker: result.worker, day: result.day, available: result.available },
+    };
+  },
+  maxResultTokens: 80,
+});
+
+/* ------------------------------------------------------------------ *
+ * job_requests.create_broadcast
+ * ------------------------------------------------------------------ */
+
+/**
+ * The manager's half of a workflow whose worker half already shipped.
+ *
+ * `job_requests.list_open` and `job_requests.accept` let a worker find and
+ * take a shift; nothing let a manager raise one, so the assistant could close
+ * that loop only from one end.
+ *
+ * IT CREATES A DRAFT, ALWAYS. `CreateWorkRequestSchema` accepts
+ * `status: 'DRAFT' | 'OPEN'`, and this tool pins DRAFT and does not expose the
+ * field. Publishing to OPEN broadcasts to every eligible worker in scope --
+ * push notifications and email to potentially hundreds of people, from a
+ * sentence the model may have misread, and unsendable once sent. That is the
+ * blast radius `ADR-074` is about, and a draft the manager publishes from the
+ * UI costs one click and removes it entirely.
+ *
+ * `confirm: true` despite being LOW_RISK_WRITE. The tier is honest -- a draft
+ * notifies nobody and is deleted in a click -- but the argument list is long
+ * enough (position, headcount, date, two times) that a misheard number is
+ * likely and cheap to catch, and the manager should see the exact shift
+ * before it is written down.
+ *
+ * NOT EXPOSED, deliberately: `hourly_rate`, `currency`, `requirements` and
+ * `expires_at`. Pay in particular is a term of employment and does not belong
+ * in a dictated sentence; the manager sets it on the draft where the number is
+ * visible next to everything else it affects.
+ */
+const CreateBroadcastArgs = z
+  .object({
+    position: z.string().trim().min(1).max(120),
+    workers_needed: z.number().int().positive().max(50),
+    shift_date: isoDate,
+    // The service takes HH:MM; validated here so a bad time fails at PROPOSAL
+    // time rather than after the manager has confirmed a call that cannot run.
+    shift_start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be HH:MM'),
+    shift_end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be HH:MM'),
+    hotel_name: z.string().trim().min(2).max(120).optional(),
+  })
+  .strict();
+
+type CreateBroadcastArgs = z.infer<typeof CreateBroadcastArgs>;
+
+export const createBroadcast = registerTool<CreateBroadcastArgs>({
+  name: 'job_requests.create_broadcast',
+  description:
+    'Draft a staffing request for a shift that needs workers. Use for "I need 3 ' +
+    'cleaners on Thursday 8am to 4pm", "raise a request for two housekeepers ' +
+    'tomorrow morning", "ich brauche zwei Reinigungskrafte am Montag". Give the ' +
+    'position, how many workers are needed, the date as YYYY-MM-DD, and the start ' +
+    'and end times as HH:MM. Returns the draft that was created.\n\n' +
+    'It is saved as a DRAFT and is NOT sent to anyone. The manager publishes it ' +
+    'from the app when the details are right. Pay rate and requirements are set ' +
+    'there too, not here. To place a specific named worker directly instead of ' +
+    'asking for volunteers, use assignments.place_worker.',
+  tier: 'LOW_RISK_WRITE',
+  confirm: true,
+
+  interfaceRef: 'IF-JR-CreateWorkRequest (job-requests/service.ts create())',
+  approvalRef:
+    APPROVED_2026_09_09_PLANNING +
+    ' Registration note: creates a DRAFT only; publishing to OPEN stays a human action in the UI.',
+
+  args: CreateBroadcastArgs,
+  permission: 'staffing:write',
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') return refuseUnresolvedHotel(hotel);
+
+    // The service's own rule, restated so an impossible shift is refused
+    // before anything is written rather than stored and puzzled over later.
+    if (args.shift_end_time <= args.shift_start_time) {
+      return refuse(
+        'NEEDS_INPUT',
+        `A shift cannot end at ${args.shift_end_time} when it starts at ${args.shift_start_time}. ` +
+          'Overnight shifts are not supported here -- ask for the end time again.'
+      );
+    }
+
+    const created = await jobRequestService.create(
+      {
+        hotel_id: hotel.hotelId,
+        target_role: 'WORKER',
+        position: args.position,
+        workers_needed: args.workers_needed,
+        shift_date: args.shift_date,
+        shift_start_time: args.shift_start_time,
+        shift_end_time: args.shift_end_time,
+        // Pinned, never an argument. See the note above.
+        status: 'DRAFT',
+      },
+      toServiceActor(actor)
+    );
+
+    return { hotel: hotel.name, request: created };
+  },
+
+  compress: (raw: unknown) => {
+    const result = raw as
+      | {
+          hotel?: string;
+          request?: { position?: string; workers_needed?: number; shift_date?: string };
+        }
+      | null;
+    if (!result) return { summary: 'Nothing was created.', data: null };
+    const refusal = asRefusal(result);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+
+    const r = result.request ?? {};
+    return {
+      summary:
+        `Drafted a request for ${r.workers_needed} x ${r.position} at ${result.hotel} on ` +
+        `${r.shift_date}. It has NOT been sent -- publish it from the app to notify workers.`,
+      data: {
+        hotel: result.hotel,
+        position: r.position,
+        workers_needed: r.workers_needed,
+        shift_date: r.shift_date,
+        status: 'DRAFT',
+      },
+    };
+  },
+  maxResultTokens: 120,
+});
+
+/* ------------------------------------------------------------------ *
+ * attendance.team_status
+ * ------------------------------------------------------------------ */
+
+/**
+ * Who actually turned up -- distinct from who was scheduled.
+ *
+ * `assignments.list_for_my_team` answers the PLAN. This answers the FACT, and
+ * the gap between them is the manager's most time-critical question of the
+ * day: a no-show has an assignment and no check-in, so the plan alone cannot
+ * show it. `attendanceService.list` filters on `expected_start` rather than
+ * `check_in_at` for precisely that reason -- a no-show must still appear.
+ *
+ * Names come from `AttendanceDto.worker`, which the DTO already resolves for
+ * its read paths. Reporting tools on this platform have twice shipped with a
+ * blank worker column because a DTO carried only ids; that is checked here
+ * rather than assumed.
+ */
+const TeamStatusArgs = z
+  .object({
+    // Optional: "who has clocked in?" means today, and forcing the manager to
+    // say so would be worse than defaulting.
+    day: isoDate.optional(),
+    hotel_name: z.string().trim().min(2).max(120).optional(),
+  })
+  .strict();
+
+type TeamStatusArgs = z.infer<typeof TeamStatusArgs>;
+
+/** Enough rows to answer a shift's worth of question without flooding context. */
+const TEAM_STATUS_LIMIT = 40;
+
+export const teamStatus = registerTool<TeamStatusArgs>({
+  name: 'attendance.team_status',
+  description:
+    'Show who has actually clocked in and out today, and who has not turned up. ' +
+    'Use for "who has clocked in?", "did Anna arrive?", "is anyone missing this ' +
+    'morning?", "wer ist heute da?". The day is optional and defaults to today; ' +
+    'give it as YYYY-MM-DD for another day. Returns each worker with their ' +
+    'check-in and check-out times, or that they have not checked in.\n\n' +
+    'This is what ACTUALLY happened. For who is SCHEDULED to work, use ' +
+    'assignments.list_for_my_team. For whether someone is free to be given a ' +
+    'shift, use calendar.check_availability. For who is on the team at all, use ' +
+    'users.find_team_member.',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef: 'IF-ATT-List (attendance/service.ts list())',
+  approvalRef:
+    APPROVED_2026_09_09_PLANNING +
+    ' Registration note: reads in-scope attendance rows the caller can already read over HTTP; adds no field.',
+
+  args: TeamStatusArgs,
+  permission: 'staffing:read',
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') return refuseUnresolvedHotel(hotel);
+
+    const day = args.day ?? todayIso();
+
+    const result = await attendanceService.list(
+      {
+        hotel_id: hotel.hotelId,
+        // Both or neither: a half-open range is rejected by the schema.
+        from: day,
+        to: day,
+        page: 1,
+        per_page: TEAM_STATUS_LIMIT,
+      } as never,
+      toServiceActor(actor)
+    );
+
+    return { hotel: hotel.name, day, total: result.total, rows: result.data };
+  },
+
+  compress: (raw: unknown) => {
+    const result = raw as
+      | {
+          hotel?: string;
+          day?: string;
+          total?: number;
+          rows?: Array<{
+            worker?: { full_name?: string | null } | null;
+            check_in_at?: string | null;
+            check_out_at?: string | null;
+            status?: string;
+          }>;
+        }
+      | null;
+    if (!result) return { summary: 'Nothing was found.', data: null };
+    const refusal = asRefusal(result);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+
+    const rows = result.rows ?? [];
+    if (rows.length === 0) {
+      return {
+        summary: `No attendance recorded at ${result.hotel} on ${result.day}.`,
+        data: { hotel: result.hotel, day: result.day, present: 0, missing: 0 },
+      };
+    }
+
+    const present = rows.filter((r) => r.check_in_at);
+    const missing = rows.filter((r) => !r.check_in_at);
+    const hhmm = (iso?: string | null) => (iso ? iso.slice(11, 16) : null);
+
+    const lines = rows.slice(0, 15).map((r) => {
+      const name = r.worker?.full_name ?? 'unnamed worker';
+      if (!r.check_in_at) return `${name}: not checked in`;
+      const out = hhmm(r.check_out_at);
+      return `${name}: in ${hhmm(r.check_in_at)}${out ? `, out ${out}` : ', still on shift'}`;
+    });
+
+    const more = rows.length > 15 ? ` (+${rows.length - 15} more)` : '';
+    const capped =
+      (result.total ?? 0) > TEAM_STATUS_LIMIT
+        ? ` Showing the first ${TEAM_STATUS_LIMIT} of ${result.total}.`
+        : '';
+
+    return {
+      summary:
+        `${present.length} checked in, ${missing.length} not, at ${result.hotel} on ` +
+        `${result.day}.${capped} ${lines.join('; ')}${more}`,
+      data: {
+        hotel: result.hotel,
+        day: result.day,
+        present: present.length,
+        missing: missing.length,
+      },
+    };
+  },
+  maxResultTokens: 400,
+});
+
+/* ------------------------------------------------------------------ *
+ * users.find_team_member
+ * ------------------------------------------------------------------ */
+
+/**
+ * Who is on the team at all.
+ *
+ * The discovery step the write tools assume. `resolveWorkerReference` turns a
+ * name into an id, but the manager has to know the name first -- and after a
+ * new starter or a transfer they often do not. Without this the assistant
+ * could act on people it could not help you find.
+ *
+ * `listUsers` is default-deny scope-resolved (`resolveNonAdminScopeFilter`,
+ * ADR-030 PR-4 FIND-01): a non-admin never resolves to global scope, so this
+ * cannot list the platform. The page cap below is a context guard, not a
+ * security one -- the scope filter is the security one, and it is the
+ * service's.
+ */
+const FindTeamMemberArgs = z
+  .object({
+    // Optional: "who is on my team" is a real question with no name in it.
+    name: z.string().trim().min(2).max(80).optional(),
+    // NOT named `role`: that is a FORBIDDEN_ARG_KEY, and the compile-time
+    // SafeArgs guard rejects it outright. The guard is right to be blunt --
+    // an argument called `role` in a tool schema is one rename away from
+    // reading as the CALLER's role, which is an authorization input and is
+    // re-derived from req.auth, never accepted from the model.
+    staff_type: z.enum(['worker', 'checker', 'manager']).optional(),
+    hotel_name: z.string().trim().min(2).max(120).optional(),
+  })
+  .strict();
+
+type FindTeamMemberArgs = z.infer<typeof FindTeamMemberArgs>;
+
+const ROSTER_LIMIT = 25;
+
+export const findTeamMember = registerTool<FindTeamMemberArgs>({
+  name: 'users.find_team_member',
+  description:
+    'Look up who is on the team, by name or by role. Use for "who is on my team?", ' +
+    '"is there a Maria at the hotel?", "list my checkers", "wer arbeitet bei uns?". ' +
+    'Give a name to search for, or a staff type (worker, checker or manager) to ' +
+    'list just those. Both are optional -- with neither, it lists the team. Returns each ' +
+    "person's name and role.\n\n" +
+    'This is the STAFF LIST, not a schedule. For who is working today use ' +
+    'assignments.list_for_my_team, for who has clocked in use ' +
+    'attendance.team_status, and for whether one person is free on a day use ' +
+    'calendar.check_availability. It returns no contact details, and it cannot ' +
+    'change anyone.',
+  tier: 'READ_ONLY',
+  confirm: false,
+
+  interfaceRef: 'IF-USR-ListUsers (users/service.ts listUsers())',
+  approvalRef:
+    APPROVED_2026_09_09_PLANNING +
+    ' Registration note: name and role only; no email, phone, address or any special-category field.',
+
+  args: FindTeamMemberArgs,
+  permission: 'users:read',
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') return refuseUnresolvedHotel(hotel);
+
+    const result = await userService.listUsers(
+      {
+        page: 1,
+        limit: ROSTER_LIMIT,
+        hotel_id: hotel.hotelId,
+        ...(args.name ? { search: args.name } : {}),
+        ...(args.staff_type ? { role: args.staff_type } : {}),
+      } as never,
+      toServiceActor(actor)
+    );
+
+    const rows = (result as { data?: Array<Record<string, unknown>>; total?: number }).data ?? [];
+    const total = (result as { total?: number }).total ?? rows.length;
+
+    if (rows.length === 0) {
+      return refuse(
+        'NOT_FOUND',
+        args.name
+          ? `Nobody matching "${args.name}" is on the team at ${hotel.name}.`
+          : `No team members are listed at ${hotel.name}.`
+      );
+    }
+
+    return {
+      hotel: hotel.name,
+      total,
+      // Name and role ONLY. The DTO carries email and more; passing the row
+      // through would put contact details into a model's context for a
+      // question that never asked for them.
+      people: rows.map((r) => ({
+        name: String(r['full_name'] ?? 'unnamed'),
+        role: String(r['role'] ?? '').toLowerCase(),
+      })),
+    };
+  },
+
+  compress: (raw: unknown) => {
+    const result = raw as
+      | { hotel?: string; total?: number; people?: Array<{ name: string; role: string }> }
+      | null;
+    if (!result) return { summary: 'Nothing was found.', data: null };
+    const refusal = asRefusal(result);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+
+    const people = result.people ?? [];
+    const capped =
+      (result.total ?? 0) > people.length
+        ? ` Showing ${people.length} of ${result.total}; narrow it by name or role.`
+        : '';
+
+    return {
+      summary:
+        `${result.total} at ${result.hotel}.${capped} ` +
+        people.map((p) => `${p.name} (${p.role})`).join(', '),
+      data: { hotel: result.hotel, total: result.total, people },
+    };
+  },
+  maxResultTokens: 300,
+});

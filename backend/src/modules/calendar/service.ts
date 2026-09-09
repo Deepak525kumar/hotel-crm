@@ -450,7 +450,18 @@ export class CalendarService extends BaseService {
   // Today-only and independent of any viewed calendar date, per RULE-CAL-08.
   async getAvailability(
     workerId: string,
-    actor: { userId: string; role: string; scope?: UserScope | null }
+    actor: { userId: string; role: string; scope?: UserScope | null },
+    /**
+     * The day to answer for, `YYYY-MM-DD`. Optional and defaulting to today,
+     * so `GET /calendar/availability` -- which passes nothing -- keeps its
+     * exact previous behaviour.
+     *
+     * Added 2026-09-09 for `calendar.check_availability`. The alternative was
+     * a chatbot tool that accepted a date and silently answered about today,
+     * which is the failure this codebase keeps finding rather than a
+     * shortcut worth taking.
+     */
+    day?: string
   ): Promise<AvailabilityDto> {
     const isSelf = actor.userId === workerId;
 
@@ -488,7 +499,7 @@ export class CalendarService extends BaseService {
     });
     if (!worker) throw new NotFoundError('Worker not found');
 
-    const today = new Date(`${todayInCalendarTimezone()}T00:00:00.000Z`);
+    const target = new Date(`${day ?? todayInCalendarTimezone()}T00:00:00.000Z`);
 
     const [assignedToday, absenceToday] = await Promise.all([
       this.prisma.workerAssignment.findFirst({
@@ -504,17 +515,21 @@ export class CalendarService extends BaseService {
           // every modern assignment. PR 9.6 moved the codebase to the `day`
           // column for exactly this reason; isWorkerFreeOnDay() already
           // filters on it, and calendar was the last consumer of the old join.
-          day: today,
+          day: target,
         },
         select: { id: true },
       }),
       this.prisma.calendarAbsence.findUnique({
-        where: { worker_id_day: { worker_id: workerId, day: today } },
+        where: { worker_id_day: { worker_id: workerId, day: target } },
         select: { id: true },
       }),
     ]);
 
-    return { worker_id: workerId, available: !assignedToday && !absenceToday };
+    return {
+      worker_id: workerId,
+      day: target.toISOString().slice(0, 10),
+      available: !assignedToday && !absenceToday,
+    };
   }
 
   private async autoCancelSameDayAssignment(

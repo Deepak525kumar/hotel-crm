@@ -80,5 +80,7 @@ export interface CalendarAbsenceDto {
 // field to request or return.
 export interface AvailabilityDto {
   worker_id: string;
+  /** The day the answer is about, `YYYY-MM-DD`. Today unless one was asked for. */
+  day: string;
   available: boolean;
 }
