@@ -149,3 +149,50 @@ export async function actorHotelNames(actor: ActorContext): Promise<string[]> {
     return [];
   }
 }
+
+
+/**
+ * The names of the workers this person supervises, for the system prompt.
+ *
+ * SAME DEFECT AS THE HOTELS, reported 2026-09-10: "it wasn't able to properly
+ * understand which user I was talking about". The model was never told who is
+ * on the team, so a name it had not seen was a name it had to guess at -- and
+ * `resolveWorkerReference` matches on substring, so a guess that is not a
+ * substring of a real name comes back NOT_FOUND with nothing to offer.
+ * Knowing the roster lets it pass the FULL name it was going to have to match
+ * anyway.
+ *
+ * Bounded hard, and empty above the bound. A prompt is not a place to
+ * paginate, and a manager of two hundred people does not get a useful hint
+ * from a list of two hundred names -- they get a diluted prompt and a bigger
+ * bill. Above the cap this returns nothing and the assistant behaves exactly
+ * as it did before: ask, resolve, refuse if unclear.
+ *
+ * Discloses nothing new: these are the people whose shifts the caller already
+ * manages, listed by the same scope-narrowed query `users.find_team_member`
+ * runs for them on request.
+ */
+const MAX_PROMPT_WORKERS = 25;
+
+export async function actorWorkerNames(actor: ActorContext): Promise<string[]> {
+  // A worker has no team; asking would be a query per turn for an empty list.
+  if (actor.role === 'worker') return [];
+
+  try {
+    const { userService } = await import('../../users/service.js');
+    const result = (await userService.listUsers(
+      { page: 1, limit: MAX_PROMPT_WORKERS + 1, role: 'worker' } as never,
+      { role: actor.role, userId: actor.userId, scope: actor.scope ?? null }
+    )) as { data?: Array<{ full_name?: string | null }> };
+
+    const names = (result.data ?? [])
+      .map((u) => u.full_name)
+      .filter((n): n is string => typeof n === 'string' && n.trim().length > 0);
+
+    return names.length > MAX_PROMPT_WORKERS ? [] : names;
+  } catch {
+    // Prompt context is an enhancement. Without it the assistant asks, which
+    // is what it did before -- failing the turn would be strictly worse.
+    return [];
+  }
+}

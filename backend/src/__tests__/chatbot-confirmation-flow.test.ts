@@ -275,3 +275,135 @@ describe('high-risk write confirmation flow', () => {
     expect(result.reply).toMatch(/nothing waiting/i);
   });
 });
+
+
+/**
+ * TYPING INSTEAD OF TAPPING.
+ *
+ * The confirmation was reachable only by `confirmToken` -- the value the
+ * Confirm button sends. People on phones type "yes". Until 2026-09-10 that
+ * fell through to the model, which saw the word with no antecedent, and the
+ * approved write never ran; "cancel" did the same AND left the write parked.
+ *
+ * The security property is unchanged and the first two tests here are what
+ * pin that: the call still comes from session_state, never the request.
+ */
+describe('a person who types instead of tapping', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sessionState = {};
+    toolCallLog = new Map();
+    writeInvoke.mockResolvedValue({ created: 1 });
+    providerCall.mockResolvedValue({
+      text: '',
+      toolUse: { name: TOOL, input: { room_number: '204', count: 1 } },
+      usage: { promptTokens: 10, completionTokens: 2 },
+    });
+  });
+
+  const propose = () => runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'clean room 204' });
+
+  it('executes the parked call on a plain "yes"', async () => {
+    await propose();
+    const done = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'yes' });
+
+    expect(writeInvoke).toHaveBeenCalledTimes(1);
+    expect(done.toolInvoked).toBe(TOOL);
+  });
+
+  it('runs the call from session_state, never anything in the request', async () => {
+    await propose();
+    await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'yes' });
+
+    // The arguments executed are the ones that were parked and displayed.
+    const [args] = writeInvoke.mock.calls[0] as [Record<string, unknown>];
+    expect(args).toEqual({ room_number: '204', count: 1 });
+  });
+
+  it.each(['ja', 'ok', 'do it', 'go ahead', 'bestätigen'])(
+    'accepts "%s" as approval too',
+    async (word) => {
+      await propose();
+      await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: word });
+      expect(writeInvoke).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['no', 'cancel', 'nein', 'abbrechen', 'never mind'])(
+    'cancels on "%s", writing nothing and disarming the proposal',
+    async (word) => {
+      await propose();
+      const out = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: word });
+
+      expect(writeInvoke).not.toHaveBeenCalled();
+      expect(out.reply).toMatch(/Cancelled\. Nothing has been changed\./);
+      expect((sessionState as any).pending_confirmation).toBeUndefined();
+    }
+  );
+
+  /**
+   * THE LOAD-BEARING TEST. "yes but make it Friday" is a CORRECTION. Reading
+   * its first word as consent would execute the very call the person was in
+   * the middle of changing.
+   */
+  it.each([
+    'yes but make it Friday',
+    'yes, room 205 instead',
+    'ja aber am Freitag',
+    'actually no, room 300',
+  ])('does NOT treat "%s" as approval', async (phrase) => {
+    await propose();
+    providerCall.mockResolvedValue({
+      text: 'Which day did you mean?',
+      toolUse: null,
+      usage: { promptTokens: 5, completionTokens: 2 },
+    });
+
+    await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: phrase });
+    expect(writeInvoke).not.toHaveBeenCalled();
+  });
+
+  /**
+   * An armed proposal that outlives the exchange it belongs to is what makes
+   * a stray Confirm dangerous later. Moving on disarms it.
+   */
+  it('disarms the proposal when the person asks something else entirely', async () => {
+    const proposal = await propose();
+    const token = proposal.pendingConfirmation!.token;
+
+    providerCall.mockResolvedValue({
+      text: 'Here is your schedule.',
+      toolUse: null,
+      usage: { promptTokens: 5, completionTokens: 2 },
+    });
+    await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'what are my shifts this week' });
+
+    expect((sessionState as any).pending_confirmation).toBeUndefined();
+
+    // And the stale token no longer does anything.
+    const late = await runTurn({ conversationId: 'conv_1', actor: ACTOR, confirmToken: token });
+    expect(writeInvoke).not.toHaveBeenCalled();
+    expect(late.reply).toMatch(/nothing waiting to be confirmed/i);
+  });
+
+  it('does not treat "yes" as approval when nothing is pending', async () => {
+    providerCall.mockResolvedValue({
+      text: 'What would you like to do?',
+      toolUse: null,
+      usage: { promptTokens: 5, completionTokens: 2 },
+    });
+    const out = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'yes' });
+
+    expect(writeInvoke).not.toHaveBeenCalled();
+    expect(out.reply).not.toMatch(/Cancelled/);
+  });
+
+  it('executes only once when "yes" is sent twice', async () => {
+    await propose();
+    await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'yes' });
+    const replay = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'yes' });
+
+    expect(writeInvoke).toHaveBeenCalledTimes(1);
+    expect(replay.reply).not.toMatch(/^done$/);
+  });
+});

@@ -228,7 +228,12 @@ describe('L0 end to end with NO provider configured', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.route).toBe('none');
-    expect(res.body.data.reply).toContain('quick commands');
+    // The durable property is that the person is pointed at something that
+    // ACTUALLY EXISTS on screen -- a row of buttons. The old wording said
+    // "quick commands", a name no client uses, which sends someone looking
+    // for a control that is not there (2026-09-10).
+    expect(res.body.data.reply).toMatch(/buttons/i);
+    expect(res.body.data.reply).not.toMatch(/quick commands|checklist/i);
   });
 });
 
