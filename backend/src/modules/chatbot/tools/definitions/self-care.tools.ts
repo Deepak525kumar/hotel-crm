@@ -4,6 +4,7 @@ import { calendarService } from '../../../calendar/service.js';
 import { analyticsService } from '../../../analytics/service.js';
 import { hrService } from '../../../hr/service.js';
 import { toServiceActor } from '../actor.js';
+import { APPROVED_2026_09_09 } from '../approvals.js';
 import { registerTool, type CompactResult } from '../registry.js';
 import { asRefusal, refuse } from '../tool-errors.js';
 import { isoDate } from '../schema-primitives.js';
@@ -61,7 +62,7 @@ export const completeMyShift = registerTool<NoArgs>({
 
   interfaceRef: 'IF-ASG-UpdateAssignment (assignments/service.ts update())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'consumes `assignments:status-write`, which was added on 2026-09-09 for exactly ' +
     'this and had no tool using it until now.',
 
@@ -135,7 +136,7 @@ export const withdrawMyAbsence = registerTool<WithdrawArgs>({
 
   interfaceRef: 'IF-CAL-DeleteAbsence (calendar/service.ts deleteAbsence())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     "Self-scoped: it resolves only within the caller's own absences, and deleteAbsence " +
     'applies its own ownership check on top.',
 
@@ -216,7 +217,7 @@ export const requestMyPayslip = registerTool<PayslipArgs>({
 
   interfaceRef: 'IF-HR-RequestPayslip (hr/service.ts requestPayslip())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'Self-scoped and LOW_RISK: it raises a request against the caller, discloses ' +
     'nothing, and is fulfilled by a person.',
 
@@ -262,7 +263,7 @@ export const myStats = registerTool<NoArgs>({
 
   interfaceRef: 'IF-ANL-GetWorkerStats (analytics/service.ts getWorkerStats())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'Self-scoped + READ_ONLY. Deliberately the ONLY analytics tool: the leaderboard ' +
     'and /stats routes carry the OQ-ANALYTICS-01 authorization gap, and /my-stats ' +
     "does not ride their guard -- its route comment says so explicitly.",

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { employeeManagementService } from '../../../employee-management/service.js';
 import { crmService } from '../../../crm/service.js';
 import { toServiceActor } from '../actor.js';
+import { APPROVED_2026_09_09 } from '../approvals.js';
 import { registerTool, type CompactResult } from '../registry.js';
 import { asRefusal, refuse } from '../tool-errors.js';
 import { resolveHotelReference, refuseUnresolvedHotel } from '../worker-reference.js';
@@ -158,7 +159,7 @@ export const listReviewQueue = registerTool<NoArgs>({
 
   interfaceRef: 'IF-EMP-GetReviewQueue (employee-management/service.ts getReviewQueue())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. First ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     "READ tool over other people's employment records; scope is the owning service's " +
     'own review-queue resolver, the same one that decides review notifications.',
 
@@ -217,7 +218,7 @@ export const listMyHotels = registerTool<NoArgs>({
 
   interfaceRef: 'IF-CRM-ListHotels (crm/service.ts listHotels())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'READ_ONLY over master data the caller can already list; listHotels applies its ' +
     "own role and scope narrowing.",
 
@@ -291,7 +292,7 @@ export const approveApplication = registerTool<ApplicantArgs>({
 
   interfaceRef: 'IF-EMP-ApproveEmployee (employee-management/service.ts approve())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     "changes another person's employment state and activates their account, so it " +
     'warrants at least the scrutiny of assignments.place_worker.',
 
@@ -354,7 +355,7 @@ export const rejectApplication = registerTool<RejectArgs>({
 
   interfaceRef: 'IF-EMP-RejectEmployee (employee-management/service.ts reject())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It ends ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     "somebody's application and is not undone by re-running anything.",
 
   args: RejectArgs,
@@ -410,7 +411,7 @@ export const assignApplicantToHotel = registerTool<AssignArgs>({
 
   interfaceRef: 'IF-EMP-AssignEmployee (employee-management/service.ts assign())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'decides where a person works, which drives their roster eligibility everywhere ' +
     'else on the platform.',
 

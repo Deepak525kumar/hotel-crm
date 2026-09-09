@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { jobRequestService } from '../../../job-requests/service.js';
 import { isJobDispatchPhase2Enabled } from '../../../../config/feature-flags.js';
 import { toServiceActor } from '../actor.js';
+import { APPROVED_2026_09_09 } from '../approvals.js';
 import { registerTool, type CompactResult } from '../registry.js';
 import { isoDate } from '../schema-primitives.js';
 import { asRefusal, refuse } from '../tool-errors.js';
@@ -144,7 +145,7 @@ export const listOpenShifts = registerTool<ListOpenArgs>({
 
   interfaceRef: 'IF-JOB-ListWorkRequests (job-requests/service.ts list())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'READ_ONLY. The candidate set is the owning service\'s own scoped answer: a ' +
     'self-scoped caller sees only their roster hotels and their own target_role.',
 
@@ -231,7 +232,7 @@ export const acceptOpenShift = registerTool<AcceptArgs>({
 
   interfaceRef: 'IF-JOB-AcceptBroadcast (job-requests/service.ts acceptBroadcast())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     "commits the caller's own day and claims a slot from a shared pool, so a mistake " +
     'costs both this person and whoever else wanted the shift.',
 

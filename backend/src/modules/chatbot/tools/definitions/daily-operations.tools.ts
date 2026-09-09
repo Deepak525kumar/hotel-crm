@@ -4,6 +4,7 @@ import { assignmentService } from '../../../assignments/service.js';
 import { attendanceService } from '../../../attendance/service.js';
 import { roomService } from '../../../rooms/service.js';
 import { toServiceActor } from '../actor.js';
+import { APPROVED_2026_09_09 } from '../approvals.js';
 import { registerTool, type CompactResult } from '../registry.js';
 import { asRefusal, refuse } from '../tool-errors.js';
 import { CALENDAR_TIMEZONE } from '../../../../lib/utils.js';
@@ -234,7 +235,7 @@ export const checkInToMyShift = registerTool<CheckInArgs>({
 
   interfaceRef: 'IF-ATT-CheckIn (attendance/service.ts checkIn())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. The ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     "2026-09-08 blanket approval covers the thirteen tools registered on that date " +
     'and explicitly does not extend to later ones. Writes a timestamped payroll ' +
     'record the worker cannot themselves retract, which is why it is HIGH_RISK.',
@@ -304,7 +305,7 @@ export const checkOutOfMyShift = registerTool<CheckOutArgs>({
 
   interfaceRef: 'IF-ATT-UpdateAttendance (attendance/service.ts update())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. Closes a ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'payroll record with a timestamp the worker cannot themselves change afterwards.',
 
   args: CheckOutArgs,
@@ -397,7 +398,7 @@ export const logRoomCleaned = registerTool<LogRoomArgs>({
 
   interfaceRef: 'IF-ROOM-LogRoom (rooms/service.ts logRoom())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. The one ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'unconfirmed write in this batch; the reversibility argument for that is at the ' +
     'tier declaration above.',
 
@@ -457,7 +458,7 @@ export const listMyRoomsToday = registerTool<MyRoomsArgs>({
 
   interfaceRef: 'IF-ROOM-ListMyRooms (rooms/service.ts listMyRooms())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'Self-scoped + READ_ONLY, the same envelope as assignments.list_mine.',
 
   args: MyRoomsArgs,
