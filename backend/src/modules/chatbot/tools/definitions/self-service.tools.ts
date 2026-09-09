@@ -71,21 +71,32 @@ const APPROVED_2026_09_08 =
  * authenticated actor at execution time. `.strict()` so an unexpected key
  * from model output is a validation failure, not a silently ignored field.
  *
- * Also note what it does not contain yet: a date range. `ListAssignmentsQuery`
- * (assignments/types.ts) exposes no from/to filter, so accepting one here
- * would be an argument the model can set that silently does nothing — worse
- * than not offering it, because the answer would look filtered when it isn't.
- * Adding date filtering is a change to the owning module's own interface
- * first (ADR-053 item 2), not something this tool may fake locally.
+ * IT NOW CONTAINS A DATE RANGE, and why the note here used to forbid one is
+ * worth keeping: `ListAssignmentsQuery` exposed no from/to, so accepting one
+ * would have been an argument the model could set that silently did nothing
+ * -- an answer that LOOKS filtered and isn't. That reasoning was right, and
+ * the interface changed underneath it: from/to were added to
+ * `ListAssignmentsQuerySchema` on 2026-09-08, the same day this was written.
+ *
+ * Leaving it stale had a real cost. Asked "am I working tomorrow" the tool
+ * returned EVERY shift, because the model had no way to say "tomorrow"
+ * (observed 2026-09-10). Both dates or neither, matching the owning schema's
+ * own refine: a half-open range reads as a typo more often than an intention.
  */
 const ListMineArgs = z
   .object({
+    from: isoDate.optional(),
+    to: isoDate.optional(),
     status: z
       .enum(['CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'NO_SHOW', 'CANCELLED', 'REASSIGNED'])
       .optional(),
     limit: z.number().int().min(1).max(50).default(20),
   })
-  .strict();
+  .strict()
+  .refine((v) => (v.from == null) === (v.to == null), {
+    message: 'from and to must be given together',
+    path: ['to'],
+  });
 
 type ListMineArgs = z.infer<typeof ListMineArgs>;
 
@@ -115,10 +126,14 @@ function compressAssignments(raw: unknown): CompactResult {
 export const listMyAssignments = registerTool<ListMineArgs>({
   name: 'assignments.list_mine',
   description:
-    "List the authenticated worker's OWN upcoming or past shift assignments. Use for " +
-    '"what are my shifts", "am I working tomorrow", "wann arbeite ich", "show my ' +
-    'schedule". Returns the day, hotel and status of each shift, and only ever the ' +
-    "caller's own -- never another worker's.",
+    "List the authenticated worker's OWN shifts. Use for \"what are my shifts\", " +
+    '"am I working tomorrow", "wann arbeite ich", "show my schedule". Returns the ' +
+    "day, hotel and status of each shift, and only ever the caller's own -- never " +
+    "another worker's.\n\n" +
+    'When the question is about a particular day or period, ALWAYS pass from and to ' +
+    'as YYYY-MM-DD -- both, or neither. For "tomorrow" set both to tomorrow; for ' +
+    '"this week" set them to the Monday and the Sunday. Omitting them returns every ' +
+    'shift, which is rarely what was asked.',
   tier: 'READ_ONLY',
   confirm: false,
 
@@ -161,6 +176,7 @@ export const listMyAssignments = registerTool<ListMineArgs>({
     // a forbidden argument key.
     const { data } = await assignmentService.list(
       {
+        ...(args.from && args.to ? { from: args.from, to: args.to } : {}),
         status: args.status,
         page: 1,
         per_page: args.limit,
@@ -849,9 +865,11 @@ export const markMyAbsence = registerTool<MarkMyAbsenceArgs>({
   name: 'calendar.mark_my_absence',
   description:
     "Record one of the authenticated user's OWN sick or vacation days. Use for " +
-    '"I am sick today", "ich bin krank", "book me off on the 12th". A vacation day ' +
-    'requires a reason; a sick day does not. Give the day as YYYY-MM-DD. Returns ' +
-    'confirmation of the day and kind recorded.',
+    '"I am sick today", "ich bin krank", "book me off on the 12th". Give the day as ' +
+    'YYYY-MM-DD. Returns confirmation of the day and kind recorded.\n\n' +
+    'A holiday requires a reason and a sick day does not. NEVER invent the reason. ' +
+    'If someone asks for a day off without saying why, ask them why first -- a ' +
+    'reason you made up is recorded against their name as though they gave it.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 
@@ -912,6 +930,11 @@ export const markMyAbsence = registerTool<MarkMyAbsenceArgs>({
  */
 const TeamAssignmentsArgs = z
   .object({
+    // Same date range, for the same reason: "who is working this week" was
+    // answered from whatever the first page of ALL assignments happened to
+    // hold, which is neither the week nor an answer.
+    from: isoDate.optional(),
+    to: isoDate.optional(),
     // Free text across worker name, hotel name and city. Capped at the same
     // 120 characters ListAssignmentsQuerySchema caps at: this becomes several
     // LIKE clauses over joined tables, and an unbounded term is a cheap way
@@ -922,7 +945,11 @@ const TeamAssignmentsArgs = z
       .optional(),
     limit: z.number().int().min(1).max(50).default(20),
   })
-  .strict();
+  .strict()
+  .refine((v) => (v.from == null) === (v.to == null), {
+    message: 'from and to must be given together',
+    path: ['to'],
+  });
 
 type TeamAssignmentsArgs = z.infer<typeof TeamAssignmentsArgs>;
 
@@ -960,9 +987,15 @@ function compressTeamAssignments(raw: unknown): CompactResult {
 export const listTeamAssignments = registerTool<TeamAssignmentsArgs>({
   name: 'assignments.list_for_my_team',
   description:
-    "List shifts across the manager's OWN hotel or group. Use for questions like " +
-    '"who is working tomorrow", "show me Anna\'s shifts", "what is scheduled at my hotel". ' +
-    'Search by name with the q parameter.',
+    "List the shifts SCHEDULED across the manager's OWN hotel or group -- the plan, " +
+    'not what happened. Use for "who is working tomorrow", "show me Anna\'s shifts", ' +
+    '"what is scheduled at my hotel". Search for one person by name with q. Returns ' +
+    'the worker, hotel, day and status of each shift.\n\n' +
+    'When the question names a day or a period, ALWAYS pass from and to as ' +
+    'YYYY-MM-DD -- both, or neither. For "tomorrow" set both to tomorrow; for "this ' +
+    'week" set them to the Monday and the Sunday. Without them every shift is ' +
+    'returned, which is rarely what was asked.\n\n' +
+    'For who actually turned up and clocked in, use attendance.team_status instead.',
   tier: 'READ_ONLY',
   confirm: false,
 
@@ -986,10 +1019,15 @@ export const listTeamAssignments = registerTool<TeamAssignmentsArgs>({
   invoke: async (args, actor) => {
     return assignmentService.list(
       {
+        ...(args.from && args.to ? { from: args.from, to: args.to } : {}),
         ...(args.q ? { q: args.q } : {}),
         ...(args.status ? { status: args.status as never } : {}),
         page: 1,
-        limit: args.limit,
+        // `per_page`, NOT `limit`. ListAssignmentsQuerySchema has no `limit`
+        // key, so the cap this tool declared was silently dropped and every
+        // call took the schema default of 20 -- the `as never` is what let it
+        // through the compiler.
+        per_page: args.limit,
       } as never,
       toServiceActor(actor)
     );
@@ -1366,11 +1404,15 @@ type MarkWorkerAbsenceArgs = z.infer<typeof MarkWorkerAbsenceArgs>;
 export const markWorkerAbsence = registerTool<MarkWorkerAbsenceArgs>({
   name: 'calendar.mark_worker_absence',
   description:
-    "Record a sick or vacation day for one of the manager's OWN workers. Use for " +
-    '"Anna is off sick on Monday", "Tomasz called in sick", "book Maria off next ' +
-    'Friday". Give the worker\'s name as they are known at the hotel; the day must ' +
-    'be YYYY-MM-DD. A vacation day requires a reason; a sick day does not. This ' +
-    "does NOT record the manager's own absence -- use calendar.mark_my_absence for that.",
+    "Record a sick or vacation day for one of the manager's OWN workers. Use when " +
+    'you are TOLD that someone is off: "Anna is off sick on Monday", "Tomasz called ' +
+    'in sick", "book Maria off next Friday". Give the worker\'s name as they are ' +
+    'known at the hotel; the day must be YYYY-MM-DD.\n\n' +
+    'Do NOT use this to answer a QUESTION about who is off -- "who called in sick?", ' +
+    '"wer ist heute krank?" are asking, not telling, and are answered by ' +
+    'calendar.team_absences. Never guess a name: if you were not given one, ask. ' +
+    'A holiday requires a reason and a sick day does not; never invent the reason. ' +
+    "This does not record the manager's own absence -- use calendar.mark_my_absence.",
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 

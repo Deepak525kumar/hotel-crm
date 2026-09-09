@@ -106,8 +106,14 @@ describe('high-risk write confirmation flow', () => {
     expect(writeInvoke).not.toHaveBeenCalled();
     expect(result.pendingConfirmation).toBeDefined();
     expect(result.pendingConfirmation!.toolName).toBe(TOOL);
-    // The summary must show the actual arguments, not a prose paraphrase.
-    expect(result.pendingConfirmation!.summary).toContain('room_number: 204');
+    // The summary must show the actual argument VALUES, not a prose
+    // paraphrase -- an omitted field is where a substituted value would
+    // hide. The label around the value is human ("Room", not "room_number")
+    // as of 2026-09-10; the value itself is the part under test.
+    expect(result.pendingConfirmation!.summary).toContain('204');
+    expect(result.pendingConfirmation!.summary).toMatch(/room/i);
+    // And it must not read like a stack trace to the person approving it.
+    expect(result.pendingConfirmation!.summary).not.toContain('test.high_risk_write');
     expect(result.pendingConfirmation!.summary).toMatch(/Nothing has been changed yet/);
   });
 
