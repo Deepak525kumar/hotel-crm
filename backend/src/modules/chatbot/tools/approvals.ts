@@ -47,3 +47,27 @@ export const APPROVED_2026_09_09 =
   'Covers this tool as registered on that date, after it passed the full ' +
   'tool-design rule suite; a later change to its scope, risk tier or ' +
   'permission requires re-approval.';
+
+/**
+ * The third batch, 2026-09-09: the planning tools.
+ *
+ * Commissioned in the same instruction that approved them -- "fix the genuine
+ * gaps. and build tools from the absent list that you think are worth
+ * building" -- after a route-by-route gap analysis of all 88 platform routes
+ * against the then-31-tool registry was put to the commissioning human.
+ *
+ * The selection was delegated; the SCOPE limits above are not. Each of the
+ * four wraps a read or a draft-only write inside the caller's existing scope,
+ * which is what was described when the delegation was given. None of them
+ * relaxes one of the capabilities that analysis recorded as deliberately
+ * refused -- credentials, role and identity mutation, consent, subject-rights
+ * exports, org-structure surgery, bulk import, the leaderboard's known
+ * authorization gap, the audit log, operator internals, location history, or
+ * manager timesheet correction. Those stay refused, and adding any of them
+ * would need its own decision rather than this one.
+ */
+export const APPROVED_2026_09_09_PLANNING =
+  'APPROVED 2026-09-09 by the commissioning human under ADR-053 item 4, as the ' +
+  'planning batch (availability, staffing broadcasts, team attendance, team roster). ' +
+  'Covers this tool as registered on that date; a later change to its scope, ' +
+  'risk tier or permission requires re-approval.';

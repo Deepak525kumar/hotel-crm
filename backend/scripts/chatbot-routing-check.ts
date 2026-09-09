@@ -98,6 +98,24 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['worker', 'meine Lohnabrechnung bitte', 'request_payslip (de)', picks('hr.request_payslip')],
   ['worker', 'how am I doing this month?', 'my_stats', picks('analytics.my_stats')],
   ['worker', 'wie sind meine Zahlen?', 'my_stats (de)', picks('analytics.my_stats')],
+
+  // Added 2026-09-09 with the planning tools. Three of these tools answer
+  // questions that all sound like "who is working", so most of the cases below
+  // are deliberate collision probes between them rather than happy paths:
+  //   list_for_my_team  = who is SCHEDULED
+  //   team_status       = who actually SHOWED UP
+  //   find_team_member  = who EXISTS
+  //   check_availability= is ONE named person free on a day
+  ['manager', 'is Anna free on Thursday?', 'check_availability', picks('calendar.check_availability')],
+  ['manager', 'kann Tomasz am Montag arbeiten?', 'check_availability (de)', picks('calendar.check_availability')],
+  ['manager', 'who has clocked in today?', 'team_status', picks('attendance.team_status')],
+  ['manager', 'wer ist heute da?', 'team_status (de)', picks('attendance.team_status')],
+  ['manager', 'is anyone missing this morning?', 'team_status (missing)', picks('attendance.team_status')],
+  ['manager', 'who is on my team?', 'find_team_member', picks('users.find_team_member')],
+  ['manager', 'list my checkers', 'find_team_member (role)', picks('users.find_team_member')],
+  ['manager', 'I need 3 cleaners on 2026-09-17 from 08:00 to 16:00', 'create_broadcast', picks('job_requests.create_broadcast')],
+  ['manager', 'ich brauche zwei Reinigungskraefte am 2026-09-17 von 08:00 bis 16:00', 'create_broadcast (de)', picks('job_requests.create_broadcast')],
+
   ['manager', 'who is waiting for approval?', 'review_queue', picks('employees.review_queue')],
   ['manager', 'approve Anna', 'approve_application', picks('employees.approve_application')],
   ['manager', 'which hotels do I look after?', 'my_hotels', picks('hotels.my_hotels')],

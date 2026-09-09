@@ -441,10 +441,19 @@ describe('CalendarService.getAvailability (REQ-CAL-T06/RULE-CAL-08, ADR-021)', (
 
   it('returns available=true when the worker has no same-day assignment and no absence mark', async () => {
     const result = await service.getAvailability('w1', { userId: 'w1', role: 'worker' });
-    expect(result).toEqual({ worker_id: 'w1', available: true });
+    // `day` echoes back which day the answer is about. It was added with the
+    // optional day parameter (2026-09-09) so a caller can never mistake an
+    // answer about today for an answer about the day it asked for.
+    expect(result).toEqual({ worker_id: 'w1', day: '2026-07-27', available: true });
   });
 
-  it('is today-only: reads today\'s date regardless of any other input', async () => {
+  /**
+   * Defaults to today. Until 2026-09-09 this method was today-ONLY, and this
+   * test was named for that; the day parameter below replaced the restriction,
+   * not the default. `GET /calendar/availability` passes no day, so the route's
+   * behaviour is exactly what it was.
+   */
+  it('reads today when no day is given', async () => {
     await service.getAvailability('w1', { userId: 'w1', role: 'worker' });
     // Filters on the denormalized `day` column, not the legacy work_request
     // relation join (2026-08-07): work_request_id is null for every assignment
@@ -454,6 +463,43 @@ describe('CalendarService.getAvailability (REQ-CAL-T06/RULE-CAL-08, ADR-021)', (
     );
     expect(mockCalendarAbsence.findUnique.mock.calls[0][0].where).toEqual({
       worker_id_day: { worker_id: 'w1', day: new Date('2026-07-27T00:00:00.000Z') } ,
+    });
+  });
+
+  /**
+   * The day parameter must reach BOTH queries.
+   *
+   * A version that threaded it into the assignment lookup and left the absence
+   * lookup on today would answer "free" for a worker on holiday next Tuesday --
+   * wrong in the direction that puts someone on a shift they cannot work. So
+   * this asserts the WHERE of each query, not the returned boolean, which a
+   * mock would happily produce either way.
+   */
+  it('answers about the day it was given, in both the assignment and absence lookups', async () => {
+    const result = await service.getAvailability(
+      'w1',
+      { userId: 'w1', role: 'worker' },
+      '2026-08-04'
+    );
+
+    const expected = new Date('2026-08-04T00:00:00.000Z');
+    expect(mockWorkerAssignment.findFirst.mock.calls[0][0].where.day).toEqual(expected);
+    expect(mockCalendarAbsence.findUnique.mock.calls[0][0].where).toEqual({
+      worker_id_day: { worker_id: 'w1', day: expected },
+    });
+    expect(result.day).toBe('2026-08-04');
+  });
+
+  it('reports unavailable for a future day the worker is already booked on', async () => {
+    mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'a1' });
+    const result = await service.getAvailability(
+      'w1',
+      { userId: 'w1', role: 'worker' },
+      '2026-08-04'
+    );
+    expect({ day: result.day, available: result.available }).toEqual({
+      day: '2026-08-04',
+      available: false,
     });
   });
 
