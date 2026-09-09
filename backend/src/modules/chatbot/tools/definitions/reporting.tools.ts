@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { plausibleDate } from '../schema-primitives.js';
 import { reportService } from '../../../reports/service.js';
 import { toServiceActor } from '../actor.js';
+import { APPROVED_2026_09_09 } from '../approvals.js';
 import { registerTool, type CompactResult } from '../registry.js';
 
 /**
@@ -60,7 +61,7 @@ export const queryTeamData = registerTool<QueryArgs>({
 
   interfaceRef: 'IF-RPT-QueryDataset (reports/service.ts queryDataset())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. Reads ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     "other people's rows, so it is the first READ tool gated on a management token " +
     'rather than self-scope.',
 
@@ -127,7 +128,7 @@ export const exportTeamReport = registerTool<ExportArgs>({
 
   interfaceRef: 'IF-RPT-GenerateReport (reports/service.ts generateReport())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. It ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     "produces a file containing other people's personal data and a link that leaves " +
     'the platform, so it warrants the closest review of any read-shaped tool here.',
 
@@ -172,7 +173,7 @@ export const exportMyData = registerTool<ExportMineArgs>({
 
   interfaceRef: 'IF-RPT-ExportOwnData (reports/service.ts exportOwnData())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'Self-scoped: it can only ever produce the caller\'s own records.',
 
   args: ExportMineArgs,

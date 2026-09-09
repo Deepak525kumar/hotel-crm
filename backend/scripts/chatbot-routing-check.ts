@@ -27,6 +27,12 @@ process.env.CHATBOT_PROVIDER = 'mantle';
 process.env.FEATURE_CHATBOT = 'true';
 process.env.CHATBOT_CONFIRM_TOKEN_SECRET = 'x'.repeat(40);
 
+// Loads the real configuration. Required since the registry grew tools whose
+// owning services read config when called -- without it every case fails with
+// "Environment not loaded" rather than routing.
+import { loadEnv } from '../src/config/env.js';
+loadEnv();
+
 import { MantleProvider } from '../src/modules/chatbot/provider/mantle-provider.js';
 import {
   visibleTools,
@@ -77,6 +83,30 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['manager', 'show me attendance from 2026-08-01 to 2026-08-31', 'query_team', picks('reports.query_team')],
   ['manager', 'export last month attendance to Excel', 'export_team', picks('reports.export_team')],
   ['manager', 'give me a PDF of August absences', 'export_team (pdf)', picks('reports.export_team')],
+
+  // Added 2026-09-09 with the self-care tools. These are the phrases most
+  // likely to collide with the shift family already present.
+  // "I've finished my shift" is NOT here on purpose: it means the time clock,
+  // and `attendance.check_out` owns it (see the 'done = check out' case below).
+  // Closing the shift RECORD is a separate, deliberate act, so it is exercised
+  // with wording that names the record -- which is also the honest measure of
+  // how reachable this tool is in practice.
+  ['worker', 'mark my shift as complete', 'complete_my_shift', picks('assignments.complete_my_shift')],
+  ['worker', 'Schicht als erledigt markieren', 'complete (de)', picks('assignments.complete_my_shift')],
+  ['worker', 'I am better, cancel my sick day on 2026-09-20', 'withdraw_absence', picks('calendar.withdraw_my_absence')],
+  ['worker', 'send me my payslip', 'request_payslip', picks('hr.request_payslip')],
+  ['worker', 'meine Lohnabrechnung bitte', 'request_payslip (de)', picks('hr.request_payslip')],
+  ['worker', 'how am I doing this month?', 'my_stats', picks('analytics.my_stats')],
+  ['worker', 'wie sind meine Zahlen?', 'my_stats (de)', picks('analytics.my_stats')],
+  ['manager', 'who is waiting for approval?', 'review_queue', picks('employees.review_queue')],
+  ['manager', 'approve Anna', 'approve_application', picks('employees.approve_application')],
+  ['manager', 'which hotels do I look after?', 'my_hotels', picks('hotels.my_hotels')],
+  ['worker', 'any shifts going on Friday?', 'list_open', picks('job_requests.list_open')],
+
+  // THE COLLISION SET. "Done" now means three different things: finished a
+  // room, finished the shift, or checked out. These must separate.
+  ['worker', 'done with room 214', 'done = a room', picks('rooms.log_cleaned')],
+  ['worker', 'I am done for today', 'done = check out', picks('attendance.check_out')],
 
   // Must NOT reach for a tool at all.
   ['worker', 'hello', 'no tool: greeting', picks(null)],

@@ -73,7 +73,14 @@ Each of these is a deliberate refusal, not an oversight. Re-deciding them is fin
   `CHATBOT_CONFIRM_TOKEN_SECRET` is now REQUIRED when `FEATURE_CHATBOT` is on, enforced at
   boot. The token binds actor, conversation, turn index, tool name, an args hash and an
   expiry, so a confirmation authorises one exact call and nothing else.
-- **No analytics tool.** Blocked on `OQ-ANALYTICS-01` — `API_INDEX.yaml` records the leaderboard routes as missing `requireRole`/`checkHotelAccess`. Wrapping a broken route in a tool would industrialize the breakage.
+- ~~**No analytics tool.**~~ **Corrected 2026-09-09.** `OQ-ANALYTICS-01` was resolved in code
+  on 2026-07-17 (Sprint 0 S0-5, `SIR-ANLY-001`) and `SPEC-ANALYTICS-001` froze on 2026-07-20;
+  the leaderboard routes now carry `requireRole`, `requirePermission('analytics:read')` and
+  `checkHotelAccess()`, re-verified against live `routes.ts`. This refusal had been standing on
+  a condition that stopped holding two months earlier. `analytics.my_stats` is now registered —
+  self-scoped and READ_ONLY, on the one route that never rode the leaderboard guard. The
+  management analytics surface stays out, on its own merits rather than on a stale finding.
+  Original text: Blocked on `OQ-ANALYTICS-01` — `API_INDEX.yaml` records the leaderboard routes as missing `requireRole`/`checkHotelAccess`. Wrapping a broken route in a tool would industrialize the breakage.
 - **Still no analytics tool, no document-upload tool, and no stored transcript.** Those
   three refusals stand, for the reasons given above and below.
 

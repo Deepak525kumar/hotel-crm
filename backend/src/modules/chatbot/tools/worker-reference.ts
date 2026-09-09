@@ -1,3 +1,4 @@
+import { refuse } from './tool-errors.js';
 import { getPrisma } from '../../../lib/db.js';
 import { listEligibleWorkerIds } from '../../../lib/roster-scope.js';
 import type { ActorContext } from './actor.js';
@@ -228,3 +229,29 @@ export function describeUnresolvedHotel(result: HotelReferenceResult): string {
       return 'Could not identify that hotel.';
   }
 }
+
+/**
+ * The same refusals, carrying a CODE.
+ *
+ * `describeUnresolved` returns prose, which is what a person reads; these
+ * return the structured shape, which is what decides the next move. A model
+ * cannot tell "try a fuller name" from "this person is not yours" by reading
+ * English, and rule 16's whole point is that it should not have to.
+ */
+export function refuseUnresolved(result: WorkerReferenceResult) {
+  const code =
+    result.status === 'AMBIGUOUS' ? 'AMBIGUOUS'
+    : result.status === 'NO_SCOPE' ? 'OUT_OF_SCOPE'
+    : 'NOT_FOUND';
+  return refuse(code, describeUnresolved(result));
+}
+
+export function refuseUnresolvedHotel(result: HotelReferenceResult) {
+  const code =
+    result.status === 'AMBIGUOUS' ? 'AMBIGUOUS'
+    // NEEDS_NAME is the caller having to supply something, not an absence.
+    : result.status === 'NEEDS_NAME' ? 'NEEDS_INPUT'
+    : 'NOT_FOUND';
+  return refuse(code, describeUnresolvedHotel(result));
+}
+

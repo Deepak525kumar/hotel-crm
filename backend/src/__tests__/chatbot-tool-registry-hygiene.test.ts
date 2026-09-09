@@ -151,12 +151,36 @@ describe('tool registry hygiene — every registered tool', () => {
     }
   });
 
-  it('registers no analytics tool while OQ-ANALYTICS-01 is open', () => {
-    // API_INDEX.yaml records the analytics leaderboard routes as missing
-    // requireRole/checkHotelAccess. Wrapping a broken route in a tool would
-    // industrialize the breakage.
-    const analytics = listTools().filter((t) => t.name.startsWith('analytics.'));
-    expect(analytics.map((t) => t.name)).toEqual([]);
+  /**
+   * CORRECTED 2026-09-09. This previously asserted NO analytics tool may exist
+   * "while OQ-ANALYTICS-01 is open", because the leaderboard routes were
+   * recorded as missing `requireRole`/`checkHotelAccess`.
+   *
+   * That finding was RESOLVED IN CODE on 2026-07-17 (Sprint 0 S0-5,
+   * `SIR-ANLY-001`), and `SPEC-ANALYTICS-001@0.2.2` has been FROZEN since
+   * 2026-07-20 with security upgraded FAIL -> PASS_WITH_ACTIONS. Re-verified
+   * here against live `analytics/routes.ts` rather than taken from the
+   * registry note: both leaderboard routes now carry
+   * `requireRole(['admin','manager','regional_manager'])`,
+   * `requirePermission('analytics:read')`, and the by-hotel route
+   * `checkHotelAccess()`.
+   *
+   * The guard had therefore been blocking on a condition that stopped holding
+   * two months ago. It is narrowed rather than deleted: what still should not
+   * exist is a chatbot tool over the MANAGEMENT analytics surface, which is a
+   * dashboard concern with no conversational shape. Only self-scoped analytics
+   * belongs in the registry.
+   */
+  it('registers no analytics tool beyond the self-scoped one', () => {
+    for (const tool of listTools().filter((t) => t.name.startsWith('analytics.'))) {
+      expect({ tool: tool.name, scope: tool.scopeCheck, tier: tool.tier }).toEqual({
+        tool: tool.name,
+        scope: 'self',
+        tier: 'READ_ONLY',
+      });
+      // Nothing may wrap the leaderboard or the management dashboard.
+      expect(tool.name).not.toMatch(/leaderboard|dashboard|hotel_summary/);
+    }
   });
 });
 

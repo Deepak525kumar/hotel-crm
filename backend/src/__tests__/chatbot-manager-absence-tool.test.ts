@@ -29,6 +29,33 @@ jest.mock('../modules/calendar/service.js', () => ({
   },
 }));
 jest.mock('../modules/chatbot/tools/worker-reference.js', () => ({
+  // The coded refusals the tools now return. Mirrors tool-errors.ts's mapping
+  // so an assertion about `refusal_code` here means the same thing it does in
+  // production.
+  refuseUnresolved: (r: any) => ({
+    refused: {
+      code: r.status === 'AMBIGUOUS' ? 'AMBIGUOUS' : r.status === 'NO_SCOPE' ? 'OUT_OF_SCOPE' : 'NOT_FOUND',
+      message:
+        r.status === 'AMBIGUOUS'
+          ? `More than one worker matches "${r.query}": ${(r.candidates ?? []).join(', ')}. Please use a fuller name.`
+          : r.status === 'NO_SCOPE'
+            ? 'This can only be done by a manager assigned to a specific hotel.'
+            : `No worker matching "${r.query}" is on your team.`,
+      nextAction: r.status === 'NO_SCOPE' ? 'stop' : 'ask_user',
+    },
+  }),
+  refuseUnresolvedHotel: (r: any) => ({
+    refused: {
+      code: r.status === 'AMBIGUOUS' ? 'AMBIGUOUS' : r.status === 'NEEDS_NAME' ? 'NEEDS_INPUT' : 'NOT_FOUND',
+      message:
+        r.status === 'NEEDS_NAME'
+          ? 'Which hotel? Please name it, since you cover more than one.'
+          : r.status === 'AMBIGUOUS'
+            ? `More than one hotel matches "${r.query}".`
+            : `No hotel matching "${r.query}" is in your scope.`,
+      nextAction: r.status === 'NEEDS_NAME' ? 'ask_user' : r.status === 'AMBIGUOUS' ? 'ask_user' : 'ask_user',
+    },
+  }),
   resolveWorkerReference: mockResolve,
   resolveHotelReference: mockResolveHotel,
   describeUnresolved: (r: any) =>

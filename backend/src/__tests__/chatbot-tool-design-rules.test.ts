@@ -2,9 +2,12 @@ import { describe, it, expect } from '@jest/globals';
 import { listTools, permissionTokens } from '../modules/chatbot/tools/registry.js';
 import { actorHasPermission } from '../modules/chatbot/tools/executor.js';
 import {
+  asRefusal,
   classifyToolError,
   describeToolError,
+  refuse,
   toolError,
+  type RefusalCode,
   type ToolErrorCode,
 } from '../modules/chatbot/tools/tool-errors.js';
 import {
@@ -423,6 +426,89 @@ describe('rule: ambiguity is refused, never guessed', () => {
         file,
         guards: true,
       });
+    }
+  });
+});
+
+/**
+ * RULE: a refusal is structured, and its code decides the next move.
+ *
+ * A refusal is NOT a failure -- "you have no shift today" and "the database is
+ * unreachable" are both non-success, and collapsing them loses the only thing
+ * a caller can act on. Refusals were a bare string until 2026-09-09, so a
+ * model could only tell "ask for another name" from "already done, stop" by
+ * reading the English. That is precisely what rule 16 exists to prevent.
+ */
+describe('rule: refusals carry a code, not just prose', () => {
+  it.each([
+    ['NOT_FOUND', 'ask_user'],
+    ['AMBIGUOUS', 'ask_user'],
+    ['NEEDS_INPUT', 'ask_user'],
+    ['ALREADY_DONE', 'stop'],
+    ['OUT_OF_SCOPE', 'stop'],
+    ['UNAVAILABLE', 'stop'],
+  ])('%s directs the caller to %s', (code, nextAction) => {
+    expect(refuse(code as RefusalCode, 'x').refused.nextAction).toBe(nextAction);
+  });
+
+  /**
+   * OUT_OF_SCOPE must never invite a rephrase. Asking a person to try again
+   * differently, when the answer is "not yours", invites them to talk their
+   * way around a boundary that exists on purpose.
+   */
+  it('never invites a retry on a scope refusal', () => {
+    const scope = refuse('OUT_OF_SCOPE', 'Not your team.').refused;
+    expect(scope.nextAction).toBe('stop');
+    expect(refuse('UNAVAILABLE', 'Not enabled.').refused.nextAction).toBe('stop');
+  });
+
+  it('separates a refusal from a failure', () => {
+    // A failure has `retryable`; a refusal has no such field, because a
+    // refusal is a decision and re-running it changes nothing.
+    expect(toolError('TEMPORARY', 'x')).toHaveProperty('retryable');
+    expect(refuse('NOT_FOUND', 'x').refused).not.toHaveProperty('retryable');
+  });
+
+  it('reads a legacy bare string without rendering an object at a person', () => {
+    // Defensive: a tool mid-migration degrades to "refused, reason unknown"
+    // rather than printing [object Object].
+    expect(asRefusal({ refused: 'plain text' })?.message).toBe('plain text');
+    expect(asRefusal({ refused: { code: 'ALREADY_DONE', message: 'done', nextAction: 'stop' } })?.code)
+      .toBe('ALREADY_DONE');
+    expect(asRefusal({ ok: true })).toBeNull();
+  });
+
+  /**
+   * The mechanical guard: no tool file may build a refusal by hand. `refuse()`
+   * is the only supported constructor, and TypeScript enforces the shape --
+   * this catches the case where somebody reintroduces the bare string.
+   */
+  it('lets no tool construct a refusal by hand', () => {
+    const { readFileSync, readdirSync } = require('node:fs') as typeof import('node:fs');
+    const dir = 'src/modules/chatbot/tools/definitions';
+    for (const file of readdirSync(dir)) {
+      const source = readFileSync(`${dir}/${file}`, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+      // `refused:` may only appear as a type annotation or inside refuse().
+      expect({ file, handBuilt: /refused:\s*['\`]/.test(source) }).toEqual({
+        file,
+        handBuilt: false,
+      });
+    }
+  });
+
+  it('surfaces the code to the model, not only the sentence', () => {
+    // compress() puts `refusal_code` in `data`, which is what the model sees.
+    const dir = 'src/modules/chatbot/tools/definitions';
+    const { readFileSync, readdirSync } = require('node:fs') as typeof import('node:fs');
+    const withRefusals = readdirSync(dir).filter((f) =>
+      readFileSync(`${dir}/${f}`, 'utf8').includes('asRefusal')
+    );
+    expect(withRefusals.length).toBeGreaterThan(0);
+    for (const file of withRefusals) {
+      expect({ file, surfaced: readFileSync(`${dir}/${file}`, 'utf8').includes('refusal_code') })
+        .toEqual({ file, surfaced: true });
     }
   });
 });

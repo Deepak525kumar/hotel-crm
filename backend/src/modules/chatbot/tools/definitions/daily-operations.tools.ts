@@ -4,7 +4,9 @@ import { assignmentService } from '../../../assignments/service.js';
 import { attendanceService } from '../../../attendance/service.js';
 import { roomService } from '../../../rooms/service.js';
 import { toServiceActor } from '../actor.js';
+import { APPROVED_2026_09_09 } from '../approvals.js';
 import { registerTool, type CompactResult } from '../registry.js';
+import { asRefusal, refuse } from '../tool-errors.js';
 import { CALENDAR_TIMEZONE } from '../../../../lib/utils.js';
 import type { ActorContext } from '../actor.js';
 
@@ -142,6 +144,16 @@ export async function resolveMyShift(
 }
 
 /** A refusal a person can act on, in their own terms. */
+/** The coded form. `describeUnresolvedShift` stays for the prose. */
+export function refuseUnresolvedShift(result: ShiftResolution) {
+  // AMBIGUOUS needs the person to choose; NONE means no shift exists to act
+  // on, which a different day might fix.
+  return refuse(
+    result.status === 'AMBIGUOUS' ? 'AMBIGUOUS' : 'NOT_FOUND',
+    describeUnresolvedShift(result)
+  );
+}
+
 export function describeUnresolvedShift(result: ShiftResolution): string {
   if (result.status === 'NONE') {
     return `You have no shift scheduled for ${result.day}.`;
@@ -165,6 +177,24 @@ export function describeUnresolvedShift(result: ShiftResolution): string {
  * at this hotel" is true but leaves someone stuck, since the assistant has no
  * location to offer. That one gains the next step.
  */
+/**
+ * The coded form of a service refusal.
+ *
+ * The geofence cases are UNAVAILABLE rather than NOT_FOUND: the shift exists
+ * and the person is entitled to it, but this channel cannot complete it. That
+ * distinction is what stops a model retrying a check-in it can never perform.
+ */
+export function refuseWriteFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const code =
+    /location permission is required|outside the hotel geofence/i.test(message)
+      ? 'UNAVAILABLE'
+      : /already/i.test(message)
+        ? 'ALREADY_DONE'
+        : 'NOT_FOUND';
+  return refuse(code, explainWriteFailure(error));
+}
+
 export function explainWriteFailure(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
 
@@ -205,7 +235,7 @@ export const checkInToMyShift = registerTool<CheckInArgs>({
 
   interfaceRef: 'IF-ATT-CheckIn (attendance/service.ts checkIn())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. The ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     "2026-09-08 blanket approval covers the thirteen tools registered on that date " +
     'and explicitly does not extend to later ones. Writes a timestamped payroll ' +
     'record the worker cannot themselves retract, which is why it is HIGH_RISK.',
@@ -218,7 +248,7 @@ export const checkInToMyShift = registerTool<CheckInArgs>({
     const day = todayIso();
     const resolved = await resolveMyShift(actor, day);
     if (resolved.status !== 'RESOLVED') {
-      return { refused: describeUnresolvedShift(resolved) };
+      return refuseUnresolvedShift(resolved);
     }
 
     const serviceActor = toServiceActor(actor);
@@ -236,14 +266,15 @@ export const checkInToMyShift = registerTool<CheckInArgs>({
       );
       return { checkedIn: true, at: record.check_in_at, status: record.status };
     } catch (error) {
-      return { refused: explainWriteFailure(error) };
+      return refuseWriteFailure(error);
     }
   },
 
   compress: (raw: unknown): CompactResult => {
-    const r = raw as { refused?: string; at?: string | null; status?: string } | null;
+    const r = raw as { at?: string | null; status?: string } | null;
     if (!r) return { summary: 'Nothing was recorded.', data: null };
-    if (r.refused) return { summary: r.refused, data: null };
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
 
     const time = r.at ? new Date(r.at).toISOString().slice(11, 16) : 'now';
     const late = r.status === 'LATE' ? ' You are marked late.' : '';
@@ -266,15 +297,20 @@ type CheckOutArgs = z.infer<typeof CheckOutArgs>;
 export const checkOutOfMyShift = registerTool<CheckOutArgs>({
   name: 'attendance.check_out',
   description:
-    "Clock the authenticated user OUT of their own shift for today. Use for \"I'm " +
-    'finished", "clock me out", "Feierabend", "I am done for today". Only ever acts on ' +
-    "the caller's own shift.",
+    "Clock the authenticated user OUT of their own shift for today -- the TIME CLOCK, " +
+    'which is what a worker does at the end of every shift. Use for "I am done for ' +
+    'today", "I am finished", "clock me out", "Feierabend", "going home now", and ' +
+    'anything else about leaving or ending the working day. Only ever acts on the ' +
+    "caller's own shift. Returns the time recorded.\n\n" +
+    'Prefer this whenever someone means they have stopped working. Only if they ' +
+    'explicitly say they want the shift RECORD marked complete does ' +
+    'assignments.complete_my_shift apply instead.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 
   interfaceRef: 'IF-ATT-UpdateAttendance (attendance/service.ts update())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. Closes a ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'payroll record with a timestamp the worker cannot themselves change afterwards.',
 
   args: CheckOutArgs,
@@ -288,7 +324,7 @@ export const checkOutOfMyShift = registerTool<CheckOutArgs>({
     const day = todayIso();
     const resolved = await resolveMyShift(actor, day);
     if (resolved.status !== 'RESOLVED') {
-      return { refused: describeUnresolvedShift(resolved) };
+      return refuseUnresolvedShift(resolved);
     }
 
     const serviceActor = toServiceActor(actor);
@@ -306,10 +342,10 @@ export const checkOutOfMyShift = registerTool<CheckOutArgs>({
     const row = (data as Array<{ id: string; check_out_at?: string | null }>)[0];
 
     if (!row) {
-      return { refused: 'You have not checked in to this shift yet.' };
+      return refuse('NOT_FOUND', 'You have not checked in to this shift yet.');
     }
     if (row.check_out_at) {
-      return { refused: 'You have already checked out of this shift.' };
+      return refuse('ALREADY_DONE', 'You have already checked out of this shift.');
     }
 
     try {
@@ -322,14 +358,15 @@ export const checkOutOfMyShift = registerTool<CheckOutArgs>({
       );
       return { checkedOut: true, at: updated.check_out_at };
     } catch (error) {
-      return { refused: explainWriteFailure(error) };
+      return refuseWriteFailure(error);
     }
   },
 
   compress: (raw: unknown): CompactResult => {
-    const r = raw as { refused?: string; at?: string | null } | null;
+    const r = raw as { at?: string | null } | null;
     if (!r) return { summary: 'Nothing was recorded.', data: null };
-    if (r.refused) return { summary: r.refused, data: null };
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
     const time = r.at ? new Date(r.at).toISOString().slice(11, 16) : 'now';
     return { summary: `Checked out at ${time}.`, data: { checked_out_at: r.at } };
   },
@@ -366,7 +403,7 @@ export const logRoomCleaned = registerTool<LogRoomArgs>({
 
   interfaceRef: 'IF-ROOM-LogRoom (rooms/service.ts logRoom())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. The one ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'unconfirmed write in this batch; the reversibility argument for that is at the ' +
     'tier declaration above.',
 
@@ -378,7 +415,7 @@ export const logRoomCleaned = registerTool<LogRoomArgs>({
     const day = todayIso();
     const resolved = await resolveMyShift(actor, day);
     if (resolved.status !== 'RESOLVED') {
-      return { refused: describeUnresolvedShift(resolved) };
+      return refuseUnresolvedShift(resolved);
     }
 
     try {
@@ -392,14 +429,15 @@ export const logRoomCleaned = registerTool<LogRoomArgs>({
       // Duplicate rooms, closed logging windows and rework assignments all
       // surface here with the owning service's own wording, which is better
       // than anything restated at this layer.
-      return { refused: explainWriteFailure(error) };
+      return refuseWriteFailure(error);
     }
   },
 
   compress: (raw: unknown): CompactResult => {
-    const r = raw as { refused?: string; room?: string } | null;
+    const r = raw as { room?: string } | null;
     if (!r) return { summary: 'Nothing was recorded.', data: null };
-    if (r.refused) return { summary: r.refused, data: null };
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
     return { summary: `Room ${r.room} logged.`, data: { room: r.room } };
   },
   maxResultTokens: 60,
@@ -425,7 +463,7 @@ export const listMyRoomsToday = registerTool<MyRoomsArgs>({
 
   interfaceRef: 'IF-ROOM-ListMyRooms (rooms/service.ts listMyRooms())',
   approvalRef:
-    'PENDING -- ADR-053 item 4 requires this tool its own explicit approval. ' +
+    APPROVED_2026_09_09 + ' Registration note: ' +
     'Self-scoped + READ_ONLY, the same envelope as assignments.list_mine.',
 
   args: MyRoomsArgs,

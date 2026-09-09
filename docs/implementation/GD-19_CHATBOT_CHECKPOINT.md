@@ -133,6 +133,29 @@ Three results are worth recording, because the unit suite structurally cannot sh
 
 All twenty registered tools are now approved, and `assertAllToolsApproved()` passes.
 
+### 2026-09-09 (third decision) — the remaining eighteen tools
+
+All thirty-one registered tools are now approved under `ADR-053` item 4; none is `PENDING`,
+and `assertAllToolsApproved()` therefore no longer blocks boot with `FEATURE_CHATBOT` on.
+
+Approved in this batch: the four shift tools (`attendance.check_in`/`check_out`,
+`rooms.log_cleaned`/`my_rooms`), the three reporting tools, the two broadcast tools, the five
+team-management tools, and the four self-care tools (`assignments.complete_my_shift`,
+`calendar.withdraw_my_absence`, `hr.request_payslip`, `analytics.my_stats`).
+
+**What made a batch approval defensible rather than a leap.** Between the first approval and
+this one, the tool-design rules stopped being conventions and became build failures:
+descriptions, least privilege, deterministic enforcement, capability boundaries, semantic
+argument validation, structured failures, structured refusals, and ambiguity refusal. Every
+tool in this batch passes that suite — 202 assertions — and several were *changed* by it
+rather than merely checked: `employees.review_queue` had to gain its own permission token
+because `employees:read` is held by workers, and `hotels.my_hotels` had a mis-stated scope.
+
+The approval constants now live in `tools/approvals.ts` so the wording, and the scope limits
+attached to it, cannot drift between tool families. Those limits are unchanged: an approval
+covers the tool **as registered on its date**, is not standing authority for tools added
+later, and does not survive a change to a tool's scope, risk tier or permission.
+
 ## 3. Every other `OD-CHAT-*` item — exact current status
 
 ### Resolved
