@@ -25,6 +25,12 @@ process.env.CHATBOT_PROVIDER = 'mantle';
 process.env.FEATURE_CHATBOT = 'true';
 process.env.CHATBOT_CONFIRM_TOKEN_SECRET = 'x'.repeat(40);
 
+// Loads the real configuration. Required since the registry grew tools whose
+// owning services read config when called -- without it every case fails with
+// "Environment not loaded" rather than routing.
+import { loadEnv } from '../src/config/env.js';
+loadEnv();
+
 import { MantleProvider } from '../src/modules/chatbot/provider/mantle-provider.js';
 import {
   visibleTools,
