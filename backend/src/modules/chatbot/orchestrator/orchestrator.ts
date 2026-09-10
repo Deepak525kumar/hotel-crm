@@ -7,7 +7,8 @@ import { executeTool } from '../tools/executor.js';
 import { findPriorCall, recordToolCall } from '../tools/tool-call-log.js';
 import { describeToolError } from '../tools/tool-errors.js';
 import { resolveTool } from '../tools/registry.js';
-import { actorHotelNames, precheckReferences } from './reference-precheck.js';
+import { actorHotelNames, actorWorkerNames, precheckReferences } from './reference-precheck.js';
+import { classifyConfirmationReply } from './confirmation-language.js';
 import { checkBudget, recordSpend } from '../guardrails/budget.js';
 import {
   ConfirmTokenError,
@@ -183,7 +184,39 @@ async function executeTurn(params: {
   // request. A client sends only the token, so there are no arguments to
   // tamper with on the way back -- the token then proves this actor, in this
   // conversation, on this turn, approved this exact call.
-  if (params.confirmToken) {
+  //
+  // A TYPED reply reaches the same place, deterministically and without the
+  // model: people on phones type "yes" instead of tapping Confirm, and until
+  // 2026-09-10 that did nothing while leaving the write parked. See
+  // confirmation-language.ts for why this does not weaken ADR-053 item 5 --
+  // the call still comes from session_state, never the request.
+  const waiting = readPendingConfirmation(conversation.session_state);
+  const typedReply =
+    waiting && !params.confirmToken && params.text
+      ? classifyConfirmationReply(params.text)
+      : 'unrelated';
+
+  if (waiting && !params.confirmToken && typedReply === 'decline') {
+    await clearPendingConfirmation(params.conversationId);
+    return {
+      reply: 'Cancelled. Nothing has been changed.',
+      status: conversation.status,
+      route: 'none',
+    };
+  }
+
+  if (waiting && !params.confirmToken && typedReply === 'unrelated') {
+    // They moved on -- a correction, or a new question entirely. Disarm the
+    // proposal rather than leaving it to be confirmed by a stray tap later,
+    // then let the message route normally.
+    await clearPendingConfirmation(params.conversationId);
+    logger.info('chatbot_pending_confirmation_abandoned', {
+      tool: waiting.toolName,
+      requestId: params.requestId,
+    });
+  }
+
+  if (params.confirmToken || (waiting && typedReply === 'approve')) {
     const pending = readPendingConfirmation(conversation.session_state);
     if (!pending) {
       return {
@@ -194,13 +227,18 @@ async function executeTurn(params: {
     }
 
     try {
-      verifyConfirmToken(params.confirmToken, {
+      // Only a token needs verifying. A typed approval carries no client-held
+      // value to forge: the actor comes from req.auth and the call from
+      // session_state, both re-derived server-side on this very request.
+      if (params.confirmToken) {
+        verifyConfirmToken(params.confirmToken, {
         actorId: params.actor.userId,
         conversationId: params.conversationId,
-        turnIndex: pending.turnIndex,
-        toolName: pending.toolName,
-        args: pending.args,
-      });
+          turnIndex: pending.turnIndex,
+          toolName: pending.toolName,
+          args: pending.args,
+        });
+      }
     } catch (error) {
       // The reason is logged, never shown. "Expired" is safe to say and
       // useful; the rest would tell someone probing exactly which claim
@@ -496,9 +534,13 @@ async function executeTurn(params: {
   // Who this person is and what just happened -- the two things the model
   // was missing when it asked a manager the same question four turns running
   // (router-l1.ts PromptContext).
-  const [hotels] = await Promise.all([actorHotelNames(params.actor)]);
+  const [hotels, workers] = await Promise.all([
+    actorHotelNames(params.actor),
+    actorWorkerNames(params.actor),
+  ]);
   const promptContext = {
     hotels,
+    workers,
     lastAction: readLastAction(conversation.session_state),
   };
 

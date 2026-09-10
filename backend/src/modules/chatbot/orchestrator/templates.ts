@@ -16,20 +16,32 @@ export function renderToolResult(result: CompactResult): string {
   return result.summary;
 }
 
+/**
+ * NAME WHAT THE PERSON CAN SEE.
+ *
+ * These three messages used to point at "the checklist" and "the quick
+ * commands". Neither phrase appears anywhere in any client: what is actually
+ * on screen is a row of buttons, labelled with the thing they do. Being told
+ * to use something that does not exist by that name is worse than being told
+ * nothing -- the person looks for it, does not find it, and concludes the app
+ * is broken.
+ */
+const USE_THE_BUTTONS = 'You can still use the buttons below.';
+
 export function renderBudgetFallback(reason: string): string {
   // Deliberately does not blame the worker or expose the cap's value.
   switch (reason) {
     case 'conversation-cap-exhausted':
-      return 'This conversation has reached its limit. Please use the checklist to continue.';
+      return `This conversation has got too long for me to continue. Start a new one, or ${USE_THE_BUTTONS.toLowerCase()}`;
     case 'daily-user-cap-exhausted':
-      return 'You have reached today’s assistant limit. Please use the checklist to continue.';
+      return `You have asked me as much as I can answer today. ${USE_THE_BUTTONS} Full use comes back tomorrow.`;
     default:
-      return 'The assistant is unavailable right now. Please use the checklist to continue.';
+      return `I am not available right now. ${USE_THE_BUTTONS}`;
   }
 }
 
 export function renderProviderUnavailable(): string {
-  return 'The assistant cannot answer free-text questions right now. You can still use the quick commands.';
+  return `I cannot answer typed questions right now. ${USE_THE_BUTTONS}`;
 }
 
 export function renderDenied(): string {
@@ -38,8 +50,17 @@ export function renderDenied(): string {
   return 'You do not have access to that.';
 }
 
+/**
+ * The last resort, and the one a person is most likely to see when they are
+ * already frustrated. "I did not understand that" tells them nothing about
+ * what WOULD work, so it invites the same message again, reworded.
+ */
 export function renderUnrecognized(): string {
-  return 'I did not understand that. Try one of the quick commands.';
+  return (
+    'Sorry, I did not catch that. Try telling me in a few plain words -- for ' +
+    'example "what are my shifts this week", "I am sick tomorrow", or "who is ' +
+    'working today". You can also tap one of the buttons below.'
+  );
 }
 
 

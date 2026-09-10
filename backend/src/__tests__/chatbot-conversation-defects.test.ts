@@ -23,7 +23,7 @@ import { describe, it, expect } from '@jest/globals';
  *   No hotel matching "hotel 1" is in your scope.   <- approved a fiction
  */
 
-import { buildSystemPrompt } from '../modules/chatbot/orchestrator/router-l1.js';
+import { buildSystemPrompt, dateReference } from '../modules/chatbot/orchestrator/router-l1.js';
 import { redactToolNames } from '../modules/chatbot/orchestrator/templates.js';
 import { schemaKeys } from '../modules/chatbot/orchestrator/reference-precheck.js';
 import { ROLE_PERMISSIONS } from '../config/constants.js';
@@ -53,23 +53,80 @@ describe('defect 1: the model was never told what day it is', () => {
     expect(prompt).toContain(berlinToday());
   });
 
-  it('tells the model to derive every relative date from it', () => {
+  it('carries a precomputed calendar rather than asking for arithmetic', () => {
     const prompt = buildSystemPrompt(manager(), []);
-    expect(prompt).toMatch(/today.*tomorrow.*this week.*this month/i);
-    expect(prompt).toMatch(/never use any other year/i);
+    expect(prompt).toMatch(/use these exact dates/i);
+    expect(prompt).toMatch(/this week .* to /i);
+    expect(prompt).toMatch(/never use another year/i);
   });
 
   /**
    * Europe/Berlin, not UTC -- the timezone every other date on this platform
-   * is computed in. Between 23:00 and 00:00 Berlin time the two disagree,
-   * and a night-shift manager would be told the wrong day.
+   * is computed in. Between 23:00 and 00:00 Berlin time the two disagree, and
+   * a night-shift manager would be told the wrong day.
+   *
+   * Asserted on the TABLE's own "today" entry, not on the absence of the UTC
+   * string anywhere in the prompt: the table legitimately contains yesterday
+   * and tomorrow, so "the prompt does not mention that date" was never the
+   * property worth pinning and became false the moment the table existed.
    */
-  it('uses Europe/Berlin, so a night shift is not a day out', () => {
+  it('uses Europe/Berlin for today, so a night shift is not a day out', () => {
     const prompt = buildSystemPrompt(manager(), []);
-    const utcToday = new Date().toISOString().slice(0, 10);
-    const berlin = berlinToday();
-    expect(prompt).toContain(berlin);
-    if (utcToday !== berlin) expect(prompt).not.toContain(utcToday);
+    expect(prompt).toContain(`today ${berlinToday()},`);
+  });
+
+  /**
+   * THE ARITHMETIC ITSELF, on a fixed instant so it is the same every run.
+   *
+   * The model got these wrong in a way nothing downstream could catch: asked
+   * "what about saturday" it answered with Friday's date, and "and last week"
+   * with this week's -- valid dates, right format, wrong day. Precomputing
+   * them moves the failure from a model behaviour into something a test can
+   * hold still.
+   *
+   * 2026-09-09T20:00Z is a Wednesday in Berlin (22:00 local).
+   */
+  describe('the precomputed calendar', () => {
+    const table = dateReference(new Date('2026-09-09T20:00:00Z'));
+
+    it('names today, tomorrow and yesterday', () => {
+      expect(table).toContain('today 2026-09-09, tomorrow 2026-09-10, yesterday 2026-09-08');
+    });
+
+    it('gives each of the next seven days its weekday, so "saturday" needs no counting', () => {
+      expect(table).toContain('Saturday 2026-09-12');
+      expect(table).toContain('Friday 2026-09-11');
+    });
+
+    /** Monday to Sunday: how weeks run in Germany, and how the rosters are drawn. */
+    it('runs weeks Monday to Sunday', () => {
+      expect(table).toContain('this week 2026-09-07 to 2026-09-13');
+      expect(table).toContain('last week 2026-08-31 to 2026-09-06');
+      expect(table).toContain('next week 2026-09-14 to 2026-09-20');
+    });
+
+    it('bounds this month and last month, including the month-length change', () => {
+      expect(table).toContain('this month 2026-09-01 to 2026-09-30');
+      expect(table).toContain('last month 2026-08-01 to 2026-08-31');
+    });
+
+    /**
+     * Sunday is the off-by-one that Monday-start weeks invite: with
+     * getUTCDay() === 0 a naive `1 - dow` lands on the Monday AFTER, making
+     * "this week" the next one.
+     */
+    it('puts a Sunday in the week that is ending, not the one starting', () => {
+      // 2026-09-13 is a Sunday.
+      const sunday = dateReference(new Date('2026-09-13T10:00:00Z'));
+      expect(sunday).toContain('this week 2026-09-07 to 2026-09-13');
+      expect(sunday).toContain('next week 2026-09-14 to 2026-09-20');
+    });
+
+    it('crosses a year boundary without inventing a month', () => {
+      const newYear = dateReference(new Date('2027-01-05T10:00:00Z'));
+      expect(newYear).toContain('this month 2027-01-01 to 2027-01-31');
+      expect(newYear).toContain('last month 2026-12-01 to 2026-12-31');
+    });
   });
 });
 
