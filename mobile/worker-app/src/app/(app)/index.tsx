@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 
+import { POLL_INTERVAL_MS } from '@/constants/polling';
 import { ThemedText } from '@/components/themed-text';
 import { ChatLauncher } from '@/components/ChatLauncher';
 import { ThemedView } from '@/components/themed-view';
@@ -51,14 +52,14 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const { data: stats, isLoading: statsLoading, isValidating: statsValidating, mutate: mutateStats } =
-    useSWR(user ? `/analytics/myStats/${user.id}` : null, () => api.analytics.myStats(), { refreshInterval: 5000 });
+    useSWR(user ? `/analytics/myStats/${user.id}` : null, () => api.analytics.myStats(), { refreshInterval: POLL_INTERVAL_MS });
 
   const {
     data: assignments,
     isLoading: assignmentsLoading,
     isValidating: assignmentsValidating,
     mutate: mutateAssignments,
-  } = useSWR(user ? `/assignments/list/${user.id}` : null, () => api.assignments.list({ limit: 5 }), { refreshInterval: 5000 });
+  } = useSWR(user ? `/assignments/list/${user.id}` : null, () => api.assignments.list({ limit: 5 }), { refreshInterval: POLL_INTERVAL_MS });
 
   // Open jobs are listed here, not just linked to: the dashboard is where a
   // worker without shifts actually looks for work, and this section previously
@@ -66,7 +67,7 @@ export default function HomeScreen() {
   const { data: openJobs, isValidating: jobsValidating, mutate: mutateJobs } = useSWR(
     user ? `/work-requests/open/${user.id}` : null,
     () => api.workRequests.list({ status: 'OPEN', limit: 3 }),
-    { refreshInterval: 5000 }
+    { refreshInterval: POLL_INTERVAL_MS }
   );
 
   const upcoming = Array.isArray(assignments)

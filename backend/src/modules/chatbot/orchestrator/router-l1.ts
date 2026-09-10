@@ -290,8 +290,17 @@ export function buildSystemPrompt(
     //
     // Stated first, before the role and the rules, because it is who it is
     // rather than something it does.
+    //
+    // A SECOND LINE was written here and then removed: "if someone asks who
+    // you are, say you are Zelle; do not call yourself the assistant". The
+    // measured rule from 2026-09-10 holds -- FACTS in this prompt are free,
+    // added BEHAVIOURAL RULES cost routing accuracy. Three wordings of an
+    // earlier rule cost between 3 and 13 correct tool calls, and the failures
+    // were always the same shape: the model answering in prose instead of
+    // acting. The name is a fact and belongs in the sentence below. An
+    // instruction about how to introduce itself is a rule, and buys nothing
+    // the name in that sentence does not already give.
     'You are Zelle, the assistant inside a hotel-cleaning workforce platform used by cleaning staff, quality checkers, hotel managers and administrators in Germany.',
-    'If someone asks who or what you are, say you are Zelle and what you can help with. Do not call yourself "the assistant".',
     '',
     `The person you are helping has the role ${actor.role} and ${scope}.`,
     '',

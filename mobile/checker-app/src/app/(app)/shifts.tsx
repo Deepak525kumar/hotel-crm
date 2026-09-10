@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import useSWR from 'swr';
 import { useTranslation } from 'react-i18next';
+import { POLL_INTERVAL_MS } from '@/constants/polling';
 import { NotificationBell } from '@/components/NotificationBell';
 import { assignmentStatusTone } from '@/lib/assignment-status-tone';
 import { useTheme } from '@/hooks/use-theme';
@@ -99,7 +100,7 @@ export default function ScheduleScreen() {
     mutate,
   } = useSWR(user ? `/assignments/list_all/${user.id}` : null, () =>
     api.assignments.list({ limit: 100 }),
-    { refreshInterval: 5000 }
+    { refreshInterval: POLL_INTERVAL_MS }
   );
 
   const items = Array.isArray(assignments) ? assignments : [];
