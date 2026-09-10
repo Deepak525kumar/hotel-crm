@@ -1249,6 +1249,12 @@
     "confirm": "Bestätigen",
     "cancel": "Abbrechen",
     "confirmed": "Bestätigt",
-    "cancelled": "Abgebrochen"
+    "cancelled": "Abgebrochen",
+    "listening": "Ich höre zu …",
+    "dictate": "Nachricht diktieren",
+    "stopDictation": "Diktat beenden",
+    "micDenied": "Der Mikrofonzugriff ist aus. Schalte ihn in den Einstellungen ein, um zu diktieren.",
+    "micFailed": "Das Diktat hat nicht funktioniert. Du kannst stattdessen tippen.",
+    "enterHint": "Enter zum Senden, Umschalt+Enter für eine neue Zeile"
   }
 }
