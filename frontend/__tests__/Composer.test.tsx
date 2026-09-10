@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Composer } from "@/components/chatbot/Composer";
 
@@ -13,12 +14,12 @@ import { Composer } from "@/components/chatbot/Composer";
  */
 
 jest.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (_k: string, d?: string) => d ?? _k }),
+  useTranslation: () => ({ t: (key: string, fallback?: string) => fallback ?? key }),
 }));
 
 /** A controlled harness, since the real one lives in ChatPanel's state. */
 function Harness({ onSubmit = jest.fn() }: { onSubmit?: () => void }) {
-  const [value, setValue] = require("react").useState("");
+  const [value, setValue] = useState("");
   return (
     <Composer
       value={value}
@@ -31,8 +32,20 @@ function Harness({ onSubmit = jest.fn() }: { onSubmit?: () => void }) {
 }
 
 /** Installs a fake `SpeechRecognition` and hands back the live instance. */
+interface FakeSpeech {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((e: unknown) => void) | null;
+  onerror: ((e: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+  start: jest.Mock;
+  stop: jest.Mock;
+  abort: jest.Mock;
+}
+
 function installSpeech() {
-  const instances: any[] = [];
+  const instances: FakeSpeech[] = [];
   class FakeRecognition {
     lang = "";
     continuous = false;
@@ -44,16 +57,24 @@ function installSpeech() {
     stop = jest.fn();
     abort = jest.fn();
     constructor() {
-      instances.push(this);
+      instances.push(this as unknown as FakeSpeech);
     }
   }
-  (window as any).SpeechRecognition = FakeRecognition;
-  return { instances, latest: () => instances[instances.length - 1] };
+  installOn("SpeechRecognition", FakeRecognition);
+  return { instances, latest: () => instances[instances.length - 1]! };
+}
+
+/** Assigning to a window global the DOM lib does not declare. */
+function installOn(name: string, value: unknown) {
+  (window as unknown as Record<string, unknown>)[name] = value;
+}
+function removeFrom(name: string) {
+  delete (window as unknown as Record<string, unknown>)[name];
 }
 
 afterEach(() => {
-  delete (window as any).SpeechRecognition;
-  delete (window as any).webkitSpeechRecognition;
+  removeFrom("SpeechRecognition");
+  removeFrom("webkitSpeechRecognition");
 });
 
 describe("the field and the send button", () => {
@@ -127,8 +148,9 @@ describe("dictation", () => {
 
   it("accepts the webkit-prefixed implementation Safari ships", async () => {
     const { instances } = installSpeech();
-    (window as any).webkitSpeechRecognition = (window as any).SpeechRecognition;
-    delete (window as any).SpeechRecognition;
+    const win = window as unknown as Record<string, unknown>;
+    win.webkitSpeechRecognition = win.SpeechRecognition;
+    removeFrom("SpeechRecognition");
 
     render(<Harness />);
     fireEvent.click(await screen.findByRole("button", { name: "Dictate a message" }));

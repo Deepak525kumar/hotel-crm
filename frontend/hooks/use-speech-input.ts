@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 /**
  * Dictation for the composer, on top of the browser's own speech recognition.
@@ -70,7 +70,22 @@ export function useSpeechInput(options: {
   onTranscript: (text: string, isFinal: boolean) => void;
 }) {
   const { language, onTranscript } = options;
-  const [supported, setSupported] = useState(false);
+  /**
+   * Read once, and differently on the server than the client.
+   *
+   * This was `useState(false)` plus a `setSupported` in an effect, which the
+   * React lint rules reject as a cascading render -- correctly: the button
+   * would render absent and then appear. `useSyncExternalStore` is the API
+   * for exactly this shape, a value that never changes but is not knowable
+   * during a server render. The subscribe callback is a no-op because there
+   * is nothing to subscribe to; the browser either has the API or it does
+   * not.
+   */
+  const supported = useSyncExternalStore(
+    () => () => undefined,
+    () => getConstructor() !== null,
+    () => false
+  );
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<SpeechError>(null);
 
@@ -78,14 +93,12 @@ export function useSpeechInput(options: {
   // Kept in a ref so restarting does not re-create the recogniser every time
   // the parent re-renders on a keystroke.
   const onTranscriptRef = useRef(onTranscript);
-  onTranscriptRef.current = onTranscript;
-
-  // Detected after mount, never during render: the server has no `window`,
-  // and deciding this during render would make the button's presence differ
-  // between the server and client trees.
+  // Assigned in an effect rather than during render: writing a ref while
+  // rendering is a side effect, and the lint rules reject it for the same
+  // reason React does -- a render may be thrown away and re-run.
   useEffect(() => {
-    setSupported(getConstructor() !== null);
-  }, []);
+    onTranscriptRef.current = onTranscript;
+  }, [onTranscript]);
 
   const stop = useCallback(() => {
     recognitionRef.current?.stop();
