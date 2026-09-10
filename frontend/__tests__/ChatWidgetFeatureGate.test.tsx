@@ -71,24 +71,24 @@ describe("ChatWidget feature gate", () => {
   it("shows the launcher only once the backend confirms availability", async () => {
     mockIsAvailable.mockResolvedValue(true);
     render(<ChatWidget />);
-    expect(await screen.findByRole("button", { name: "Assistant" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Zelle" })).toBeInTheDocument();
   });
 
   it("opens and closes, keeping aria-expanded truthful", async () => {
     mockIsAvailable.mockResolvedValue(true);
     render(<ChatWidget />);
-    const launcher = await screen.findByRole("button", { name: "Assistant" });
+    const launcher = await screen.findByRole("button", { name: "Zelle" });
     expect(launcher).toHaveAttribute("aria-expanded", "false");
 
     fireEvent.click(launcher);
     await waitFor(() => expect(useChatbotStore.getState().open).toBe(true));
-    expect(screen.getByRole("dialog", { name: "Assistant" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Zelle" })).toBeInTheDocument();
   });
 
   it("closes on Escape, so keyboard users are not trapped", async () => {
     mockIsAvailable.mockResolvedValue(true);
     render(<ChatWidget />);
-    fireEvent.click(await screen.findByRole("button", { name: "Assistant" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Zelle" }));
     await waitFor(() => expect(useChatbotStore.getState().open).toBe(true));
 
     fireEvent.keyDown(document, { key: "Escape" });

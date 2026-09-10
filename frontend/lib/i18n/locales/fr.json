@@ -1235,7 +1235,7 @@
     "loggedCount": "{{n}} chambres"
   },
   "chatbot": {
-    "title": "Assistant",
+    "title": "Zelle",
     "subtitle": "Réponses sur vos propres services, votre contrat, vos fiches de paie et vos messages.",
     "greeting": "Comment puis-je aider ?",
     "greetingHint": "Posez une question ou choisissez ci-dessous.",

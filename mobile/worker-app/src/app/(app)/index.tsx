@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -73,10 +74,27 @@ export default function HomeScreen() {
     : [];
 
   const loading = statsLoading || assignmentsLoading;
-  const refreshing = statsValidating || assignmentsValidating || jobsValidating;
+  // THE SPINNER MUST MEAN "YOU PULLED", NOT "A POLL RAN".
+  //
+  // `refreshing` was wired to SWR's `isValidating`, and these screens poll
+  // every 5 seconds -- so the pull-to-refresh spinner appeared, on its own,
+  // every 5 seconds. Reported as the home screen "automatically reloading or
+  // refreshing after a few seconds", on both apps, and that is exactly what it
+  // looked like.
+  //
+  // Background revalidation is meant to be INVISIBLE: SWR keeps showing the
+  // last data and swaps it when the new data lands. Announcing it with the
+  // manual-refresh control turns a quiet update into a UI that never settles.
+  // Driven by an explicit user action now, so the two cannot be confused.
+  const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => {
-    await Promise.all([mutateStats(), mutateAssignments(), mutateJobs()]);
+    setRefreshing(true);
+    try {
+      await Promise.all([mutateStats(), mutateAssignments(), mutateJobs()]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const name = workerDisplayName(user?.first_name);

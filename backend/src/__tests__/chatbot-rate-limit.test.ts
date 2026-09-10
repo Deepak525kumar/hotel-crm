@@ -27,7 +27,38 @@ jest.mock('../lib/logger.js', () => ({
 
 const TURN_MAX = 3;
 const ACTION_MAX = 5;
-const WINDOW_MS = 60000;
+
+/**
+ * THE RESIDUAL FLAKE, FOUND AND FIXED 2026-09-10.
+ *
+ * This was 60_000 -- the real production window -- and it made the suite fail
+ * roughly once in every twenty full runs, always here, always the same way:
+ *
+ *     ● chatbot rate limiting › rejects the turn after the limit with a 429
+ *       Expected: 429
+ *       Received: 200
+ *
+ * `express-rate-limit`'s memory store clears its counters on an interval
+ * anchored to when the store was created -- which is `beforeEach`, when the
+ * limiter is constructed. Every test here fills the quota and then asserts
+ * that ONE more request is refused. If that interval fires between the fill
+ * and the assertion, the counter is back at zero and the request is allowed.
+ * Nothing in the test is wrong; it just depends on wall-clock time not
+ * crossing a boundary while it runs, and under a long serial run it sometimes
+ * does.
+ *
+ * It cost hours to find, because it presents as "some unrelated suite failed
+ * once, passes alone, passes on re-run" -- the same shape as genuine
+ * cross-file pollution, which is what it was mistaken for.
+ *
+ * An hour-long window removes the dependency entirely rather than making it
+ * less likely: no test here asserts anything about the window EXPIRING, so
+ * its length was never part of what is under test. Fake timers were the
+ * alternative and are worse -- `express-rate-limit` reads the clock inside
+ * the library, so faking it tests the mock's behaviour as much as the
+ * limiter's.
+ */
+const WINDOW_MS = 3_600_000;
 
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({

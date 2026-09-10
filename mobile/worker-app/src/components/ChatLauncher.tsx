@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
@@ -37,14 +37,28 @@ export function ChatLauncher() {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t('chatbot.title', 'Assistant')}
+      accessibilityLabel={t('chatbot.title', 'Zelle')}
       onPress={() => router.push('/assistant')}
       style={[styles.fab, { backgroundColor: theme.primary }]}
     >
-      {/* A word rather than an icon: the app ships in six languages including
-          Arabic and Urdu, and a speech-bubble glyph reads as decoration to
-          someone who has not seen this feature before. */}
-      <ThemedText style={styles.label}>{t('chatbot.title', 'Assistant')}</ThemedText>
+      {/* A MARK AND A NAME, not one or the other.
+          
+          This was the word "Assistant" alone, on the reasoning that a
+          speech-bubble glyph reads as decoration to someone who has not seen
+          the feature -- which was right about the glyph and wrong about the
+          word. "Assistant" is a category, and the assistant has a name:
+          Zelle. A name is the one label that needs no translation, so it
+          serves ar/ur/uk exactly as well as en, and it is what someone is
+          told to look for when a colleague says "ask Zelle".
+
+          The badge is a circle with a Z, built from a View and Text rather
+          than an SVG: these apps ship no vector library (no react-native-svg,
+          no vector-icons), and adding one to draw a 20px circle would be a
+          dependency for a shape the layout engine already draws. */}
+      <View style={[styles.badge, { borderColor: '#FFFFFF' }]}>
+        <ThemedText style={styles.badgeLetter}>Z</ThemedText>
+      </View>
+      <ThemedText style={styles.label}>{t('chatbot.title', 'Zelle')}</ThemedText>
     </Pressable>
   );
 }
@@ -58,6 +72,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
     borderRadius: Radius.full,
+    // The badge sits beside the name rather than above it: a pill is easier
+    // to hit one-handed than a tall stack, and these users are mid-shift.
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
     // Raised above the scrolling content it floats over.
     elevation: 4,
     shadowColor: '#000',
@@ -66,4 +85,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   label: { color: '#FFFFFF', fontWeight: '600' },
+  badge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Nudged up a hair: a capital Z sits low in its line box, and centring the
+  // box is not the same as centring the letter.
+  badgeLetter: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+    lineHeight: 15,
+  },
 });

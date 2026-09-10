@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -104,10 +105,27 @@ export default function HomeScreen() {
   );
 
   const loading = statsLoading || assignmentsLoading;
-  const refreshing = statsValidating || assignmentsValidating || attendanceValidating || jobsValidating;
+  // THE SPINNER MUST MEAN "YOU PULLED", NOT "A POLL RAN".
+  //
+  // `refreshing` was wired to SWR's `isValidating`, and these screens poll
+  // every 5 seconds -- so the pull-to-refresh spinner appeared, on its own,
+  // every 5 seconds. Reported as the home screen "automatically reloading or
+  // refreshing after a few seconds", on both apps, and that is exactly what it
+  // looked like.
+  //
+  // Background revalidation is meant to be INVISIBLE: SWR keeps showing the
+  // last data and swaps it when the new data lands. Announcing it with the
+  // manual-refresh control turns a quiet update into a UI that never settles.
+  // Driven by an explicit user action now, so the two cannot be confused.
+  const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => {
-    await Promise.all([mutateStats(), mutateAssignments(), mutateAttendance(), mutateJobs()]);
+    setRefreshing(true);
+    try {
+      await Promise.all([mutateStats(), mutateAssignments(), mutateAttendance(), mutateJobs()]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const name = workerDisplayName(user?.first_name);

@@ -1235,7 +1235,7 @@
     "loggedCount": "{{n}} Zimmer"
   },
   "chatbot": {
-    "title": "Assistent",
+    "title": "Zelle",
     "subtitle": "Antworten zu Ihren eigenen Schichten, Ihrem Vertrag, Lohnabrechnungen und Nachrichten.",
     "greeting": "Wie kann ich helfen?",
     "greetingHint": "Stellen Sie eine Frage oder wählen Sie unten aus.",

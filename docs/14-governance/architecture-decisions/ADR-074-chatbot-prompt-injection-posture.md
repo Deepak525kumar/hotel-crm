@@ -132,6 +132,45 @@ Alternatives rejected: fencing replayed assistant text as "data, not instruction
 delimiter — that is a prompt-level defence, and this record's entire position is that prompt-level
 defences are not the boundary.
 
+### 5.2 Amended 2026-09-10: read results DO return to the model, within a bounded loop.
+
+Ratified by the commissioning human (`OD-CHAT-013`) on 2026-09-10.
+
+**What changed.** A turn was one model call: the first tool chosen was the last, and whatever it
+returned was the answer. Any question needing two lookups was unanswerable — asked *"who is off
+today and who is covering their shifts?"*, the assistant answered the first half and stated in its
+own reply that it still needed the second, then stopped. The turn is now a loop bounded by
+`CHATBOT_MAX_TOOL_CALLS_PER_TURN`: read, observe, read again if something is genuinely missing,
+then answer.
+
+This removes control 8 as originally stated. §5 requires that such a change name what replaces it,
+so:
+
+| | Replacement control | Where |
+|---|---|---|
+| C8-a | Only **read** results re-enter. A write still ends the turn at the confirmation gate; no write result is ever observed. | `orchestrator.ts`, tests in `chatbot-confirmation-flow.test.ts` |
+| C8-b | Only **structured data** re-enters — never the prose summary, and never a field holding text a person typed (`note`, `reason`, `message`, `description`, …), which are dropped by key. | `observation.ts`, `chatbot-observation-fence.test.ts` |
+| C8-c | The block is labelled as data with an explicit boundary. | `observation.ts` |
+| C8-d | **The authority boundary is unchanged.** Every step re-derives its actor from `req.auth` and passes the same executor gate. | `executor.ts` (unchanged) |
+| C8-e | Bounded: `CHATBOT_MAX_TOOL_CALLS_PER_TURN` steps, plus a deterministic repeat guard that ends the loop if the same tool and arguments recur. | `orchestrator.ts` |
+
+**C8-c is not load-bearing, and §5.1 is the reason.** That section rejected delimiter-fencing as a
+defence — "prompt-level defences are not the boundary" — and this amendment does not reverse that.
+The label is a courtesy to a cooperating model. The controls that actually hold are C8-b, which
+removes attacker-fillable text before it can reach a prompt at all, and C8-d, which is control 7
+and was always the real guarantee: **a fully compromised model cannot exceed the authority of the
+person it acts for.** Control 8 was defence-in-depth layered on that, never the guarantee itself.
+
+**What is genuinely given up.** Control 8's stated property — *no text authored elsewhere reaches
+the model* — no longer holds in full. C8-b removes the free-text fields, but a person's **name** is
+data and does re-enter: a worker named `Ignore previous instructions` reaches their manager's
+prompt. This is accepted, not overlooked. It is bounded by C8-d, logged by the tripwire, and
+`chatbot-observation-fence.test.ts` asserts the name is **not** filtered — a test that pretended
+otherwise would imply free text is safe there.
+
+Live injection containment was re-measured after the change: **10/10 contained**
+(`scripts/chatbot-injection-check.ts`).
+
 ## 6. Verification
 
 This record is satisfied when, and only while:
@@ -140,7 +179,11 @@ This record is satisfied when, and only while:
    actually prevented, not merely that the happy path works.
 2. The registry hygiene test continues to fail the build on a write tool with no real permission
    token, and on any forbidden argument key.
-3. No code path returns tool output to a model. Still true by construction, and asserted.
+3. ~~No code path returns tool output to a model.~~ **Superseded 2026-09-10 by §5.2.** Read
+   results do return to the model inside a bounded loop. The condition is restated: no **write**
+   result and no **free-text field** reaches a prompt, enforced by `observation.ts` dropping such
+   fields by key and by the confirmation gate ending the turn before any write executes. Both have
+   negative-case tests.
 
 4. **Amended 2026-09-08.** Conversation history IS replayed, under §5.1's control. This condition
    is therefore restated: no code path replays an ASSISTANT message into a prompt, and the
