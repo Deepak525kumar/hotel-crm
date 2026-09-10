@@ -231,7 +231,12 @@ export const checkInToMyShift = registerTool<CheckInArgs>({
     'starting work", "clock me in", "ich fange jetzt an", "I have arrived", "im ' +
     'here", "ich bin da" -- a worker announcing that they have turned up is asking ' +
     "to be clocked in, not making conversation. Only ever acts on the caller's own " +
-    'shift, and only for today.',
+    'shift. Returns the time recorded.\n\n' +
+    'TODAY ONLY, and the time recorded is the time RIGHT NOW. It cannot fix a past ' +
+    'day. If someone says they forgot to clock in yesterday, or gives any time other ' +
+    'than now, do NOT call this -- it would clock them in for today instead, which ' +
+    'is a different and wrong thing. Tell them a manager has to correct a past ' +
+    'record.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 

@@ -105,12 +105,36 @@ type ListMineArgs = z.infer<typeof ListMineArgs>;
  * worker needs to answer "what are my shifts" — dropping the rest bounds
  * tokens and removes fields the model has no business seeing.
  */
+/**
+ * THREE THINGS THIS THREW AWAY, all of them already in the DTO.
+ *
+ * Found 2026-09-10 by asking the assistant the commonest question a cleaner
+ * has -- "what time do i start tomorrow". It routed correctly, ran, and could
+ * not answer, because the answer was discarded here.
+ *
+ *   - `day` was read from `confirmed_at`, which is WHEN THE SHIFT WAS
+ *     CONFIRMED, not when it is. A shift for next Friday booked this morning
+ *     reported this morning. `AssignmentDto.day` is the shift's calendar day
+ *     and exists precisely because "the row carried the date all along, the
+ *     API just never returned it" -- and then this read the wrong field.
+ *   - `shift_start_time` / `shift_end_time` were dropped entirely, so the
+ *     assistant answered "I don't know your shift start time. Please check
+ *     your schedule in the app" -- about the schedule it was holding.
+ *   - `hotel_id` was passed through instead of `hotel.name`: a raw cuid, for
+ *     a person who asked where they are working.
+ *
+ * The summary is now the answer itself rather than a count. "2 shifts found"
+ * is true and useless; a worker asked WHEN and WHERE.
+ */
 function compressAssignments(raw: unknown): CompactResult {
   const rows = (raw as AssignmentDto[]) ?? [];
   const data = rows.map((row) => ({
-    id: row.id,
-    hotel_id: row.hotel_id,
-    day: row.confirmed_at ? row.confirmed_at.slice(0, 10) : null,
+    // `day`, with `confirmed_at` only as a fallback for the paths that do not
+    // select it (the field is nullable for exactly that reason).
+    day: row.day ?? (row.confirmed_at ? row.confirmed_at.slice(0, 10) : null),
+    from: row.shift_start_time,
+    to: row.shift_end_time,
+    hotel: row.hotel?.name ?? null,
     status: row.status,
   }));
 
@@ -118,7 +142,16 @@ function compressAssignments(raw: unknown): CompactResult {
     summary:
       data.length === 0
         ? 'No shifts found for that period.'
-        : `${data.length} shift${data.length === 1 ? '' : 's'} found.`,
+        : data
+            .slice(0, 10)
+            .map((d) => {
+              // Times are null for a calendar-placed shift -- they live on a
+              // JobRequest and there is no request. Say so rather than
+              // inventing an hour.
+              const when = d.from && d.to ? `${d.from}-${d.to}` : 'time not set';
+              return `${d.day ?? 'day unknown'} ${when}${d.hotel ? ` at ${d.hotel}` : ''}`;
+            })
+            .join('; ') + (data.length > 10 ? ` (+${data.length - 10} more)` : ''),
     data,
   };
 }
@@ -129,7 +162,8 @@ export const listMyAssignments = registerTool<ListMineArgs>({
     "List the authenticated worker's OWN shifts. Use for \"what are my shifts\", " +
     '"am I working tomorrow", "wann arbeite ich", "show my schedule". Returns the ' +
     "day, hotel and status of each shift, and only ever the caller's own -- never " +
-    "another worker's.\n\n" +
+    "another worker's. Each shift comes back with its day, its start and end " +
+    'times, and the hotel.\n\n' +
     'When the question is about a particular day or period, ALWAYS pass from and to ' +
     'as YYYY-MM-DD -- both, or neither. For "tomorrow" set both to tomorrow; for ' +
     '"this week" set them to the Monday and the Sunday. Omitting them returns every ' +
@@ -959,6 +993,11 @@ interface TeamAssignmentRow {
   hotel_id?: string;
   status?: string;
   confirmed_at?: string | null;
+  /** The shift's calendar day. See compressTeamAssignments for why this is
+   *  read rather than `confirmed_at`. */
+  day?: string | null;
+  shift_start_time?: string | null;
+  shift_end_time?: string | null;
   worker_name?: string | null;
   hotel_name?: string | null;
 }
@@ -971,7 +1010,12 @@ function compressTeamAssignments(raw: unknown): CompactResult {
     // might repeat back as if it meant something.
     worker: row.worker_name ?? null,
     hotel: row.hotel_name ?? null,
-    day: row.confirmed_at ? row.confirmed_at.slice(0, 10) : null,
+    // `day`, not `confirmed_at`. See compressAssignments: the same wrong
+    // field was read here, so a manager asking who works next week was shown
+    // the dates those shifts were BOOKED.
+    day: row.day ?? (row.confirmed_at ? row.confirmed_at.slice(0, 10) : null),
+    from: row.shift_start_time ?? null,
+    to: row.shift_end_time ?? null,
     status: row.status ?? null,
   }));
 
@@ -979,7 +1023,13 @@ function compressTeamAssignments(raw: unknown): CompactResult {
     summary:
       data.length === 0
         ? 'No shifts found for your team.'
-        : `${data.length} shift${data.length === 1 ? '' : 's'} across your team.`,
+        : data
+            .slice(0, 12)
+            .map((d) => {
+              const when = d.from && d.to ? ` ${d.from}-${d.to}` : '';
+              return `${d.worker ?? 'unnamed'} on ${d.day ?? 'day unknown'}${when}`;
+            })
+            .join('; ') + (data.length > 12 ? ` (+${data.length - 12} more)` : ''),
     data,
   };
 }

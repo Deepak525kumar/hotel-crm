@@ -6,7 +6,7 @@ import type { ActorContext } from '../tools/actor.js';
 import { executeTool } from '../tools/executor.js';
 import { findPriorCall, recordToolCall } from '../tools/tool-call-log.js';
 import { describeToolError } from '../tools/tool-errors.js';
-import { resolveTool } from '../tools/registry.js';
+import { resolveTool, type CompactResult } from '../tools/registry.js';
 import {
   actorHotelNames,
   actorLanguage,
@@ -14,6 +14,7 @@ import {
   precheckReferences,
 } from './reference-precheck.js';
 import { classifyConfirmationReply } from './confirmation-language.js';
+import { buildObservation } from './observation.js';
 import { checkBudget, recordSpend } from '../guardrails/budget.js';
 import {
   ConfirmTokenError,
@@ -553,11 +554,47 @@ async function executeTurn(params: {
     lastAction: readLastAction(conversation.session_state),
   };
 
+  // ---- THE TOOL LOOP -------------------------------------------------------
+  //
+  // A turn is no longer one model call. The model may read, see what came
+  // back, and read again before answering -- so a question needing two
+  // lookups ("who can cover Anna's shift tomorrow?") is answerable at all.
+  // Before this, the first tool call was also the last, and the first answer
+  // was assumed to be the right one.
+  //
+  // WRITES ARE NOT IN THE LOOP. A tool requiring confirmation still stops the
+  // turn at the confirmation gate below and its result is never observed, so
+  // no chained step can act on one. Only READ results re-enter, fenced by
+  // `observation.ts`, which states what replaces `ADR-074`'s control 8.
+  //
+  // `messages` is the ONLY thing that grows. The system prompt, the tool
+  // manifest and the actor are rebuilt from scratch on every step, so nothing
+  // an earlier step produced can widen what a later one may do.
+  const messages = buildMessages(params.text ?? '', history);
+  const maxSteps = Math.max(1, env.CHATBOT_MAX_TOOL_CALLS_PER_TURN);
+
+  /**
+   * Every read already made this turn, by tool and arguments.
+   *
+   * THE GUARD THAT MAKES THE LOOP SAFE TO SHIP. A model that asks for the
+   * same tool again -- because the answer did not contain what it hoped, or
+   * simply out of habit -- would otherwise re-run it on every step: five
+   * identical queries, five times the latency, for one question. The
+   * observation text asks it not to, but asking is not a control.
+   *
+   * A repeat ENDS the loop and answers with the result already in hand. That
+   * is the right outcome as well as the cheap one: a second identical read
+   * returns identical data, so there is nothing further to learn from it.
+   */
+  const alreadyRead = new Map<string, CompactResult>();
+
+  for (let step = 0; step < maxSteps; step += 1) {
+  const isLastStep = step + 1 >= maxSteps;
   let completion;
   try {
     completion = await provider.completeWithTools({
       system: buildSystemPrompt(params.actor, tools, promptContext),
-      messages: buildMessages(params.text ?? '', history),
+      messages,
       tools: tools.map(toolSpec),
       // Reads and chat run on the fast model. The planning tier is reserved
       // for the write path, which does not exist yet.
@@ -743,6 +780,32 @@ async function executeTurn(params: {
     }
   }
 
+  // A read this turn has already made returns what it returned. See
+  // `alreadyRead`: re-running it costs a query and cannot change the answer.
+  const callKey = `${completion.toolUse.name}:${JSON.stringify(completion.toolUse.input ?? {})}`;
+  const repeated = alreadyRead.get(callKey);
+  if (repeated) {
+    logger.info('chatbot_tool_loop_repeat_stopped', {
+      tool: completion.toolUse.name,
+      step,
+      requestId: params.requestId,
+    });
+    await prisma.chatbotConversation.update({
+      where: { id: params.conversationId },
+      data: {
+        turn_count: { increment: 1 },
+        tokens_input: { increment: completion.usage.promptTokens },
+        tokens_output: { increment: completion.usage.completionTokens },
+      },
+    });
+    return {
+      reply: renderToolResult(repeated),
+      status: ChatbotConversationStatus.IN_PROGRESS,
+      route: 'L1',
+      toolInvoked: completion.toolUse.name,
+    };
+  }
+
   const outcome = await executeTool({
     toolName: completion.toolUse.name,
     rawArgs: completion.toolUse.input,
@@ -787,11 +850,11 @@ async function executeTurn(params: {
     };
   }
 
-  // Rendered deterministically from the tool's own compressed result -- there
-  // is no second model call to phrase it. Redaction runs first, so
-  // special-category values become presence booleans and never reach the
-  // reply. A second model call here would also be the point where tool data
-  // could re-enter a prompt as instructions.
+  // Rendered deterministically from the tool's own compressed result. The
+  // SUMMARY is never phrased by a model -- what a person reads is still built
+  // in code from the tool's own output. What changed on 2026-09-10 is that
+  // the structured DATA may go back to the model for a further READ, fenced
+  // by observation.ts; the sentence the user sees does not come from there.
   if (outcome.status === 'FAILED') {
     // The tool ran and the owning service refused or a dependency failed.
     // The person is told what happened and what to do about it; the CODE
@@ -810,11 +873,46 @@ async function executeTurn(params: {
   await writeLastAction(params.conversationId, { tool: completion.toolUse.name, ok: true });
 
   const safe = redact(outcome.result);
+
+  // THE STEP THAT MAKES THIS A LOOP.
+  //
+  // A read whose budget still has room goes back to the model as fenced data
+  // instead of straight to the user, so it can decide whether that actually
+  // answered the question. On the last allowed step the result is the answer:
+  // there is no budget left to check it, and a summary the person can read
+  // beats an admission that we ran out of steps.
+  //
+  // Redaction runs BEFORE this, so special-category values are already
+  // presence booleans by the time observation.ts sees them -- the fence
+  // narrows further, it does not have to catch those.
+  alreadyRead.set(callKey, safe);
+
+  if (!isLastStep) {
+    messages.push({ role: 'user', content: buildObservation(completion.toolUse.name, safe) });
+    continue;
+  }
+
+  logger.info('chatbot_tool_loop_exhausted', {
+    steps: maxSteps,
+    tool: completion.toolUse.name,
+    requestId: params.requestId,
+  });
+
   return {
     reply: renderToolResult(safe),
     status: ChatbotConversationStatus.IN_PROGRESS,
     route: 'L1',
     toolInvoked: completion.toolUse.name,
+  };
+  }
+
+  // Unreachable: every path inside the loop either returns or continues, and
+  // the last iteration always returns. Present because TypeScript cannot see
+  // that, and because falling through silently would be worse than saying so.
+  return {
+    reply: renderUnrecognized(),
+    status: ChatbotConversationStatus.IN_PROGRESS,
+    route: 'L1',
   };
 }
 
