@@ -166,19 +166,32 @@ export const checkAvailability = registerTool<CheckAvailabilityArgs>({
  * take a shift; nothing let a manager raise one, so the assistant could close
  * that loop only from one end.
  *
- * IT CREATES A DRAFT, ALWAYS. `CreateWorkRequestSchema` accepts
- * `status: 'DRAFT' | 'OPEN'`, and this tool pins DRAFT and does not expose the
- * field. Publishing to OPEN broadcasts to every eligible worker in scope --
- * push notifications and email to potentially hundreds of people, from a
- * sentence the model may have misread, and unsendable once sent. That is the
- * blast radius `ADR-074` is about, and a draft the manager publishes from the
- * UI costs one click and removes it entirely.
+ * IT CREATES THE REQUEST OPEN. It used to pin `status: DRAFT`, and that was
+ * wrong twice over.
  *
- * `confirm: true` despite being LOW_RISK_WRITE. The tier is honest -- a draft
- * notifies nobody and is deleted in a click -- but the argument list is long
- * enough (position, headcount, date, two times) that a misheard number is
- * likely and cheap to catch, and the manager should see the exact shift
- * before it is written down.
+ * WRONG ON THE FACTS. The justification written here was that "publishing to
+ * OPEN broadcasts to every eligible worker in scope -- push notifications and
+ * email to potentially hundreds of people". It does not. `create()` sets the
+ * status and `published_at` and enqueues nothing; the worker fan-out
+ * (`enqueueRosterPublished`) belongs to a different method entirely. An OPEN
+ * request becomes VISIBLE in the marketplace to workers who look. The blast
+ * radius the DRAFT was protecting against did not exist.
+ *
+ * WRONG ON THE DESIGN, which matters more. A confirmed action that then does
+ * half the job makes the confirmation meaningless. The manager was shown the
+ * exact request, approved it, and got a draft plus an instruction to go and
+ * finish it somewhere else -- and this platform has no draft workflow anyone
+ * was asking for. The confirmation IS the human approval; `ADR-053` item 5
+ * exists to put a person in front of the write, not to downgrade the write
+ * after they say yes.
+ *
+ * So: confirm, then do the thing. Anyone who genuinely wants a draft can
+ * create one in the web UI, which has that control and always did.
+ *
+ * `confirm: true` despite being LOW_RISK_WRITE, and now for a real reason:
+ * the request becomes visible to workers who may act on it, and the argument
+ * list is long enough (position, headcount, date, two times) that a misheard
+ * number is likely and cheap to catch before it is live.
  *
  * NOT EXPOSED, deliberately: `hourly_rate`, `currency`, `requirements` and
  * `expires_at`. Pay in particular is a term of employment and does not belong
@@ -203,15 +216,15 @@ type CreateBroadcastArgs = z.infer<typeof CreateBroadcastArgs>;
 export const createBroadcast = registerTool<CreateBroadcastArgs>({
   name: 'job_requests.create_broadcast',
   description:
-    'Draft a staffing request for a shift that needs workers. Use for "I need 3 ' +
+    'Create a staffing request for a shift that needs workers. Use for "I need 3 ' +
     'cleaners on Thursday 8am to 4pm", "raise a request for two housekeepers ' +
     'tomorrow morning", "ich brauche zwei Reinigungskrafte am Montag". Give the ' +
     'position, how many workers are needed, the date as YYYY-MM-DD, and the start ' +
     'and end times as HH:MM. Returns the draft that was created.\n\n' +
-    'It is saved as a DRAFT and is NOT sent to anyone. The manager publishes it ' +
-    'from the app when the details are right. Pay rate and requirements are set ' +
-    'there too, not here. To place a specific named worker directly instead of ' +
-    'asking for volunteers, use assignments.place_worker.',
+    'The request is created and open for workers to see. Pay rate and ' +
+    'requirements are set in the app, not here. To place a specific named ' +
+    'worker directly instead of asking for volunteers, use ' +
+    'assignments.place_worker.',
   tier: 'LOW_RISK_WRITE',
   confirm: true,
 
@@ -247,8 +260,9 @@ export const createBroadcast = registerTool<CreateBroadcastArgs>({
         shift_date: args.shift_date,
         shift_start_time: args.shift_start_time,
         shift_end_time: args.shift_end_time,
-        // Pinned, never an argument. See the note above.
-        status: 'DRAFT',
+        // Pinned to OPEN, and still never an argument: the manager confirmed
+        // a staffing request, not a decision about workflow state.
+        status: 'OPEN',
       },
       toServiceActor(actor)
     );
@@ -260,7 +274,13 @@ export const createBroadcast = registerTool<CreateBroadcastArgs>({
     const result = raw as
       | {
           hotel?: string;
-          request?: { position?: string; workers_needed?: number; shift_date?: string };
+          request?: {
+            position?: string;
+            workers_needed?: number;
+            shift_date?: string;
+            shift_start_time?: string;
+            shift_end_time?: string;
+          };
         }
       | null;
     if (!result) return { summary: 'Nothing was created.', data: null };
@@ -270,14 +290,15 @@ export const createBroadcast = registerTool<CreateBroadcastArgs>({
     const r = result.request ?? {};
     return {
       summary:
-        `Drafted a request for ${r.workers_needed} x ${r.position} at ${result.hotel} on ` +
-        `${r.shift_date}. It has NOT been sent -- publish it from the app to notify workers.`,
+        `Created a request for ${r.workers_needed} x ${r.position} at ${result.hotel} on ` +
+        `${r.shift_date}, ${r.shift_start_time ?? ''}-${r.shift_end_time ?? ''}. ` +
+        'It is open for workers to pick up.',
       data: {
         hotel: result.hotel,
         position: r.position,
         workers_needed: r.workers_needed,
         shift_date: r.shift_date,
-        status: 'DRAFT',
+        status: 'OPEN',
       },
     };
   },
