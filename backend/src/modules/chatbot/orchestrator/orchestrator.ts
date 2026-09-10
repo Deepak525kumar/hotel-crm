@@ -7,7 +7,12 @@ import { executeTool } from '../tools/executor.js';
 import { findPriorCall, recordToolCall } from '../tools/tool-call-log.js';
 import { describeToolError } from '../tools/tool-errors.js';
 import { resolveTool } from '../tools/registry.js';
-import { actorHotelNames, actorWorkerNames, precheckReferences } from './reference-precheck.js';
+import {
+  actorHotelNames,
+  actorLanguage,
+  actorWorkerNames,
+  precheckReferences,
+} from './reference-precheck.js';
 import { classifyConfirmationReply } from './confirmation-language.js';
 import { checkBudget, recordSpend } from '../guardrails/budget.js';
 import {
@@ -534,13 +539,17 @@ async function executeTurn(params: {
   // Who this person is and what just happened -- the two things the model
   // was missing when it asked a manager the same question four turns running
   // (router-l1.ts PromptContext).
-  const [hotels, workers] = await Promise.all([
+  // In parallel: three small scoped reads, so the prompt costs one round trip
+  // rather than three.
+  const [hotels, workers, language] = await Promise.all([
     actorHotelNames(params.actor),
     actorWorkerNames(params.actor),
+    actorLanguage(params.actor),
   ]);
   const promptContext = {
     hotels,
     workers,
+    language,
     lastAction: readLastAction(conversation.session_state),
   };
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
 /**
  * SPEC-CALENDAR-001 REQ-CAL-T03/T04/T08 (narrow ADR-021 slice, GD-18).
@@ -99,14 +99,47 @@ jest.mock('../config/env.js', () => ({
 
 import { CalendarService } from '../modules/calendar/service.js';
 
+/**
+ * Captured once, at module load, before anything can have replaced it.
+ *
+ * `Intl` is a PROCESS global. Jest resets the module registry between test
+ * files but never globals, and this suite runs `--runInBand` in a single
+ * process -- so an `Intl.DateTimeFormat` left stubbed here is stubbed for
+ * every file that runs afterwards. The stub below ignores locale and options
+ * and returns one fixed string for everything, so a leak does not degrade a
+ * later suite, it silently freezes every date in it.
+ *
+ * That mattered little when little code formatted dates. It matters now: the
+ * chatbot's system prompt, `todayIso()` and the whole precomputed calendar
+ * are built on `Intl.DateTimeFormat`.
+ */
+const REAL_DATE_TIME_FORMAT = Intl.DateTimeFormat;
+
+/**
+ * Restored unconditionally after EVERY test in this file, not only by the
+ * `restoreClock()` each describe remembers to call.
+ *
+ * The calls are balanced today. The point is that they no longer have to be:
+ * a describe added later without an `afterEach`, or a restore skipped because
+ * something threw between the spy and the teardown, can no longer escape this
+ * file.
+ */
+afterEach(() => {
+  (Intl as { DateTimeFormat: typeof Intl.DateTimeFormat }).DateTimeFormat =
+    REAL_DATE_TIME_FORMAT;
+});
+
 function fixedToday(isoDate: string) {
   // Anchors "today" (Europe/Berlin) for deterministic past/future assertions
   // without relying on the real system clock.
-  const real = Intl.DateTimeFormat;
-  jest.spyOn(Intl, 'DateTimeFormat').mockImplementation(() => ({ format: () => isoDate }) as any);
-  return () => {
-    (Intl.DateTimeFormat as any) = real;
-  };
+  const spy = jest
+    .spyOn(Intl, 'DateTimeFormat')
+    .mockImplementation(() => ({ format: () => isoDate }) as any);
+  // `mockRestore()` rather than reassigning the property: reassignment leaves
+  // jest still believing its spy is installed, so the next `spyOn` of the
+  // same property operates on a registry entry that no longer matches
+  // reality.
+  return () => spy.mockRestore();
 }
 
 describe('CalendarService.markAbsence', () => {

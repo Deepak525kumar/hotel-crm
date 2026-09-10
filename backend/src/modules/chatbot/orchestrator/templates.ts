@@ -209,11 +209,24 @@ export function renderConfirmationRequest(toolName: string, args: unknown): stri
  * the model's text regardless of what the model intended, so a leak requires
  * the redaction to fail rather than the model to behave.
  *
- * WHAT IT DOES NOT DO: invent a replacement. A tool name is removed and the
- * sentence around it is left alone, because guessing the phrase the model
- * "meant" would put words in its mouth that no tool result supports. If the
- * removal leaves the reply empty or meaningless, the caller falls back to the
- * unrecognised-input text, which at least tells the truth.
+ * IT SUBSTITUTES MEANING, NOT A PLACEHOLDER. The first version replaced each
+ * name with the word "that", on the reasoning that inventing a replacement
+ * would put words in the model's mouth. In production that produced this,
+ * when a manager asked what the assistant could do:
+ *
+ *     - Schedule a worker or checker: Use the name and today's date with that.
+ *     - Check availability: Use that to see if someone is free today.
+ *     - See who's already scheduled: Use that for today.
+ *
+ * Three different capabilities, all called "that". The caution was right in
+ * principle and produced something worse than the leak it prevented.
+ *
+ * `TOOL_ACTIONS` already maps every tool to what it DOES, in the words a
+ * person uses -- it was written for the confirmation screen. Reusing it here
+ * puts no words in the model's mouth that the platform does not already
+ * stand behind: the phrase describes the capability, not the answer, and an
+ * unmapped tool still falls back to a plain sentence built from its own name
+ * rather than an identifier.
  */
 export function redactToolNames(text: string, toolNames: readonly string[]): string {
   if (!text) return text;
@@ -225,10 +238,8 @@ export function redactToolNames(text: string, toolNames: readonly string[]): str
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Optional surrounding backticks: the model formats them as code, and
     // leaving an empty `` pair behind looks like a rendering bug.
-    out = out.replace(new RegExp('`?' + escaped + '`?', 'g'), 'that');
+    out = out.replace(new RegExp('`?' + escaped + '`?', 'g'), describeToolAction(name).toLowerCase());
   }
 
-  // "Use that – shows all shifts" reads badly but honestly; collapse the
-  // whitespace the removals leave behind rather than the meaning.
   return out.replace(/[ \t]{2,}/g, ' ').trim();
 }

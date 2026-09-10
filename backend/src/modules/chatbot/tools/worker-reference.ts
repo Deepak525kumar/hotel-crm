@@ -89,12 +89,36 @@ export async function resolveWorkerReference(
   // is bounded by the actor's own hotel before any name is compared, so a
   // name that matches nobody in scope cannot reveal that it matches someone
   // elsewhere.
-  const eligibleIds = await listEligibleWorkerIds(hotelId, 'WORKER');
+  // WORKER **AND CHECKER**.
+  //
+  // This searched WORKER only, and it was recorded as a known limit rather
+  // than a defect -- until a manager hit it in production on 2026-09-10:
+  //
+  //     > place checker named new checker on a shift in hotel 1 today
+  //     No worker matching "new checker" is on your team.
+  //     > not worker i am saying he's a checker
+  //     No worker matching "new checker" is on your team.
+  //
+  // The person WAS on their team. The assistant could not see them, said
+  // something that read as a flat contradiction, and repeated it when
+  // corrected.
+  //
+  // A checker is staffable: `TargetRoleEnum` is ['WORKER', 'CHECKER'],
+  // `EmploymentRecord` carries no role of its own precisely because "a
+  // checker has one exactly like a worker does", and attendance admits a
+  // checker to check in because "a checker works a shift like a worker does".
+  // The narrowing was never a rule, only a default nobody had needed to
+  // revisit.
+  //
+  // Both roles are named EXPLICITLY rather than omitting the filter: omitting
+  // it also returns managers and admins who hold employment records, and a
+  // manager is not someone you put on a cleaning shift.
+  const eligibleIds = await listEligibleWorkerIds(hotelId, ['WORKER', 'CHECKER']);
   if (eligibleIds.length === 0) return { status: 'NOT_FOUND', query };
 
   const candidates = await getPrisma().user.findMany({
     where: { id: { in: eligibleIds }, deleted_at: null, is_active: true },
-    select: { id: true, first_name: true, last_name: true },
+    select: { id: true, first_name: true, last_name: true, role: true },
   });
 
   const matches = candidates.filter((c) => {
@@ -106,18 +130,47 @@ export async function resolveWorkerReference(
 
   if (matches.length === 0) return { status: 'NOT_FOUND', query };
 
-  if (matches.length > 1) {
+  // AN EXACT MATCH WINS OUTRIGHT.
+  //
+  // Substring matching is right -- managers say "Schmidt" as readily as
+  // "Anna" -- but it made an exactly-named person ambiguous with anyone whose
+  // name merely contains theirs. Production, 2026-09-10:
+  //
+  //     > is worker 1 available to work in hotel 1 today?
+  //     More than one worker matches "worker 1": worker 1, worker 10.
+  //     Please use a fuller name.
+  //
+  // There is no fuller name. "worker 1" IS the full name, and the assistant
+  // asked for something the manager could not give -- they eventually
+  // resorted to quoting it. Whenever exactly one candidate matches the query
+  // EXACTLY, that is the answer, and the fact that another name contains it
+  // as a prefix says nothing about which person was meant.
+  const exact = matches.filter((c) => fold(`${c.first_name} ${c.last_name}`) === needle);
+  const resolved = exact.length === 1 ? exact : matches;
+
+  if (resolved.length > 1) {
     return {
       status: 'AMBIGUOUS',
       query,
       // Names only. These people are all inside the caller's own scope, so
       // naming them discloses nothing they cannot already see -- but ids
       // would be useless to a person and are exactly what must not travel.
-      candidates: matches.map((m) => `${m.first_name} ${m.last_name}`).sort(),
+      // The ROLE is included now that both are searched: "Anna Braun
+      // (checker)" and "Anna Braun (worker)" are the same string without it,
+      // and telling them apart is the entire purpose of this message.
+      candidates: resolved
+        .map((m) => {
+          const name = `${m.first_name} ${m.last_name}`;
+          // The suffix is dropped rather than rendered when the role is
+          // absent: "Anna Schmidt (undefined)" is worse than "Anna Schmidt",
+          // and this string is read by a person.
+          return m.role ? `${name} (${String(m.role).toLowerCase()})` : name;
+        })
+        .sort(),
     };
   }
 
-  const only = matches[0]!;
+  const only = resolved[0]!;
   return {
     status: 'RESOLVED',
     workerId: only.id,
@@ -171,7 +224,8 @@ export function describeUnresolved(result: WorkerReferenceResult): string {
  */
 export type HotelReferenceResult =
   | { status: 'RESOLVED'; hotelId: string; name: string }
-  | { status: 'NEEDS_NAME' }
+  /** `choices` are the caller's own hotels, so the question can name them. */
+  | { status: 'NEEDS_NAME'; choices: string[] }
   | { status: 'NOT_FOUND'; query: string }
   | { status: 'AMBIGUOUS'; query: string; candidates: string[] };
 
@@ -203,7 +257,29 @@ export async function resolveHotelReference(
   // Unscoped or group-scoped: a name is required. Defaulting would mean
   // guessing which of several hotels a manager meant.
   const needle = query?.trim();
-  if (!needle) return { status: 'NEEDS_NAME' };
+  if (!needle) {
+    // ASK WITH THE OPTIONS IN THE QUESTION.
+    //
+    // This used to return "Which hotel? Please name it, since you cover more
+    // than one" -- a question that withholds the very thing needed to answer
+    // it. Production, 2026-09-10: the manager was asked it twice and replied
+    // "what are the options.", which is the only sensible response to being
+    // asked to pick from a list nobody showed them.
+    //
+    // Their own hotels, from their own scope, which they can already see on
+    // their home screen. Capped, because past a dozen the list stops being an
+    // answer and starts being a wall.
+    const { hotels } = await crmService.listHotels(
+      { page: 1, limit: 13 } as never,
+      actor.role,
+      actor.userId,
+      actor.scope ?? null
+    );
+    const names = (hotels ?? [])
+      .map((h: { name?: string }) => h.name)
+      .filter((n): n is string => typeof n === 'string');
+    return { status: 'NEEDS_NAME', choices: names.length > 12 ? [] : names };
+  }
 
   // `hotels`, not `data` -- listHotels returns { hotels, pagination }.
   const { hotels } = await crmService.listHotels(
@@ -224,11 +300,20 @@ export async function resolveHotelReference(
   return { status: 'RESOLVED', hotelId: hotels[0]!.id, name: hotels[0]!.name };
 }
 
+
+/** "a, b or c" -- how a person reads a short list of choices. */
+function humanList(items: string[]): string {
+  if (items.length === 1) return items[0]!;
+  return `${items.slice(0, -1).join(', ')} or ${items[items.length - 1]}`;
+}
+
 /** The sentence a person sees when a hotel could not be identified. */
 export function describeUnresolvedHotel(result: HotelReferenceResult): string {
   switch (result.status) {
     case 'NEEDS_NAME':
-      return 'Which hotel? Please name it, since you cover more than one.';
+      return result.choices.length > 0
+        ? `Which hotel do you mean -- ${humanList(result.choices)}?`
+        : 'Which hotel? Please name it, since you cover more than one.';
     case 'NOT_FOUND':
       return `No hotel matching "${result.query}" is in your scope.`;
     case 'AMBIGUOUS':
