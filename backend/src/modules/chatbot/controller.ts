@@ -180,8 +180,10 @@ export async function listCommands(
   next: NextFunction
 ): Promise<void> {
   try {
-    actorFromRequest(req); // authenticated callers only
-    sendSuccess(res, commandManifest(), { requestId: req.requestId });
+    // The actor decides WHICH chips: a chip whose tool this person cannot
+    // call is a button that can only answer "You do not have access to that".
+    const actor = actorFromRequest(req);
+    sendSuccess(res, commandManifest(actor), { requestId: req.requestId });
   } catch (error) {
     next(error);
   }

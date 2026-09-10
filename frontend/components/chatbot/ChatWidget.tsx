@@ -59,7 +59,20 @@ export function ChatWidget() {
           role="dialog"
           aria-modal="false"
           aria-label={t("chatbot.title", "Assistant")}
-          className="fixed bottom-24 right-4 z-40 flex h-[min(32rem,calc(100vh-8rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900 sm:right-6"
+          /* MOBILE BROWSERS, and two things they do differently.
+             `100vh` on iOS Safari and Android Chrome is the height of the
+             viewport WITHOUT the browser's own collapsing toolbars, so a
+             panel sized from it extends underneath them and its composer --
+             the input you type into -- sits off-screen. `100dvh` is that
+             height as it actually is at any moment. Used alone rather than
+             paired with a `100vh` class: two `h-[...]` utilities both get
+             emitted and which wins depends on the order Tailwind writes them
+             into the stylesheet, not the order they appear here -- so the
+             "fallback" would be a coin toss. `dvh` is supported by every
+             browser this app targets (iOS 15.4+, Chrome 108+).
+             The bottom offset also clears the home-indicator inset, so the
+             panel is not pinned under it on a notched phone. */
+          className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-4 z-40 flex h-[min(32rem,calc(100dvh-9rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900 sm:right-6"
         >
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
             <p className="text-sm font-semibold">{t("chatbot.title", "Assistant")}</p>
@@ -100,7 +113,14 @@ export function ChatWidget() {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={open ? t("chatbot.close", "Close") : t("chatbot.title", "Assistant")}
-        className="fixed bottom-5 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:right-6 dark:focus:ring-offset-gray-900"
+        /* THE LAUNCHER, reported invisible on a mobile browser (2026-09-10).
+           At `bottom-5` (20px) a 56px button sits directly under the browser
+           chrome that iOS Safari and Android Chrome overlay along the bottom
+           edge, and under the home indicator on a notched phone -- so the one
+           control that opens the assistant is the one thing covered.
+           `env(safe-area-inset-bottom)` is 0 everywhere it does not apply, so
+           this changes nothing on desktop. */
+        className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:right-6 dark:focus:ring-offset-gray-900"
       >
         {open ? (
           <X className="h-6 w-6" aria-hidden="true" />

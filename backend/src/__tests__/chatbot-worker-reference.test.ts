@@ -24,7 +24,15 @@ import type { ActorContext } from '../modules/chatbot/tools/actor.js';
 const manager = (hotelId = 'h1'): ActorContext =>
   ({ userId: 'mgr', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: hotelId } }) as unknown as ActorContext;
 
-const worker = (id: string, first: string, last: string) => ({ id, first_name: first, last_name: last });
+// `role` is selected by the resolver (2026-09-10) so an ambiguous answer can
+// tell a worker and a checker apart. Default WORKER; pass CHECKER to exercise
+// the role this resolver used to be blind to.
+const worker = (id: string, first: string, last: string, role: 'WORKER' | 'CHECKER' = 'WORKER') => ({
+  id,
+  first_name: first,
+  last_name: last,
+  role,
+});
 
 describe('resolveWorkerReference', () => {
   beforeEach(() => {
@@ -42,7 +50,11 @@ describe('resolveWorkerReference', () => {
     // filtering afterwards would make this a probe oracle: a manager could
     // learn who exists elsewhere from the shape of the responses.
     await resolveWorkerReference('Anna', manager('h1'));
-    expect(mockEligible).toHaveBeenCalledWith('h1', 'WORKER');
+    // WORKER **and CHECKER** since 2026-09-10: a checker works a shift exactly
+    // as a worker does, and searching workers only meant a manager asking to
+    // place one was told they were "not on your team". Both are named rather
+    // than omitting the filter, which would also sweep in managers and admins.
+    expect(mockEligible).toHaveBeenCalledWith('h1', ['WORKER', 'CHECKER']);
     // And the user lookup is constrained to those ids, never open.
     expect(mockFindMany.mock.calls[0][0].where.id).toEqual({ in: ['w1', 'w2', 'w3'] });
   });
@@ -69,7 +81,10 @@ describe('resolveWorkerReference', () => {
     mockFindMany.mockResolvedValue([worker('w1', 'Anna', 'Schmidt'), worker('w4', 'Anna', 'Weber')]);
     const r = await resolveWorkerReference('anna', manager());
     expect(r.status).toBe('AMBIGUOUS');
-    expect(r).toMatchObject({ candidates: ['Anna Schmidt', 'Anna Weber'] });
+    // The ROLE is shown now that both are searched: without it "Anna Braun"
+    // and "Anna Braun" are the same string, and telling two people apart is
+    // the entire purpose of this message.
+    expect(r).toMatchObject({ candidates: ['Anna Schmidt (worker)', 'Anna Weber (worker)'] });
   });
 
   it('returns NOT_FOUND for someone outside the scope, indistinguishably from nobody', async () => {
@@ -154,7 +169,48 @@ describe('resolveHotelReference', () => {
       const r = await resolveHotelReference(undefined, actor);
       expect(r.status).toBe('NEEDS_NAME');
     }
-    expect(mockListHotels).not.toHaveBeenCalled();
+  });
+
+  /**
+   * It ASKS WITH THE OPTIONS IN THE QUESTION (2026-09-10).
+   *
+   * The question used to be "Which hotel? Please name it, since you cover
+   * more than one" -- which withholds the one thing needed to answer it. In
+   * production a manager was asked it twice and replied "what are the
+   * options.", which is the only sensible response.
+   *
+   * The listing is the caller's OWN, unfiltered by any search term: this is
+   * "here are yours", not a guess at what they meant. Nothing is resolved
+   * from it -- the status is still NEEDS_NAME.
+   */
+  it('lists the caller\'s own hotels in the question, without searching for one', async () => {
+    mockListHotels.mockResolvedValue({
+      hotels: [{ id: 'h1', name: 'Hotel Adler' }, { id: 'h2', name: 'Premier Inn Essen' }],
+      pagination: {},
+    });
+
+    const r = await resolveHotelReference(undefined, admin);
+
+    expect(r.status).toBe('NEEDS_NAME');
+    expect(r).toMatchObject({ choices: ['Hotel Adler', 'Premier Inn Essen'] });
+    // No search term: it is not guessing which one, only naming both.
+    expect(mockListHotels.mock.calls[0][0]).not.toHaveProperty('search');
+    expect(describeUnresolvedHotel(r)).toMatch(/Hotel Adler.*Premier Inn Essen/);
+  });
+
+  /**
+   * Past a dozen the list stops being an answer and becomes a wall, so it is
+   * dropped and the plain question comes back.
+   */
+  it('drops the list when there are too many hotels to name', async () => {
+    mockListHotels.mockResolvedValue({
+      hotels: Array.from({ length: 13 }, (_, i) => ({ id: `h${i}`, name: `Hotel ${i}` })),
+      pagination: {},
+    });
+
+    const r = await resolveHotelReference(undefined, admin);
+    expect(r).toMatchObject({ status: 'NEEDS_NAME', choices: [] });
+    expect(describeUnresolvedHotel(r)).toMatch(/Which hotel\?/);
   });
 
   it('searches through the ACTOR-SCOPED listing, never an open query', async () => {
@@ -181,7 +237,8 @@ describe('resolveHotelReference', () => {
 
   it('never leaks an id in any message', () => {
     const cases: HotelReferenceResult[] = [
-      { status: 'NEEDS_NAME' },
+      { status: 'NEEDS_NAME', choices: [] },
+      { status: 'NEEDS_NAME', choices: ['Hotel Adler', 'Premier Inn Essen'] },
       { status: 'NOT_FOUND', query: 'x' },
       { status: 'AMBIGUOUS', query: 'x', candidates: ['A'] },
     ];
@@ -199,7 +256,94 @@ describe('resolveWorkerReference with an explicit hotel', () => {
     const admin = { userId: 'a', role: 'admin', permissions: [], scope: null } as unknown as ActorContext;
 
     const r = await resolveWorkerReference('Anna', admin, 'h7');
-    expect(mockEligible).toHaveBeenCalledWith('h7', 'WORKER');
+    expect(mockEligible).toHaveBeenCalledWith('h7', ['WORKER', 'CHECKER']);
     expect(r).toMatchObject({ status: 'RESOLVED', hotelId: 'h7' });
+  });
+});
+
+/**
+ * THE CHECKER, AND THE EXACT NAME.
+ *
+ * Both reported from production on 2026-09-10, in the same conversation.
+ */
+describe('resolving people the resolver used to be unable to find', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEligible.mockResolvedValue(['w1', 'c1']);
+  });
+
+  /**
+   *     > place checker named new checker on a shift in hotel 1 today
+   *     No worker matching "new checker" is on your team.
+   *     > not worker i am saying he's a checker
+   *     No worker matching "new checker" is on your team.
+   *
+   * They were on the team. The assistant could not see them, and repeated a
+   * flat contradiction when corrected.
+   */
+  it('finds a CHECKER by name, not only a worker', async () => {
+    mockFindMany.mockResolvedValue([worker('c1', 'New', 'Checker', 'CHECKER')]);
+
+    const r = await resolveWorkerReference('new checker', manager('h1'));
+    expect(r).toMatchObject({ status: 'RESOLVED', workerId: 'c1', fullName: 'New Checker' });
+  });
+
+  /**
+   * Managers and admins hold employment records too, and a manager is not
+   * someone you put on a cleaning shift -- so the filter names both staffing
+   * roles rather than being omitted.
+   */
+  it('asks for exactly WORKER and CHECKER, never an unfiltered roster', async () => {
+    mockFindMany.mockResolvedValue([worker('w1', 'Anna', 'Braun')]);
+    await resolveWorkerReference('Anna', manager('h1'));
+
+    const [, roles] = mockEligible.mock.calls[0];
+    expect(roles).toEqual(['WORKER', 'CHECKER']);
+  });
+
+  /**
+   *     > is worker 1 available to work in hotel 1 today?
+   *     More than one worker matches "worker 1": worker 1, worker 10.
+   *     Please use a fuller name.
+   *
+   * There is no fuller name -- "worker 1" IS the full name. The manager was
+   * asked for something they could not give, and resorted to quoting it.
+   */
+  it('resolves an EXACT name even when another name contains it', async () => {
+    mockEligible.mockResolvedValue(['w1', 'w10']);
+    mockFindMany.mockResolvedValue([
+      worker('w1', 'worker', '1'),
+      worker('w10', 'worker', '10'),
+    ]);
+
+    const r = await resolveWorkerReference('worker 1', manager('h1'));
+    expect(r).toMatchObject({ status: 'RESOLVED', workerId: 'w1', fullName: 'worker 1' });
+  });
+
+  /** A genuinely partial name is still ambiguous -- that part was correct. */
+  it('still refuses when the query matches several and none exactly', async () => {
+    mockEligible.mockResolvedValue(['w1', 'w10']);
+    mockFindMany.mockResolvedValue([
+      worker('w1', 'worker', '1'),
+      worker('w10', 'worker', '10'),
+    ]);
+
+    const r = await resolveWorkerReference('worker', manager('h1'));
+    expect(r.status).toBe('AMBIGUOUS');
+  });
+
+  /** Two people with the SAME name are still ambiguous, and told apart by role. */
+  it('does not let an exact match hide a real duplicate', async () => {
+    mockEligible.mockResolvedValue(['w1', 'c1']);
+    mockFindMany.mockResolvedValue([
+      worker('w1', 'Anna', 'Braun'),
+      worker('c1', 'Anna', 'Braun', 'CHECKER'),
+    ]);
+
+    const r = await resolveWorkerReference('Anna Braun', manager('h1'));
+    expect(r).toMatchObject({
+      status: 'AMBIGUOUS',
+      candidates: ['Anna Braun (checker)', 'Anna Braun (worker)'],
+    });
   });
 });

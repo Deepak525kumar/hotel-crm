@@ -99,6 +99,9 @@
       "src/lib/**/*.ts",
       "!src/**/*.d.ts"
     ],
-    "testTimeout": 20000
+    "testTimeout": 20000,
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/__tests__/support/global-hygiene.ts"
+    ]
   }
 }

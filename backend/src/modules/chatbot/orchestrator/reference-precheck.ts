@@ -196,3 +196,45 @@ export async function actorWorkerNames(actor: ActorContext): Promise<string[]> {
     return [];
   }
 }
+
+
+/**
+ * The language this person chose for the app, named in full.
+ *
+ * The prompt said "Reply in the language the user wrote in. German and
+ * English are both common here" -- and the model still answered an English
+ * question in German twice on 2026-09-10, because the surrounding context
+ * (German hotel names, a German platform) outweighed one short message.
+ *
+ * It also undersold the problem. `UI_LOCALES` is de, en, ur, ar, fr, uk: a
+ * worker can be running the app in Urdu, Arabic, French or Ukrainian, and
+ * "the language the user wrote in" is a weak signal for a two-word message in
+ * any of them. `User.preferred_language` is an EXPLICIT choice the person
+ * already made, and it beats inference.
+ *
+ * Null when unset, which is a real state -- the column is nullable so the
+ * client can negotiate from the device locale. The prompt then falls back to
+ * the inference rule, exactly as before.
+ */
+const LANGUAGE_NAMES: Record<string, string> = {
+  de: 'German',
+  en: 'English',
+  ur: 'Urdu',
+  ar: 'Arabic',
+  fr: 'French',
+  uk: 'Ukrainian',
+};
+
+export async function actorLanguage(actor: ActorContext): Promise<string | null> {
+  try {
+    const { getPrisma } = await import('../../../lib/db.js');
+    const row = await getPrisma().user.findUnique({
+      where: { id: actor.userId },
+      select: { preferred_language: true },
+    });
+    const code = row?.preferred_language;
+    return code ? (LANGUAGE_NAMES[code] ?? null) : null;
+  } catch {
+    return null;
+  }
+}

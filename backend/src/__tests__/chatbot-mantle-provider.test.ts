@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
 const mockSign = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
 jest.mock('@smithy/signature-v4', () => ({
@@ -47,6 +47,29 @@ function sentUrl(n = 0): string {
   const calls = (global.fetch as unknown as jest.Mock).mock.calls as unknown as Array<[string, unknown]>;
   return calls[n][0];
 }
+
+/**
+ * `global.fetch` is a PROCESS global, and jest resets the module registry
+ * between test files but never globals. The suite runs `--runInBand`, in one
+ * process, so a mock installed here and left in place is still installed for
+ * every file that runs afterwards -- any of which that calls fetch without
+ * mocking it first gets a mantle-shaped response to a question it never
+ * asked. Two suites have shown intermittent failures in full runs while
+ * passing alone; this is one real mechanism for that, whether or not it is
+ * the only one.
+ *
+ * The two other suites that touch global.fetch (push-provider,
+ * email-provider) already save and restore it. This one did not.
+ */
+const originalFetch = global.fetch;
+// afterEACH, not afterAll: the hygiene guard in setupFilesAfterEnv registers
+// its own root-level afterAll first, so it runs BEFORE any afterAll declared
+// here and would report this file as leaking even after it had cleaned up.
+// Restoring per test is also simply more honest -- nothing here needs the mock
+// to survive a test.
+afterEach(() => {
+  global.fetch = originalFetch;
+});
 
 function mockFetch(status: number, body: unknown) {
   global.fetch = jest.fn(async () => ({

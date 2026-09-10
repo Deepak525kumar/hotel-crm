@@ -18,6 +18,10 @@
  * worse than spending a token on getting it right.
  */
 
+import { resolveTool } from '../tools/registry.js';
+import { actorHasPermission } from '../tools/executor.js';
+import type { ActorContext } from '../tools/actor.js';
+
 export interface L0Command {
   /** Stable id the client sends when a chip is tapped. */
   id: string;
@@ -35,6 +39,69 @@ export interface L0Command {
 }
 
 export const L0_COMMANDS: readonly L0Command[] = [
+  // ---- MANAGERS ---------------------------------------------------------
+  //
+  // There were none. Every one of the eight commands below this block is a
+  // worker's own record, so a hotel manager opening the assistant was shown
+  // chips for payslips and cleaned rooms and nothing at all for running a
+  // shift -- and their three commonest questions each cost a model call, a
+  // second of latency and a slice of the token budget, to reach a tool that
+  // takes no arguments and could have answered instantly.
+  //
+  // Zero arguments each, deliberately: these answer "today", which is what
+  // the question means when someone taps a button rather than typing. A
+  // period is a typed question, and L1 handles it.
+  {
+    id: 'team_today',
+    label: "Who's on today",
+    tool: 'assignments.list_for_my_team',
+    args: {},
+    phrases: [
+      'who is on today',
+      'whos on today',
+      'who is working today',
+      'whos working today',
+      'who is scheduled today',
+      'team today',
+      'wer arbeitet heute',
+      'wer ist heute eingeteilt',
+    ],
+  },
+  {
+    id: 'team_clocked_in',
+    label: 'Who has clocked in',
+    tool: 'attendance.team_status',
+    args: {},
+    phrases: [
+      'who has clocked in',
+      'whos clocked in',
+      'who has checked in',
+      'is everyone in',
+      'is everyone here',
+      'who is missing',
+      'wer ist heute da',
+      'wer hat eingestempelt',
+      'hat jemand nicht eingestempelt',
+    ],
+  },
+  {
+    id: 'team_off',
+    label: "Who's off",
+    tool: 'calendar.team_absences',
+    args: {},
+    phrases: [
+      'who is off',
+      'whos off',
+      'who is off today',
+      'who called in sick',
+      'whos sick',
+      'who is sick today',
+      'wer ist heute krank',
+      'wer hat urlaub',
+      'wer fehlt heute',
+    ],
+  },
+
   {
     id: 'my_payslips',
     label: 'My payslips',
@@ -109,6 +176,23 @@ export const L0_COMMANDS: readonly L0Command[] = [
       'welche dokumente fehlen',
       'fehlen noch unterlagen',
       'sind meine unterlagen vollstaendig',
+    ],
+  },
+  {
+    // Added with `attendance.my_hours` (2026-09-10). Hours are what people
+    // are paid for, so this is asked constantly -- and it was reaching the
+    // model every time.
+    id: 'my_hours',
+    label: 'My hours',
+    tool: 'attendance.my_hours',
+    args: {},
+    phrases: [
+      'my hours',
+      'how many hours have i worked',
+      'how many hours did i work',
+      'hours worked',
+      'meine stunden',
+      'wie viele stunden habe ich gearbeitet',
     ],
   },
   {
@@ -301,6 +385,28 @@ export function resolveCommandId(id: string): L0Command | undefined {
 }
 
 /** The manifest the client renders as quick-reply chips. */
-export function commandManifest(): Array<{ id: string; label: string; tool: string }> {
-  return L0_COMMANDS.map((c) => ({ id: c.id, label: c.label, tool: c.tool }));
+export function commandManifest(
+  actor?: ActorContext
+): Array<{ id: string; label: string; tool: string }> {
+  // FILTERED BY WHAT THIS PERSON CAN ACTUALLY USE.
+  //
+  // The manifest used to return every command to everyone. That was harmless
+  // only for as long as every command happened to be a self-service tool that
+  // every role holds -- the moment a manager-scoped chip existed, a worker
+  // would have been shown a button whose only possible answer is "You do not
+  // have access to that." Offering someone a control that refuses them is a
+  // worse failure than not offering it at all.
+  //
+  // Checked against the SAME permission the executor enforces, so the chips a
+  // person sees and the calls that will actually succeed cannot drift apart.
+  // Called without an actor it returns everything, as before.
+  const visible = actor
+    ? L0_COMMANDS.filter((c) => {
+        const tool = resolveTool(c.tool);
+        if (!tool) return false;
+        return tool.permission === null || actorHasPermission(actor, tool.permission);
+      })
+    : L0_COMMANDS;
+
+  return visible.map((c) => ({ id: c.id, label: c.label, tool: c.tool }));
 }

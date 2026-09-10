@@ -113,7 +113,10 @@ export async function listEligibleHotelIds(userId: string): Promise<string[]> {
  * is additive — the unfiltered (both-roles) shape stays available for any
  * future caller that genuinely wants it.
  */
-export async function listEligibleWorkerIds(hotelId: string, role?: UserRole): Promise<string[]> {
+export async function listEligibleWorkerIds(
+  hotelId: string,
+  role?: UserRole | UserRole[]
+): Promise<string[]> {
   const prisma = getPrisma();
   const hotel = await prisma.hotel.findUnique({
     where: { id: hotelId },
@@ -124,7 +127,11 @@ export async function listEligibleWorkerIds(hotelId: string, role?: UserRole): P
     where: {
       hotel_group_id: hotel.hotel_group_id,
       status: EmploymentStatus.ACTIVE,
-      ...(role ? { user: { role } } : {}),
+      // An ARRAY narrows to several roles at once (2026-09-10). The chatbot's
+      // name resolver needs WORKER and CHECKER together and neither alone:
+      // a checker works a shift exactly as a worker does, but passing no role
+      // would also sweep in managers and admins who hold employment records.
+      ...(role ? { user: { role: Array.isArray(role) ? { in: role } : role } } : {}),
     },
     select: { user_id: true },
   });
