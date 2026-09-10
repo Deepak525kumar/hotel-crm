@@ -134,6 +134,29 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['worker', 'im here', 'im here = check in', picks('attendance.check_in')],
   ['worker', 'im off now', 'im off = check out', picks('attendance.check_out')],
 
+  // Added 2026-09-10 with attendance.correct_times. The risk is not that a
+  // manager cannot reach it -- it is that it STEALS the clock-in/clock-out
+  // traffic, since "forgot to clock out" appears in both families. The
+  // worker cases above and the negative case below are the real guards.
+  ['manager', 'Anna forgot to clock out yesterday, she left at 16:30', 'correct_times', picks('attendance.correct_times')],
+  // A REASON IS PART OF THE REQUEST, and this case originally omitted it.
+  //
+  // "Tomasz actually started at 07:00 on 2026-09-09" failed twice, returning
+  // no tool at all -- and that was the tool working as designed, not a
+  // misroute. Its description says to ask for the reason rather than guess
+  // one, because the reason is written into the timesheet and is what a
+  // dispute is later argued from. With no reason given, asking IS the correct
+  // move, so the expectation was wrong rather than the model.
+  //
+  // The first case above passes because "forgot to clock out" is itself the
+  // reason. This one now carries one too.
+  ['manager', 'Tomasz actually started at 07:00 on 2026-09-09, the tablet was down', 'correct_times (in)', picks('attendance.correct_times')],
+  // A WORKER saying the same thing must NOT reach it -- they cannot fix their
+  // own timesheet, and the tool is not in their manifest at all.
+  ['worker', 'I forgot to clock out yesterday', 'worker cannot correct',
+    (t) => t !== 'attendance.correct_times'],
+
+
 
   ['manager', 'who is waiting for approval?', 'review_queue', picks('employees.review_queue')],
   ['manager', 'approve Anna', 'approve_application', picks('employees.approve_application')],

@@ -17,6 +17,7 @@ import { APPROVED_2026_09_09_PLANNING } from '../approvals.js';
 // The Europe/Berlin "today", shared with the daily-operations tools rather than
 // recomputed: a UTC date here would give a night-shift manager yesterday.
 import { todayIso } from './daily-operations.tools.js';
+import { CALENDAR_TIMEZONE } from '../../../../lib/utils.js';
 
 /**
  * PLANNING TOOLS -- the four capabilities a route-by-route gap analysis
@@ -675,4 +676,221 @@ export const teamAbsences = registerTool<TeamAbsencesArgs>({
     };
   },
   maxResultTokens: 300,
+});
+
+/* ------------------------------------------------------------------ *
+ * attendance.correct_times
+ * ------------------------------------------------------------------ */
+
+/**
+ * Interpret `day` + `HH:MM` as a Europe/Berlin wall-clock time.
+ *
+ * A manager saying "she left at 16:30" means half four in Frankfurt, not in
+ * UTC. Building `new Date(\`${day}T${time}:00Z\`)` would store an instant one
+ * or two hours out depending on the season, and that error lands directly in
+ * paid minutes -- which is the one place on this platform where being an hour
+ * wrong is not cosmetic.
+ *
+ * The offset is derived from the zone at that instant rather than assumed,
+ * so it is right on both sides of the DST switch. The one case it cannot
+ * resolve is a time inside the spring-forward gap (02:30 on the changeover
+ * night does not exist); that lands on the hour after, which is the only
+ * answer available and is a shift nobody works.
+ */
+export function berlinInstant(day: string, hhmm: string): Date {
+  const asIfUtc = Date.parse(`${day}T${hhmm}:00Z`);
+
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: CALENDAR_TIMEZONE,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+      .formatToParts(new Date(asIfUtc))
+      .map((p) => [p.type, p.value])
+  ) as Record<string, string>;
+
+  const shownAsUtc = Date.parse(
+    `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}Z`
+  );
+
+  // How far ahead of UTC the zone was at that instant.
+  return new Date(asIfUtc - (shownAsUtc - asIfUtc));
+}
+
+/**
+ * A MANAGER FIXING A TIMESHEET -- the capability held back until now, and the
+ * reasons for holding it are what shape it.
+ *
+ * "I forgot to clock out yesterday" is among the commonest things a worker
+ * says, and a worker CANNOT fix it: attendance `update()` forces server time
+ * on the self branch and refuses an already-closed record, deliberately, to
+ * stop time manipulation. Only a manager can, so until now the assistant's
+ * only honest answer was "ask your manager" -- and the manager then had no way
+ * to do it from here either.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT EXPOSE, and this is the whole design. The
+ * manager branch of `update()` also accepts `minutes_worked`, `minutes_late`
+ * and `is_verified`. `minutes_worked` is a DIRECT WRITE OF PAID TIME, derived
+ * from nothing: whoever sets it decides what a shift is worth. This tool
+ * cannot set it. It sets the CLOCK TIMES, and the service recomputes minutes
+ * from them -- so a correction is always a claim about when somebody arrived
+ * or left, checkable against a roster, rather than a number typed into a pay
+ * field. `is_verified` is excluded for the same reason: signing a timesheet
+ * off is an act, not a correction.
+ *
+ * A REASON IS REQUIRED, unlike the HTTP route, which treats notes as
+ * optional. Every correction here lands in `notes` and therefore in the
+ * record a dispute would be argued from. A change to paid time with no
+ * stated cause is exactly what an audit cannot evaluate later, and the
+ * assistant is the one path where the person making the change is not
+ * looking at the timesheet while they do it.
+ *
+ * `confirm: true` and HIGH_RISK_WRITE: the manager sees the resolved worker,
+ * the day, and the exact times before anything is written.
+ */
+const CorrectTimesArgs = z
+  .object({
+    worker_name: z.string().trim().min(2).max(80),
+    day: isoDate,
+    // HH:MM, 24-hour. At least one is required (refined below).
+    check_in: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be HH:MM').optional(),
+    check_out: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be HH:MM').optional(),
+    reason: z.string().trim().min(3).max(200),
+    hotel_name: z.string().trim().min(2).max(120).optional(),
+  })
+  .strict()
+  .refine((v) => Boolean(v.check_in || v.check_out), {
+    message: 'give a check_in time, a check_out time, or both',
+    path: ['check_out'],
+  });
+
+type CorrectTimesArgs = z.infer<typeof CorrectTimesArgs>;
+
+export const correctTimes = registerTool<CorrectTimesArgs>({
+  name: 'attendance.correct_times',
+  description:
+    "Correct the clock-in or clock-out time on one of the manager's OWN workers' " +
+    'timesheets for a past day. Use when you are told a time was missed or is wrong: ' +
+    '"Anna forgot to clock out yesterday, she left at 16:30", "Tomasz actually ' +
+    'started at 07:00 on Monday", "korrigiere Annas Stempelzeit". Give the worker\'s ' +
+    'name, the day as YYYY-MM-DD, the times as HH:MM, and a short reason. Returns ' +
+    'the corrected times and the hours they now add up to.\n\n' +
+    'ALWAYS ask for the actual time and the reason if you were not given them -- ' +
+    'never guess either. This changes what someone is PAID. It cannot set hours or ' +
+    'mark a timesheet verified; it sets the clock times and the hours are ' +
+    'recalculated from them. A worker cannot use this on their own record: they ' +
+    'clock out with attendance.check_out, and only for today.',
+  tier: 'HIGH_RISK_WRITE',
+  confirm: true,
+
+  interfaceRef: 'IF-ATT-Update (attendance/service.ts update())',
+  approvalRef:
+    APPROVED_2026_09_09_PLANNING +
+    ' Registration note: manager-scoped correction of clock TIMES only; minutes_worked, minutes_late and is_verified are deliberately not exposed, and a reason is mandatory.',
+
+  args: CorrectTimesArgs,
+  // The PATCH route enforces no token -- it is shared with a worker's own
+  // check-out, and the service's role branch is the real gate. `staffing:write`
+  // is the closest capability this caller must already hold (manager, RM and
+  // admin only; no worker has it), and it is route-checked elsewhere, so this
+  // names a real permission rather than inventing one.
+  permission: 'staffing:write',
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') return refuseUnresolvedHotel(hotel);
+
+    const resolved = await resolveWorkerReference(args.worker_name, actor, hotel.hotelId);
+    if (resolved.status !== 'RESOLVED') return refuseUnresolved(resolved);
+
+    const serviceActor = toServiceActor(actor);
+
+    // The record is found from the roster, never named by the caller: an
+    // attendance id is not something a manager has or should supply.
+    const { data } = await attendanceService.list(
+      { worker_id: resolved.workerId, from: args.day, to: args.day, page: 1, per_page: 5 } as never,
+      serviceActor
+    );
+
+    const rows = (data ?? []) as Array<{ id: string }>;
+    if (rows.length === 0) {
+      return refuse(
+        'NOT_FOUND',
+        `${resolved.fullName} has no attendance record for ${args.day}, so there is nothing to correct.`
+      );
+    }
+    if (rows.length > 1) {
+      return refuse(
+        'AMBIGUOUS',
+        `${resolved.fullName} has more than one attendance record on ${args.day}. ` +
+          'Correct it in the app, where each shift can be picked individually.'
+      );
+    }
+
+    const updated = await attendanceService.update(
+      rows[0]!.id,
+      {
+        ...(args.check_in ? { check_in_at: berlinInstant(args.day, args.check_in).toISOString() } : {}),
+        ...(args.check_out ? { check_out_at: berlinInstant(args.day, args.check_out).toISOString() } : {}),
+        // The reason travels into the record itself, attributed, so a dispute
+        // is argued from the timesheet rather than from memory.
+        notes: `Corrected via assistant: ${args.reason}`,
+      } as never,
+      serviceActor.userId,
+      serviceActor.role,
+      serviceActor.scope ?? null
+    );
+
+    return { worker: resolved.fullName, day: args.day, attendance: updated };
+  },
+
+  compress: (raw: unknown) => {
+    const result = raw as
+      | {
+          worker?: string;
+          day?: string;
+          attendance?: { check_in_at?: string | null; check_out_at?: string | null; minutes_worked?: number | null };
+        }
+      | null;
+    if (!result) return { summary: 'Nothing was changed.', data: null };
+    const refusal = asRefusal(result);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+
+    const hhmm = (iso?: string | null) =>
+      iso
+        ? new Intl.DateTimeFormat('en-GB', {
+            timeZone: CALENDAR_TIMEZONE,
+            hourCycle: 'h23',
+            hour: '2-digit',
+            minute: '2-digit',
+          }).format(new Date(iso))
+        : null;
+
+    const minutes = result.attendance?.minutes_worked ?? null;
+    const hours = typeof minutes === 'number' ? Math.round((minutes / 60) * 10) / 10 : null;
+
+    return {
+      summary:
+        `${result.worker}'s timesheet for ${result.day} now reads ` +
+        `${hhmm(result.attendance?.check_in_at) ?? 'no clock-in'} to ` +
+        `${hhmm(result.attendance?.check_out_at) ?? 'no clock-out'}` +
+        `${hours !== null ? ` -- ${hours} hours` : ''}.`,
+      data: {
+        worker: result.worker,
+        day: result.day,
+        // Times shown back in Berlin, the way they were given.
+        check_in: hhmm(result.attendance?.check_in_at),
+        check_out: hhmm(result.attendance?.check_out_at),
+        hours,
+      },
+    };
+  },
+  maxResultTokens: 120,
 });

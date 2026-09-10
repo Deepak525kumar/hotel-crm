@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { POLL_INTERVAL_MS } from '@/constants/polling';
 import { ChatLauncher } from '@/components/ChatLauncher';
 import { useRouter } from 'expo-router';
 import useSWR from 'swr';
@@ -61,14 +62,14 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const { data: stats, isLoading: statsLoading, isValidating: statsValidating, mutate: mutateStats } =
-    useSWR(user ? `/analytics/myStats/${user.id}` : null, () => api.analytics.myStats(), { refreshInterval: 5000 });
+    useSWR(user ? `/analytics/myStats/${user.id}` : null, () => api.analytics.myStats(), { refreshInterval: POLL_INTERVAL_MS });
 
   const {
     data: assignments,
     isLoading: assignmentsLoading,
     isValidating: assignmentsValidating,
     mutate: mutateAssignments,
-  } = useSWR(user ? `/assignments/list/${user.id}` : null, () => api.assignments.list({ limit: 5 }), { refreshInterval: 5000 });
+  } = useSWR(user ? `/assignments/list/${user.id}` : null, () => api.assignments.list({ limit: 5 }), { refreshInterval: POLL_INTERVAL_MS });
 
   const {
     data: attendance,
@@ -76,7 +77,7 @@ export default function HomeScreen() {
     mutate: mutateAttendance,
   } = useSWR(user ? `/attendance/mine/${user.id}` : null, () =>
     api.attendance.listMine(user!.id, { per_page: 20 }),
-    { refreshInterval: 5000 }
+    { refreshInterval: POLL_INTERVAL_MS }
   );
 
   // Open jobs, CHECKER-targeted only (enforced server-side, see jobs.tsx's
@@ -88,7 +89,7 @@ export default function HomeScreen() {
     mutate: mutateJobs,
   } = useSWR(user ? `/work-requests/open/${user.id}` : null, () =>
     api.workRequests.list({ status: 'OPEN', limit: 3 }),
-    { refreshInterval: 5000 }
+    { refreshInterval: POLL_INTERVAL_MS }
   );
 
   const upcoming = Array.isArray(assignments)

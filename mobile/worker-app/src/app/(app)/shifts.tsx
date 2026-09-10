@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { POLL_INTERVAL_MS } from '@/constants/polling';
 import { matchesShift, SEARCH_THRESHOLD } from '@/lib/check-search';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -103,7 +104,7 @@ export default function ScheduleScreen() {
     mutate,
   } = useSWR(user ? `/assignments/list_all/${user.id}` : null, () =>
     api.assignments.list({ limit: 100 }),
-    { refreshInterval: 5000 },
+    { refreshInterval: POLL_INTERVAL_MS },
   );
 
   const items = Array.isArray(assignments) ? assignments : [];

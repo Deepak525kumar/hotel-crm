@@ -31,6 +31,33 @@
 #     nobody had the failing run's TEXT, and the next one will look exactly as
 #     unhelpful from a summary line.
 #
+#   - ONE MORE REMAINS, ~1 run in 20, and it now has a SIGNATURE (2026-09-11).
+#     Two captured instances, in different suites, are the same shape:
+#
+#         attendance-scope-authz  "allows a regional_manager to read an
+#                                  in-group record (200)"   -> got 403
+#         job-requests-scope-authz "scopes a regional_manager's list to their
+#                                  hotel_group only (200)"  -> got 403
+#
+#     Both are a REGIONAL_MANAGER reading something inside its own scope and
+#     being denied. Start there rather than from the suite name, which differs
+#     each time and is what made this look like generic pollution.
+#
+#     Ruled out so far, with evidence:
+#       * process-global pollution — `support/global-hygiene.ts` fails the
+#         polluting FILE by name and does not fire on these runs
+#       * `resolveScopeGroupFilter` — the `hotel_group` branch is pure, no DB
+#         call, so an RM with a group claim cannot resolve to deny there
+#       * env leakage — both suites mock `config/env.js`
+#       * open handles — `--detectOpenHandles` reports none
+#       * heap — peak 1206 MB against a 2240 MB limit
+#       * rate limiting — see above, fixed and non-recurring
+#       * the suites themselves — each passes 10/10 and 6/6 run alone
+#
+#     Untried: bisecting the run order (`--runTestsByPath` with the prefix of
+#     files that precede the failing one) to find which earlier suite leaves
+#     whatever makes an RM claim resolve to deny.
+#
 # So: run this with a clean tree and nothing else running, and leave it alone.
 #
 #   cd backend && ./scripts/flake-hunt.sh 30

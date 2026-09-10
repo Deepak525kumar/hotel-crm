@@ -14,6 +14,7 @@ import useSWR from 'swr';
 import { useTranslation } from 'react-i18next';
 import { SymbolView } from 'expo-symbols';
 
+import { POLL_INTERVAL_MS } from '@/constants/polling';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -182,7 +183,7 @@ export default function HistoryScreen() {
   const { data, isLoading, isValidating, mutate, error } = useSWR(
     ['/quality/my-inspections', debounced],
     () => api.quality.myInspections(1, 20, debounced),
-    { refreshInterval: 5000 }
+    { refreshInterval: POLL_INTERVAL_MS }
   );
 
   const items = data?.checks ?? [];
