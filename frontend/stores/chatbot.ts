@@ -37,6 +37,8 @@ interface ChatbotState {
   runCommand: (commandId: string, label: string) => Promise<void>;
   confirm: (messageId: string, token: string) => Promise<void>;
   cancelConfirmation: (messageId: string) => void;
+  /** Resend the request behind a failed message, replacing that message. */
+  retry: (messageId: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -105,6 +107,26 @@ export const useChatbotStore = create<ChatbotState>((set, get) => ({
    * cancellation endpoint to call and inventing one would imply state that
    * does not exist.
    */
+  /**
+   * Resend what failed.
+   *
+   * The failed bubble is REMOVED first rather than left above the new
+   * attempt: two "I could not answer that" bubbles for one question read as
+   * two failures, and the user's own message is still there above it saying
+   * what was asked.
+   *
+   * No echo is passed, because the question is already in the transcript --
+   * echoing again would show it twice.
+   */
+  retry: async (messageId) => {
+    const message = get().messages.find((m) => m.id === messageId);
+    if (!message?.retry || get().sending) return;
+
+    const input = message.retry;
+    set((s) => ({ messages: s.messages.filter((m) => m.id !== messageId) }));
+    await exchange(set, get, input, null);
+  },
+
   cancelConfirmation: (messageId) => {
     markResolved(set, messageId, "cancelled");
     set((s) => ({
@@ -171,8 +193,13 @@ async function exchange(
     }));
   } catch (err) {
     // Rendered as a failed bubble rather than a toast: the question stays
-    // visible above it, so a worker can see what was being answered and
-    // retry, instead of a banner that disappears.
+    // visible above it, so a worker can see what was being answered,
+    // instead of a banner that disappears.
+    //
+    // AND IT CARRIES WHAT TO RETRY. The comment here used to say a worker
+    // could "retry" -- which meant retyping the whole message, on a phone,
+    // mid-shift, having just watched it fail. `retry` holds the exact input
+    // that failed so the bubble can offer a button that resends it.
     set((s) => ({
       sending: false,
       error: err instanceof Error ? err.message : "Something went wrong.",
@@ -181,8 +208,19 @@ async function exchange(
         {
           id: nextId(),
           role: "assistant" as const,
-          text: "I could not answer that just now. Please try again.",
+          text: "I could not answer that just now.",
           failed: true,
+          // The original request, verbatim -- a chip tap resends the chip,
+          // not its label, so this is the input rather than the echo.
+          //
+          // A failed CONFIRMATION is deliberately not retryable: the pending
+          // call may already have been cleared server-side, so resending the
+          // token would either do nothing or claim to retry something that
+          // is no longer there. Those turns keep the plain failure message
+          // and the person can ask again.
+          ...(input.text || input.commandId
+            ? { retry: { ...(input.text ? { text: input.text } : {}), ...(input.commandId ? { commandId: input.commandId } : {}) } }
+            : {}),
         },
       ],
     }));

@@ -78,6 +78,16 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['worker', 'export all my data please', 'export_my_data', picks('reports.export_my_data')],
   ['worker', 'I am sick tomorrow', 'mark_my_absence', picks('calendar.mark_my_absence')],
   ['manager', 'put Anna on Tuesday', 'place_worker', picks('assignments.place_worker')],
+
+  // Added 2026-09-11 with assignments.move_shift. The risk is the pair, not
+  // either alone: "move" and "put on" are one word apart, and before this
+  // tool existed "move anna to tomorrow" routed to place_worker -- which ADDS
+  // a placement rather than moving one. The place_worker case above is the
+  // other half of this guard.
+  ['manager', 'move Anna to tomorrow', 'move_shift', picks('assignments.move_shift')],
+  ['manager', 'verschiebe Annas Schicht auf Montag', 'move_shift (de)', picks('assignments.move_shift')],
+  ['manager', "push Tomasz's Friday shift to Saturday", 'move_shift (reschedule)', picks('assignments.move_shift')],
+
   ['manager', 'Anna is off sick on Monday', 'mark_worker_absence', picks('calendar.mark_worker_absence')],
   ['manager', "who's working at my hotel this week?", 'list_for_my_team', picks('assignments.list_for_my_team')],
   ['manager', 'show me attendance from 2026-08-01 to 2026-08-31', 'query_team', picks('reports.query_team')],

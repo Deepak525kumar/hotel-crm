@@ -1249,6 +1249,7 @@
     "confirm": "Bestätigen",
     "cancel": "Abbrechen",
     "confirmed": "Bestätigt",
-    "cancelled": "Abgebrochen"
+    "cancelled": "Abgebrochen",
+    "retry": "Erneut versuchen"
   }
 }

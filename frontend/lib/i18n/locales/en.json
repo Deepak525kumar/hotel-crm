@@ -1249,6 +1249,7 @@
     "confirm": "Confirm",
     "cancel": "Cancel",
     "confirmed": "Confirmed",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "retry": "Try again"
   }
 }

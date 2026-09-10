@@ -1945,6 +1945,14 @@ export interface ChatMessage {
   /** Set once the user has answered a confirmation, so it cannot be re-answered. */
   resolved?: "confirmed" | "cancelled";
   failed?: boolean;
+  /**
+   * The exact request that failed, so the bubble can offer to resend it.
+   *
+   * Present only on a failed assistant message. It holds the INPUT rather
+   * than the echoed text: a tapped chip sends a `command_id`, and resending
+   * its label would send different words than the ones that failed.
+   */
+  retry?: { text?: string; commandId?: string };
 }
 
 /**

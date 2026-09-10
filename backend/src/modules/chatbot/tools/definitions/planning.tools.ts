@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isoDate } from '../schema-primitives.js';
 import { calendarService } from '../../../calendar/service.js';
 import { attendanceService } from '../../../attendance/service.js';
+import { assignmentService } from '../../../assignments/service.js';
 import { jobRequestService } from '../../../job-requests/service.js';
 import { userService } from '../../../users/service.js';
 import {
@@ -893,4 +894,169 @@ export const correctTimes = registerTool<CorrectTimesArgs>({
     };
   },
   maxResultTokens: 120,
+});
+
+/* ------------------------------------------------------------------ *
+ * assignments.move_shift
+ * ------------------------------------------------------------------ */
+
+/**
+ * MOVING A SHIFT TO ANOTHER DAY -- a capability the platform has had all
+ * along and the assistant could not reach.
+ *
+ * FOUND BY PROBING with the words a manager uses. "move anna to tomorrow"
+ * routed to `assignments.place_worker`, which ADDS a placement: the manager
+ * would have been told the shift was moved while the original day still had
+ * one, or -- because a worker may hold only one active assignment per day
+ * (TRULE-006, backed by a unique index) -- watched it fail for a reason that
+ * has nothing to do with what they asked. Either way "move" is not "place",
+ * and the registry offered only the second.
+ *
+ * `PATCH /assignments/calendar-entries/:id/move` already does exactly this,
+ * is already restricted to admin/manager/RM, and re-checks hotel scope
+ * itself. Nothing needed building except the tool.
+ *
+ * DAY ONLY, because that is what the endpoint does: "the hotel and worker on
+ * a CalendarEntry never change via this endpoint (product decision,
+ * 2026-08-05); moving to a different hotel means cancelling and re-placing".
+ * The description says so rather than letting a manager discover it.
+ *
+ * THE SOURCE DAY IS OPTIONAL, and the refusal when it is missing is the
+ * interesting part. "Move Anna to tomorrow" does not say which shift, so:
+ * exactly one upcoming placement is unambiguous and gets moved; none is a
+ * plain refusal; several is a refusal that LISTS the days, because choosing
+ * one for them would silently move the wrong shift and nothing downstream
+ * would notice.
+ */
+const MoveShiftArgs = z
+  .object({
+    worker_name: z.string().trim().min(2).max(80),
+    to_day: isoDate,
+    /** Which shift to move, when the worker has more than one coming up. */
+    from_day: isoDate.optional(),
+    hotel_name: z.string().trim().min(2).max(120).optional(),
+  })
+  .strict()
+  .refine((v) => v.from_day !== v.to_day, {
+    message: 'the shift is already on that day',
+    path: ['to_day'],
+  });
+
+type MoveShiftArgs = z.infer<typeof MoveShiftArgs>;
+
+/** How far ahead to look for "their shift" when no day was named. */
+const MOVE_LOOKAHEAD_DAYS = 60;
+
+export const moveShift = registerTool<MoveShiftArgs>({
+  name: 'assignments.move_shift',
+  description:
+    "Move one of the manager's OWN workers' existing shifts to a different day. " +
+    'Use when you are asked to MOVE or RESCHEDULE someone who is already on the ' +
+    'rota: "move Anna to tomorrow", "push Tomasz\'s Friday shift to Saturday", ' +
+    '"verschiebe Marias Schicht auf Montag". Give the worker\'s name and the new ' +
+    'day as YYYY-MM-DD; add from_day when they have more than one shift coming ' +
+    'up. Returns the day the shift moved from and to.\n\n' +
+    'This MOVES an existing shift, leaving nothing on the old day. To put ' +
+    'somebody on the rota who is not on it yet, use assignments.place_worker ' +
+    'instead. It cannot move a shift to a different hotel -- that means ' +
+    'cancelling it and placing them again, which is done in the app.',
+  tier: 'HIGH_RISK_WRITE',
+  confirm: true,
+
+  interfaceRef: 'IF-ASG-MoveCalendarEntry (assignments/service.ts moveCalendarEntry())',
+  approvalRef:
+    APPROVED_2026_09_09_PLANNING +
+    ' Registration note: moves an existing in-scope placement between days; cannot change hotel or worker, and refuses rather than choose when several shifts could be meant.',
+
+  args: MoveShiftArgs,
+  permission: 'staffing:write',
+  scopeCheck: 'none',
+
+  invoke: async (args, actor) => {
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') return refuseUnresolvedHotel(hotel);
+
+    const resolved = await resolveWorkerReference(args.worker_name, actor, hotel.hotelId);
+    if (resolved.status !== 'RESOLVED') return refuseUnresolved(resolved);
+
+    const serviceActor = toServiceActor(actor);
+    const today = todayIso();
+
+    // The window is bounded rather than open-ended: "their shift" means one
+    // that has not happened yet, and an unbounded query would also drag in
+    // last spring's.
+    const from = args.from_day ?? today;
+    const to =
+      args.from_day ??
+      new Date(Date.parse(`${today}T12:00:00Z`) + MOVE_LOOKAHEAD_DAYS * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+
+    const { data } = await assignmentService.listCalendarEntries(
+      { worker_id: resolved.workerId, hotel_id: hotel.hotelId, from, to, page: 1, per_page: 50 } as never,
+      serviceActor
+    );
+
+    // Cancelled placements are still rows; moving one would resurrect a shift
+    // nobody is coming to.
+    const live = ((data ?? []) as Array<{ id: string; day: string; assignment_status?: string }>)
+      .filter((e) => e.assignment_status !== 'CANCELLED' && e.assignment_status !== 'REASSIGNED')
+      .filter((e) => e.day?.slice(0, 10) !== args.to_day);
+
+    if (live.length === 0) {
+      return refuse(
+        'NOT_FOUND',
+        args.from_day
+          ? `${resolved.fullName} has no shift on ${args.from_day} to move.`
+          : `${resolved.fullName} has no upcoming shift to move.`
+      );
+    }
+
+    if (live.length > 1) {
+      const days = live
+        .map((e) => e.day.slice(0, 10))
+        .sort()
+        .join(', ');
+      return refuse(
+        'AMBIGUOUS',
+        `${resolved.fullName} has shifts on ${days}. Say which day to move from.`
+      );
+    }
+
+    const entry = live[0]!;
+    const moved = await assignmentService.moveCalendarEntry(
+      entry.id,
+      { day: args.to_day },
+      serviceActor
+    );
+
+    return {
+      worker: resolved.fullName,
+      from_day: entry.day.slice(0, 10),
+      to_day: args.to_day,
+      hotel: hotel.name,
+      result: moved,
+    };
+  },
+
+  compress: (raw: unknown) => {
+    const result = raw as
+      | { worker?: string; from_day?: string; to_day?: string; hotel?: string }
+      | null;
+    if (!result) return { summary: 'Nothing was moved.', data: null };
+    const refusal = asRefusal(result);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+
+    return {
+      summary:
+        `Moved ${result.worker}'s shift at ${result.hotel} from ${result.from_day} ` +
+        `to ${result.to_day}. Nothing is left on ${result.from_day}.`,
+      data: {
+        worker: result.worker,
+        from_day: result.from_day,
+        to_day: result.to_day,
+      },
+    };
+  },
+  maxResultTokens: 100,
 });

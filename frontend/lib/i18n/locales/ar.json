@@ -1250,6 +1250,7 @@
     "confirm": "تأكيد",
     "cancel": "إلغاء",
     "confirmed": "تم التأكيد",
-    "cancelled": "أُلغي"
+    "cancelled": "أُلغي",
+    "retry": "أعد المحاولة"
   }
 }

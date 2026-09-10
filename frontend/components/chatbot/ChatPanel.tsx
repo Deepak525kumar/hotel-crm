@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Send, AlertTriangle, Check, X } from "lucide-react";
+import { AlertTriangle, Check, RotateCcw, Send, X } from "lucide-react";
 import { useChatbotStore } from "@/stores/chatbot";
 import type { ChatMessage } from "@/lib/types";
 
@@ -17,7 +17,7 @@ import type { ChatMessage } from "@/lib/types";
  */
 export function ChatPanel({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation();
-  const { messages, commands, sending, send, runCommand, confirm, cancelConfirmation } =
+  const { messages, commands, sending, send, runCommand, confirm, cancelConfirmation, retry } =
     useChatbotStore();
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -68,6 +68,8 @@ export function ChatPanel({ compact = false }: { compact?: boolean }) {
                   m.pendingConfirmation && void confirm(m.id, m.pendingConfirmation.token)
                 }
                 onCancel={() => cancelConfirmation(m.id)}
+                onRetry={retry}
+                retryLabel={t("chatbot.retry", "Try again")}
               />
             ))}
             {sending && <Typing />}
@@ -159,10 +161,15 @@ function Bubble({
   message,
   onConfirm,
   onCancel,
+  onRetry,
+  retryLabel,
 }: {
   message: ChatMessage;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Absent when the message carries nothing safe to resend. */
+  onRetry?: (messageId: string) => void;
+  retryLabel: string;
 }) {
   const isUser = message.role === "user";
   return (
@@ -182,6 +189,23 @@ function Bubble({
             <AlertTriangle className="mr-1.5 inline h-4 w-4 align-[-3px]" aria-hidden="true" />
           )}
           {message.text}
+
+          {/* RETRY, rather than making them type it again.
+              The old failure said "please try again", which on a phone
+              mid-shift meant retyping the whole message they had just
+              watched fail. The request is still held, so the button resends
+              it. Absent on a failed confirmation, which is not safe to
+              replay -- see the store. */}
+          {message.failed && message.retry && onRetry && (
+            <button
+              type="button"
+              onClick={() => onRetry(message.id)}
+              className="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-400 px-2.5 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100 dark:border-amber-600 dark:text-amber-200 dark:hover:bg-amber-900"
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              {retryLabel}
+            </button>
+          )}
         </div>
 
         {message.pendingConfirmation && <ConfirmBar
