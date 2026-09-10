@@ -322,7 +322,9 @@ export const teamStatus = registerTool<TeamStatusArgs>({
     'Use for "who has clocked in?", "did Anna arrive?", "is anyone missing this ' +
     'morning?", "wer ist heute da?". The day is optional and defaults to today; ' +
     'give it as YYYY-MM-DD for another day. Returns each worker with their ' +
-    'check-in and check-out times, or that they have not checked in.\n\n' +
+    'check-in and check-out times, how many minutes late they were if they ' +
+    'were late, or that they have not checked in at all. Use it for "who is ' +
+    'late?" too.\n\n' +
     'This is what ACTUALLY happened. For who is SCHEDULED to work, use ' +
     'assignments.list_for_my_team. For whether someone is free to be given a ' +
     'shift, use calendar.check_availability. For who is on the team at all, use ' +
@@ -370,6 +372,7 @@ export const teamStatus = registerTool<TeamStatusArgs>({
             worker?: { full_name?: string | null } | null;
             check_in_at?: string | null;
             check_out_at?: string | null;
+            minutes_late?: number | null;
             status?: string;
           }>;
         }
@@ -388,13 +391,23 @@ export const teamStatus = registerTool<TeamStatusArgs>({
 
     const present = rows.filter((r) => r.check_in_at);
     const missing = rows.filter((r) => !r.check_in_at);
+    const late = rows.filter((r) => typeof r.minutes_late === 'number' && r.minutes_late > 0);
     const hhmm = (iso?: string | null) => (iso ? iso.slice(11, 16) : null);
 
+    // LATENESS, which the DTO already carried and this ignored.
+    //
+    // "whos late" is a manager's question every single morning, and it routes
+    // here -- correctly -- but the answer listed arrival times and left them
+    // to compare each against a shift start they were not shown. The service
+    // computes `minutes_late` already.
     const lines = rows.slice(0, 15).map((r) => {
       const name = r.worker?.full_name ?? 'unnamed worker';
       if (!r.check_in_at) return `${name}: not checked in`;
       const out = hhmm(r.check_out_at);
-      return `${name}: in ${hhmm(r.check_in_at)}${out ? `, out ${out}` : ', still on shift'}`;
+      const late = typeof r.minutes_late === 'number' && r.minutes_late > 0
+        ? ` (${r.minutes_late} min late)`
+        : '';
+      return `${name}: in ${hhmm(r.check_in_at)}${late}${out ? `, out ${out}` : ', still on shift'}`;
     });
 
     const more = rows.length > 15 ? ` (+${rows.length - 15} more)` : '';
@@ -405,13 +418,15 @@ export const teamStatus = registerTool<TeamStatusArgs>({
 
     return {
       summary:
-        `${present.length} checked in, ${missing.length} not, at ${result.hotel} on ` +
-        `${result.day}.${capped} ${lines.join('; ')}${more}`,
+        `${present.length} checked in${late.length > 0 ? ` (${late.length} late)` : ''}, ` +
+        `${missing.length} not, at ${result.hotel} on ${result.day}.${capped} ` +
+        `${lines.join('; ')}${more}`,
       data: {
         hotel: result.hotel,
         day: result.day,
         present: present.length,
         missing: missing.length,
+        late: late.length,
       },
     };
   },

@@ -407,3 +407,61 @@ describe('a person who types instead of tapping', () => {
     expect(replay.reply).not.toMatch(/^done$/);
   });
 });
+
+
+/**
+ * THE TOOL LOOP, and the line it must not cross.
+ *
+ * A turn may now take several READ steps before answering. A WRITE must still
+ * end the turn at the confirmation gate -- if a write could be chained, the
+ * model could act on the result of its own action without a human ever seeing
+ * it, which is exactly what ADR-053 item 5 exists to prevent.
+ */
+describe('the tool loop stops at a write', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sessionState = {};
+    toolCallLog = new Map();
+    writeInvoke.mockResolvedValue({ created: 1 });
+  });
+
+  it('proposes the write and ends the turn, never looping past it', async () => {
+    providerCall.mockResolvedValue({
+      text: '',
+      toolUse: { name: TOOL, input: { room_number: '204', count: 1 } },
+      usage: { promptTokens: 10, completionTokens: 2 },
+    });
+
+    const result = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'clean room 204' });
+
+    expect(result.pendingConfirmation).toBeDefined();
+    expect(writeInvoke).not.toHaveBeenCalled();
+    // ONE model call: the turn stopped rather than observing anything.
+    expect(providerCall).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * A write's result is never observed either. The confirmed execution
+   * returns straight to the user -- no further model call looks at what the
+   * write produced.
+   */
+  it('does not feed a confirmed write result back to the model', async () => {
+    providerCall.mockResolvedValue({
+      text: '',
+      toolUse: { name: TOOL, input: { room_number: '204', count: 1 } },
+      usage: { promptTokens: 10, completionTokens: 2 },
+    });
+    const proposal = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'clean room 204' });
+    const callsAfterProposal = providerCall.mock.calls.length;
+
+    await runTurn({
+      conversationId: 'conv_1',
+      actor: ACTOR,
+      confirmToken: proposal.pendingConfirmation!.token,
+    });
+
+    expect(writeInvoke).toHaveBeenCalledTimes(1);
+    // The confirmation path involves no model at all.
+    expect(providerCall).toHaveBeenCalledTimes(callsAfterProposal);
+  });
+});

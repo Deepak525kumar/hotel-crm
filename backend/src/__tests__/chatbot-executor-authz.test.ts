@@ -328,9 +328,15 @@ describe('chatbot tool executor — self-scoping (RULE-CHAT-09 / REQ-CHAT-013)',
     expect(res.status).toBe(200);
     expect(lastAssignmentWhere?.worker_id).toBe('w1');
 
-    const ids = (res.body.data.data as Array<{ id: string }>).map((r) => r.id);
-    expect(ids).toEqual(['a1']);
-    expect(ids).not.toContain('a2'); // another worker's row
+    // The row COUNT and the query filter are the evidence, not an id.
+    // `compressAssignments` stopped returning `id` on 2026-09-10: a raw cuid
+    // is of no use to the person asking and is exactly the kind of string a
+    // model repeats back as though it meant something. The narrowing is
+    // proven by the WHERE above and by getting only the caller's own row.
+    const rows = res.body.data.data as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    expect(JSON.stringify(rows)).not.toContain('a2'); // another worker's row
+    expect(JSON.stringify(rows)).not.toMatch(/\bid\b/);
   });
 
   it('a manager with no scope claim resolves to an empty hotel set, not platform-wide', async () => {

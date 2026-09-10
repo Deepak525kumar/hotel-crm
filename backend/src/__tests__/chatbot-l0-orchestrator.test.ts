@@ -167,7 +167,13 @@ describe('L0 end to end with NO provider configured', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.route).toBe('L0');
     expect(res.body.data.toolInvoked).toBe('assignments.list_mine');
-    expect(res.body.data.reply).toContain('1 shift');
+    // The reply is the ANSWER now, not a count. "1 shift found" was true and
+    // useless -- a worker asking about their shifts wants the day, the time
+    // and the hotel (2026-09-10). The day is the durable part to assert; the
+    // fixture has no times, which is itself a real state and must read as
+    // "time not set" rather than an invented hour.
+    expect(res.body.data.reply).toContain('2026-06-01');
+    expect(res.body.data.reply).not.toMatch(/\d shift(s)? found/);
     expect(getProvider()).toBeNull(); // proves no provider was involved
     expect(providerCalls).toBe(0);
   });
