@@ -19,10 +19,17 @@
 #     unrelated suite failing intermittently and passing on re-run, which is
 #     indistinguishable from a real flake until you have the text.
 #
-#   - A residual flake DOES exist beyond that, at roughly one run in fifty
-#     with no edits in flight. It has not been captured. `global-hygiene.ts`
-#     rules out process-global pollution (it would fail the polluting file by
-#     name), and every occurrence has been in an HTTP/supertest suite.
+#   - THE RESIDUAL FLAKE WAS CAUGHT BY THIS SCRIPT AND FIXED (2026-09-10).
+#     It was `chatbot-rate-limit.test.ts`: the limiter's memory store clears
+#     its counters on an interval anchored to the store's creation, and each
+#     test fills the quota then asserts ONE more request is refused. When that
+#     interval fired between the fill and the assertion, the counter was back
+#     at zero and the request returned 200 instead of 429. The window is now
+#     an hour in that suite, so the boundary cannot be crossed mid-test.
+#
+#     Keep this script anyway. That flake took hours to find precisely because
+#     nobody had the failing run's TEXT, and the next one will look exactly as
+#     unhelpful from a summary line.
 #
 # So: run this with a clean tree and nothing else running, and leave it alone.
 #

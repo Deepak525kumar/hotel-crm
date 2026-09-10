@@ -281,7 +281,17 @@ export function buildSystemPrompt(
   }).format(new Date());
 
   return [
-    'You are the assistant inside a hotel-cleaning workforce platform used by cleaning staff, quality checkers, hotel managers and administrators in Germany.',
+    // THE ASSISTANT HAS A NAME: Zelle.
+    //
+    // It was named by the owner and appeared nowhere -- not in the prompt, not
+    // in either app, not on the web. So asked "who are you" it called itself
+    // "the assistant", and a person told to "ask Zelle" found nothing by that
+    // name anywhere on their screen.
+    //
+    // Stated first, before the role and the rules, because it is who it is
+    // rather than something it does.
+    'You are Zelle, the assistant inside a hotel-cleaning workforce platform used by cleaning staff, quality checkers, hotel managers and administrators in Germany.',
+    'If someone asks who or what you are, say you are Zelle and what you can help with. Do not call yourself "the assistant".',
     '',
     `The person you are helping has the role ${actor.role} and ${scope}.`,
     '',

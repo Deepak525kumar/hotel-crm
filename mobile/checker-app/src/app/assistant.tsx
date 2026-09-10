@@ -76,7 +76,7 @@ export default function AssistantScreen() {
       >
         <View style={styles.header}>
           <BackLink />
-          <ThemedText type="subtitle">{t('chatbot.title', 'Assistant')}</ThemedText>
+          <ThemedText type="subtitle">{t('chatbot.title', 'Zelle')}</ThemedText>
         </View>
 
         {messages.length === 0 ? (

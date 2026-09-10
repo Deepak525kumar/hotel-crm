@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { usePathname } from "next/navigation";
-import { MessageCircle, X, Maximize2 } from "lucide-react";
+import { X, Maximize2 } from "lucide-react";
+import { ZelleMark } from "./ZelleMark";
 import Link from "next/link";
 import { useChatbotStore } from "@/stores/chatbot";
 import { ChatPanel } from "./ChatPanel";
@@ -58,7 +59,7 @@ export function ChatWidget() {
           ref={panelRef}
           role="dialog"
           aria-modal="false"
-          aria-label={t("chatbot.title", "Assistant")}
+          aria-label={t("chatbot.title", "Zelle")}
           /* MOBILE BROWSERS, and two things they do differently.
              `100vh` on iOS Safari and Android Chrome is the height of the
              viewport WITHOUT the browser's own collapsing toolbars, so a
@@ -75,7 +76,10 @@ export function ChatWidget() {
           className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-4 z-40 flex h-[min(32rem,calc(100dvh-9rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900 sm:right-6"
         >
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-            <p className="text-sm font-semibold">{t("chatbot.title", "Assistant")}</p>
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <ZelleMark className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              {t("chatbot.title", "Zelle")}
+            </p>
             <div className="flex items-center gap-1">
               <Link
                 href="/assistant"
@@ -112,7 +116,7 @@ export function ChatWidget() {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-label={open ? t("chatbot.close", "Close") : t("chatbot.title", "Assistant")}
+        aria-label={open ? t("chatbot.close", "Close") : t("chatbot.title", "Zelle")}
         /* THE LAUNCHER, reported invisible on a mobile browser (2026-09-10).
            At `bottom-5` (20px) a 56px button sits directly under the browser
            chrome that iOS Safari and Android Chrome overlay along the bottom
@@ -125,7 +129,7 @@ export function ChatWidget() {
         {open ? (
           <X className="h-6 w-6" aria-hidden="true" />
         ) : (
-          <MessageCircle className="h-6 w-6" aria-hidden="true" />
+          <ZelleMark className="h-6 w-6" />
         )}
       </button>
     </>

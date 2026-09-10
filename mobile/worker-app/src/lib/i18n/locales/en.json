@@ -1235,7 +1235,7 @@
     "loggedCount": "{{n}} rooms"
   },
   "chatbot": {
-    "title": "Assistant",
+    "title": "Zelle",
     "subtitle": "Answers about your own shifts, contract, payslips and messages.",
     "greeting": "How can I help?",
     "greetingHint": "Ask a question, or pick one below.",
