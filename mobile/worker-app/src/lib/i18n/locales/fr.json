@@ -1249,6 +1249,7 @@
     "confirm": "Confirmer",
     "cancel": "Annuler",
     "confirmed": "Confirmé",
-    "cancelled": "Annulé"
+    "cancelled": "Annulé",
+    "retry": "Réessayer"
   }
 }
