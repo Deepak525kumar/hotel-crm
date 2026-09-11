@@ -1255,6 +1255,7 @@
     "stopDictation": "Stop dictating",
     "micDenied": "Microphone access is off. Turn it on in Settings to dictate.",
     "micFailed": "Dictation did not work. You can type instead.",
-    "enterHint": "Enter to send, Shift+Enter for a new line"
+    "enterHint": "Enter to send, Shift+Enter for a new line",
+    "retry": "Try again"
   }
 }

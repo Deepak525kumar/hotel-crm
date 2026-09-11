@@ -54,13 +54,13 @@ function ManagerOverview() {
           </CardContent>
         </Card>
       ) : isLoading || !stats ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-24 w-full" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile
             label={t("analytics.openRequests")}
             value={stats.work_requests.open}
@@ -122,7 +122,20 @@ export default function DashboardPage() {
 
 
       <StaffingWriteGate>
-        <div className="grid gap-4 sm:grid-cols-2 mb-6">
+        {/* `grid-cols-1` IS THE FIX, not decoration. With no explicit column
+            below `sm`, the grid gets one implicit `auto` track, and an auto
+            track grows to fit its widest content -- so a single notification
+            title with a long unbroken string (an email, an id, a German
+            compound) widened the whole page past a phone's edge. Reported on
+            the admin dashboard, whose notifications carry exactly that kind of
+            text. `grid-cols-1` compiles to `minmax(0, 1fr)`, a track that is
+            allowed to shrink.
+
+            It also explains a second report: the Zelle launcher is `fixed` at
+            `right: 1rem`, and once the page is wider than the screen that
+            edge is off-screen. The launcher was never missing -- it was
+            parked beyond the right-hand side of a page that had grown. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6">
           <ManagerActionRequired />
           <ManagerRecentActivity />
         </div>
@@ -133,7 +146,9 @@ export default function DashboardPage() {
           — no leaderboard, no other worker's data (see MyStatsCard's own
           comment). Previously only reachable from /profile. */}
       <RoleGate allow={["worker"]}>
-        <div className="grid gap-4 sm:grid-cols-2 mb-6">
+        {/* Same flaw as the manager row above, not yet reported only because a
+            worker's notifications happen to be short. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6">
           <WorkerUpcomingSchedule />
           <WorkerAlerts />
         </div>

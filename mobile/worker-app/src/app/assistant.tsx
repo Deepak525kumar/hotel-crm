@@ -32,7 +32,7 @@ export default function AssistantScreen() {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { available, probe, messages, commands, sending, send, runCommand, confirm, cancelConfirmation } =
+  const { available, probe, messages, commands, sending, send, runCommand, confirm, cancelConfirmation, retry } =
     useChatbotStore();
   const [draft, setDraft] = useState('');
 
@@ -140,6 +140,7 @@ export default function AssistantScreen() {
                   item.pendingConfirmation && void confirm(item.id, item.pendingConfirmation.token)
                 }
                 onCancel={() => cancelConfirmation(item.id)}
+                onRetry={() => void retry(item.id)}
               />
             )}
             ListFooterComponent={
@@ -231,10 +232,12 @@ function Bubble({
   message,
   onConfirm,
   onCancel,
+  onRetry,
 }: {
   message: ChatMessage;
   onConfirm: () => void;
   onCancel: () => void;
+  onRetry: () => void;
 }) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -257,6 +260,23 @@ function Bubble({
           ]}
         >
           <ThemedText style={{ color: isUser ? '#FFFFFF' : theme.text }}>{message.text}</ThemedText>
+
+          {/* RETRY, rather than making them type it all again.
+              "Please try again" meant retyping the whole message on a phone,
+              in gloves, having just watched it fail. The request is still
+              held, so this resends it. Absent on a failed confirmation,
+              which is not safe to replay -- see the store. */}
+          {message.failed && message.retry ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onRetry}
+              style={[styles.retry, { borderColor: theme.border }]}
+            >
+              <ThemedText style={[styles.retryText, { color: theme.text }]}>
+                {t('chatbot.retry', 'Try again')}
+              </ThemedText>
+            </Pressable>
+          ) : null}
         </ThemedView>
 
         {/* NOTHING HAS BEEN WRITTEN when this renders — the assistant has only
@@ -373,4 +393,13 @@ const styles = StyleSheet.create({
   },
   glyph: { fontSize: 16, lineHeight: 20 },
   glyphOnColor: { color: '#FFFFFF', fontWeight: '700' },
+  retry: {
+    marginTop: Spacing.two,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+  },
+  retryText: { fontWeight: '600', fontSize: 13 },
 });

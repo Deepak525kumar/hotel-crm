@@ -44,7 +44,14 @@ export function useSpeechInput(options: {
   // Held in a ref so the event subscriptions below are not re-created on
   // every keystroke in the parent.
   const onTranscriptRef = useRef(onTranscript);
-  onTranscriptRef.current = onTranscript;
+  // Assigned in an effect rather than during render. Writing a ref while
+  // rendering is a side effect, and a render can be thrown away and re-run --
+  // the React lint rule rejects it for exactly that reason. The web copy of
+  // this hook had the same line and was fixed first; this one arrived on main
+  // unfixed, which is how the lint gate caught it on a later merge.
+  useEffect(() => {
+    onTranscriptRef.current = onTranscript;
+  }, [onTranscript]);
 
   useSpeechRecognitionEvent('result', (event) => {
     const text = event.results?.[0]?.transcript ?? '';
