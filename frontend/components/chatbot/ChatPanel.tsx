@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Send, AlertTriangle, Check, X } from "lucide-react";
+import { AlertTriangle, Check, X } from "lucide-react";
+import { Composer } from "./Composer";
 import { useChatbotStore } from "@/stores/chatbot";
 import type { ChatMessage } from "@/lib/types";
 
@@ -16,7 +17,7 @@ import type { ChatMessage } from "@/lib/types";
  * and a composer pinned to the bottom that grows with the text.
  */
 export function ChatPanel({ compact = false }: { compact?: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { messages, commands, sending, send, runCommand, confirm, cancelConfirmation } =
     useChatbotStore();
   const [draft, setDraft] = useState("");
@@ -76,36 +77,16 @@ export function ChatPanel({ compact = false }: { compact?: boolean }) {
         )}
       </div>
 
-      <div className="border-t border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
-        <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
-          <textarea
-            ref={inputRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              // Enter sends, Shift+Enter breaks the line. The convention
-              // people already expect from every chat surface.
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit();
-              }
-            }}
-            rows={1}
-            placeholder={t("chatbot.placeholder", "Ask about your shifts, contract or messages…")}
-            aria-label={t("chatbot.inputLabel", "Message")}
-            className="max-h-40 min-h-[42px] flex-1 resize-y rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
-          />
-          <button
-            type="button"
-            onClick={submit}
-            disabled={sending || draft.trim().length === 0}
-            aria-label={t("chatbot.send", "Send")}
-            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"
-          >
-            <Send className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-      </div>
+      <Composer
+        value={draft}
+        onChange={setDraft}
+        onSubmit={submit}
+        sending={sending}
+        // `i18n` is optional-chained: it is absent wherever `useTranslation`
+        // is mocked to just `{ t }`, and a composer that throws would take the
+        // whole conversation down with it.
+        language={i18n?.language?.split('-')[0] ?? 'en'}
+      />
     </div>
   );
 }

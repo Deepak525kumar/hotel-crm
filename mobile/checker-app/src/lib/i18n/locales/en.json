@@ -1249,6 +1249,12 @@
     "confirm": "Confirm",
     "cancel": "Cancel",
     "confirmed": "Confirmed",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "listening": "Listening…",
+    "dictate": "Dictate a message",
+    "stopDictation": "Stop dictating",
+    "micDenied": "Microphone access is off. Turn it on in Settings to dictate.",
+    "micFailed": "Dictation did not work. You can type instead.",
+    "enterHint": "Enter to send, Shift+Enter for a new line"
   }
 }

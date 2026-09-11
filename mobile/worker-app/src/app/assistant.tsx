@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useSpeechInput } from '@/hooks/use-speech-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BackLink } from '@/components/BackLink';
@@ -29,11 +30,33 @@ import { useChatbotStore, type ChatMessage } from '@/stores/chatbot-store';
  */
 export default function AssistantScreen() {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { available, probe, messages, commands, sending, send, runCommand, confirm, cancelConfirmation } =
     useChatbotStore();
   const [draft, setDraft] = useState('');
+
+  // What the field held when dictation started. Speech ADDS to it rather
+  // than replacing it, so someone can type half a sentence, tap the
+  // microphone and say the rest.
+  const dictationBase = useRef('');
+
+  const speech = useSpeechInput({
+    language: i18n?.language?.split('-')[0] ?? 'en',
+    onTranscript: (text) => {
+      const base = dictationBase.current;
+      setDraft(base ? `${base.replace(/\s*$/, '')} ${text}` : text);
+    },
+  });
+
+  const onMicPress = () => {
+    if (speech.listening) {
+      speech.stop();
+      return;
+    }
+    dictationBase.current = draft;
+    void speech.start();
+  };
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
@@ -130,27 +153,74 @@ export default function AssistantScreen() {
         )}
 
         <View style={[styles.composer, { borderTopColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            placeholder={t('chatbot.placeholder', 'Ask about your shifts, contract or messages…')}
-            placeholderTextColor={theme.textSecondary}
-            accessibilityLabel={t('chatbot.inputLabel', 'Message')}
-            multiline
-            style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('chatbot.send', 'Send')}
-            disabled={sending || draft.trim().length === 0}
-            onPress={submit}
-            style={[
-              styles.send,
-              { backgroundColor: draft.trim().length === 0 || sending ? theme.border : theme.primary },
-            ]}
-          >
-            <ThemedText style={styles.sendText}>{t('chatbot.send', 'Send')}</ThemedText>
-          </Pressable>
+          {speech.error ? (
+            <ThemedText style={[styles.micError, { color: theme.textSecondary }]}>
+              {speech.error === 'denied'
+                ? t('chatbot.micDenied', 'Microphone access is off. Turn it on in Settings to dictate.')
+                : t('chatbot.micFailed', 'Dictation did not work. You can type instead.')}
+            </ThemedText>
+          ) : null}
+
+          {/* ONE surface, not a boxed field beside a word-button. The row owns
+              the border; the field and its two round controls sit inside it,
+              which is the shape every assistant on a phone already uses. */}
+          <View style={[styles.inputRow, { borderColor: theme.border, backgroundColor: theme.background }]}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder={
+                speech.listening
+                  ? t('chatbot.listening', 'Listening…')
+                  : t('chatbot.placeholder', 'Ask about your shifts, contract or messages…')
+              }
+              placeholderTextColor={theme.textSecondary}
+              accessibilityLabel={t('chatbot.inputLabel', 'Message')}
+              multiline
+              style={[styles.input, { color: theme.text }]}
+            />
+
+            {/* Dictation. A microphone glyph rather than an icon component:
+                these apps ship no vector library, and one drawn shape is not
+                worth a native dependency. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: speech.listening }}
+              accessibilityLabel={
+                speech.listening
+                  ? t('chatbot.stopDictation', 'Stop dictating')
+                  : t('chatbot.dictate', 'Dictate a message')
+              }
+              disabled={sending}
+              onPress={onMicPress}
+              style={[
+                styles.circle,
+                speech.listening
+                  ? { backgroundColor: '#DC2626' }
+                  : { backgroundColor: 'transparent' },
+              ]}
+            >
+              <ThemedText style={[styles.glyph, speech.listening ? styles.glyphOnColor : { color: theme.textSecondary }]}>
+                {speech.listening ? '\u25A0' : '\uD83C\uDFA4'}
+              </ThemedText>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('chatbot.send', 'Send')}
+              disabled={sending || draft.trim().length === 0}
+              onPress={submit}
+              style={[
+                styles.circle,
+                {
+                  backgroundColor:
+                    draft.trim().length === 0 || sending ? theme.border : theme.primary,
+                },
+              ]}
+            >
+              {/* An upward arrow, the same affordance as the web composer. */}
+              <ThemedText style={[styles.glyph, styles.glyphOnColor]}>{'\u2191'}</ThemedText>
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -270,26 +340,37 @@ const styles = StyleSheet.create({
   resolved: { marginTop: Spacing.two, fontSize: 12 },
   typing: { paddingVertical: Spacing.three, alignItems: 'flex-start' },
   composer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: Spacing.two,
     padding: Spacing.three,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  micError: { fontSize: 12, marginBottom: Spacing.two },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Spacing.one,
+    borderWidth: 1,
+    // Fully rounded: the row reads as one control, and a pill is a bigger,
+    // more forgiving target than a rectangle for a thumb.
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+  },
   input: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 40,
+    // Grows with the text and then scrolls, so dictating three sentences
+    // shows three sentences without pushing the buttons off the screen.
     maxHeight: 120,
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.two,
   },
-  send: {
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.three,
-    height: 44,
+  circle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  sendText: { color: '#FFFFFF', fontWeight: '600' },
+  glyph: { fontSize: 16, lineHeight: 20 },
+  glyphOnColor: { color: '#FFFFFF', fontWeight: '700' },
 });
