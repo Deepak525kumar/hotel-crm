@@ -40,8 +40,14 @@
 #                                  hotel_group only (200)"  -> got 403
 #
 #     Both are a REGIONAL_MANAGER reading something inside its own scope and
-#     being denied. Start there rather than from the suite name, which differs
-#     each time and is what made this look like generic pollution.
+#     being denied. A third instance (2026-09-11) widens it slightly:
+#
+#         geo-authz  "rejects an unauthenticated list with 401"  -> wrong status
+#
+#     so the common factor is AUTHORIZATION assertions in supertest suites
+#     returning the wrong status, not regional_manager specifically. Start
+#     there rather than from the suite name, which differs every time and is
+#     what made this look like generic pollution.
 #
 #     Ruled out so far, with evidence:
 #       * process-global pollution — `support/global-hygiene.ts` fails the

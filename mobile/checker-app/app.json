@@ -13,7 +13,11 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.fhmhotelservices.checkerapp",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Zelle uses the microphone so you can speak a message to the assistant instead of typing it.",
+        "NSSpeechRecognitionUsageDescription": "Zelle turns what you say into text so you can ask about your shifts without typing."
+      }
     },
     "android": {
       "package": "com.fhmhotelservices.checkerapp",
@@ -70,7 +74,8 @@
         }
       ],
       "expo-sharing",
-      "./plugins/withDisableUserScriptSandboxing.js"
+      "./plugins/withDisableUserScriptSandboxing.js",
+      "expo-speech-recognition"
     ],
     "experiments": {
       "typedRoutes": true,

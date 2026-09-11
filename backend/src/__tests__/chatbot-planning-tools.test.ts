@@ -180,14 +180,19 @@ describe('calendar.check_availability', () => {
 
 describe('job_requests.create_broadcast', () => {
   /**
-   * THE MOST IMPORTANT TEST IN THIS FILE.
+   * IT CREATES THE REQUEST OPEN, and the history is worth keeping.
    *
-   * Publishing to OPEN notifies every eligible worker in scope -- push and
-   * email to potentially hundreds of people, from a sentence the model may
-   * have misread, and unsendable afterwards. The tool pins DRAFT and does not
-   * expose the field; if that ever changes, this fails.
+   * This test used to assert the opposite, on a justification that was simply
+   * false: that publishing "notifies every eligible worker -- push and email
+   * to hundreds". `create()` enqueues nothing; the fan-out belongs to a
+   * different method. What the DRAFT actually bought was a confirmed action
+   * that did half the job and told the manager to go and finish it elsewhere,
+   * which makes the confirmation meaningless.
+   *
+   * `status` is still not an argument -- the manager confirmed a staffing
+   * request, not a decision about workflow state.
    */
-  it('always creates a DRAFT, and does not accept a status argument', async () => {
+  it('creates the request OPEN, and does not accept a status argument', async () => {
     await createBroadcast.invoke(
       {
         position: 'Cleaner',
@@ -200,18 +205,23 @@ describe('job_requests.create_broadcast', () => {
     );
 
     const [input] = mockCreateRequest.mock.calls[0] as [Record<string, unknown>];
-    expect(input.status).toBe('DRAFT');
+    expect(input.status).toBe('OPEN');
     expect(createBroadcast.args.safeParse({
       position: 'Cleaner',
       workers_needed: 1,
       shift_date: '2026-09-17',
       shift_start_time: '08:00',
       shift_end_time: '16:00',
-      status: 'OPEN',
+      status: 'DRAFT',
     }).success).toBe(false);
   });
 
-  it('tells the manager plainly that nothing was sent', async () => {
+  /**
+   * The reply must say the thing HAPPENED. It previously said the opposite --
+   * "it has NOT been sent, publish it from the app" -- after the manager had
+   * already approved it.
+   */
+  it('tells the manager the request is live, not that it still needs doing', async () => {
     const out = await createBroadcast.invoke(
       {
         position: 'Cleaner',
@@ -222,7 +232,9 @@ describe('job_requests.create_broadcast', () => {
       } as never,
       manager()
     );
-    expect(summaryOf(createBroadcast, out)).toMatch(/NOT been sent/i);
+    const summary = summaryOf(createBroadcast, out);
+    expect(summary).toMatch(/open for workers/i);
+    expect(summary).not.toMatch(/draft|not been sent|publish it/i);
   });
 
   it('takes the hotel from the actor\'s scope, never from an argument', async () => {

@@ -1250,6 +1250,12 @@
     "cancel": "Annuler",
     "confirmed": "Confirmé",
     "cancelled": "Annulé",
+    "listening": "J'écoute…",
+    "dictate": "Dicter un message",
+    "stopDictation": "Arrêter la dictée",
+    "micDenied": "L'accès au microphone est désactivé. Activez-le dans les réglages pour dicter.",
+    "micFailed": "La dictée n'a pas fonctionné. Vous pouvez écrire à la place.",
+    "enterHint": "Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne",
     "retry": "Réessayer"
   }
 }
