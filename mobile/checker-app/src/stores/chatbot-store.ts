@@ -62,15 +62,13 @@ export const useChatbotStore = create<ChatbotState>((set, get) => ({
 
   probe: async () => {
     if (get().available !== null) return;
-    const available = await api.chatbot.isAvailable();
-    set({ available });
-    if (!available) return;
-    try {
-      set({ commands: await api.chatbot.commands() });
-    } catch {
-      // Chips are a convenience; free text still works without them.
-      set({ commands: [] });
-    }
+    // ONE request, not two. This used to call isAvailable() -- which fetches
+    // /chatbot/commands and discards it -- and then commands(), fetching the
+    // same endpoint again. See probeCommands() for why the second round trip
+    // was worth removing.
+    const commands = await api.chatbot.probeCommands();
+    // Chips are a convenience; an empty list still leaves free text working.
+    set({ available: commands !== null, commands: commands ?? [] });
   },
 
   reset: () => set({ conversationId: null, messages: [], sending: false }),
@@ -163,6 +161,24 @@ async function exchange(
     if (!existing) set(() => ({ conversationId }));
 
     const turn = await api.chatbot.sendMessage(conversationId, input);
+
+    // A CONVERSATION THE SERVER HAS CLOSED IS NOT REUSABLE.
+    //
+    // `status` has always been on the turn and was always ignored here, so
+    // the id was held until something called reset(). Once the server closed
+    // the conversation -- a budget cap, the turn ceiling -- every later
+    // message was posted straight back to the dead id and refused, which is
+    // how a production user got "You do not have access to that." three
+    // times in a row for "hello" and "how are you" (2026-09-12). The server
+    // now says something true in that case, but the client is what breaks
+    // the loop: dropping the id means the NEXT message opens a fresh
+    // conversation instead of knocking on the closed one forever.
+    //
+    // The messages already on screen are deliberately kept. The person can
+    // still read what they asked; only the server-side thread restarts.
+    if (turn.status && turn.status !== 'IN_PROGRESS') {
+      set(() => ({ conversationId: null }));
+    }
 
     set((s) => ({
       sending: false,

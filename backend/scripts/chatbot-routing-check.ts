@@ -22,6 +22,30 @@
  *
  * Needs AWS credentials with Bedrock mantle access in eu-central-1.
  * Baseline at 2026-09-08, twenty tools: 32/32.
+ *
+ * READ THE SCORE AS A RANGE, NOT A NUMBER (measured 2026-09-12, 40 tools).
+ * Two consecutive runs of the identical tree scored 70/74 and 72/74 -- and
+ * they failed DIFFERENT cases. Run 1 lost "im here", "Feierabend" and "I'm
+ * done for today"; run 2 passed all three and lost "I am sick tomorrow"
+ * instead. The model samples, so a handful of borderline cases land either
+ * way on any given run.
+ *
+ * The consequence for anyone using this script: a single run showing 70/74
+ * is NOT evidence that the last edit broke four things. Before believing a
+ * regression, check whether the failing case's tool is even VISIBLE to that
+ * role (`visibleTools` filters by permission, so a worker's prompt is
+ * unchanged by adding a manager-only tool -- that alone explained three of
+ * run 1's four failures), then re-run and see whether the same case fails
+ * twice. A case that fails in both runs is a finding; one that moves is
+ * noise.
+ *
+ * ONE CASE FAILED BOTH RUNS -- the only one that did -- and was FIXED rather
+ * than left open: "give me a pdf of absences for August 2026" routed to
+ * `reports.query_team`, so a manager asking for a PDF got numbers on screen
+ * and no file. The discriminator the model was missing is FILE vs DATA:
+ * "absences" appeared only in query_team's examples, and query_team never
+ * said it produces no file. Both descriptions now say so and name each
+ * other, and both directions are cased below.
  */
 process.env.CHATBOT_PROVIDER = 'mantle';
 process.env.FEATURE_CHATBOT = 'true';
@@ -93,6 +117,37 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['manager', 'show me attendance from 2026-08-01 to 2026-08-31', 'query_team', picks('reports.query_team')],
   ['manager', 'export last month attendance to Excel', 'export_team', picks('reports.export_team')],
   ['manager', 'give me a PDF of August absences', 'export_team (pdf)', picks('reports.export_team')],
+  // FOUND BY THIS SCRIPT, 2026-09-12, failing two runs out of two -- the only
+  // case that did. Both "pdf of absences" phrasings routed to
+  // reports.query_team, so a manager who asked for a PDF got numbers on
+  // screen and no file at all.
+  //
+  // Neither description was wrong; they were both TRUE OF THE SAME REQUEST.
+  // "absences" appeared only in query_team's examples, query_team never said
+  // it produces no file, and export_team's examples were all attendance and
+  // rosters. So the model matched on the DATASET, which does not distinguish
+  // them, instead of on file-versus-data, which does. Both descriptions now
+  // say that explicitly and name each other.
+  //
+  // Kept alongside the phrasing above rather than replacing it: the two are
+  // the same defect said two ways, and one of them passed on the run where
+  // the other failed.
+  ['manager', 'give me a pdf of absences for August 2026', 'export_team (pdf, dataset in words)',
+    picks('reports.export_team')],
+  // The other half of the discriminator: the same dataset, no file asked for,
+  // must NOT become an export. A fix that dragged every absence question to
+  // export_team would trade one defect for a worse one -- export_team is
+  // confirmed and produces a downloadable file of other people's data.
+  //
+  // ASSERTS THE PROPERTY, NOT A PARTICULAR TOOL, and that is deliberate:
+  // written first as picks('reports.query_team') it passed one run and failed
+  // the next to calendar.team_absences -- which ANSWERS THE QUESTION, over
+  // exactly the right range. Two tools legitimately read absences and the
+  // sentence does not choose between them, so pinning one makes this case
+  // fail for being right. What actually matters is that no file is produced
+  // when none was asked for.
+  ['manager', 'who was absent in August 2026', 'no export without a file asked for',
+    (t) => t !== 'reports.export_team'],
 
   // Added 2026-09-09 with the self-care tools. These are the phrases most
   // likely to collide with the shift family already present.
@@ -167,6 +222,32 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
     (t) => t !== 'attendance.correct_times'],
 
 
+
+  // Added 2026-09-12 with calendar.set_day_summary. THE FIRST CASE IS THE
+  // REPORTED SENTENCE, verbatim, from the transcript that opened the bug --
+  // misspellings and all. It refused for both an admin and a manager because
+  // no tool existed; keeping the exact words is what proves it still routes
+  // once someone reorganises the descriptions.
+  //
+  // "blibe" is `bleiben` -- a stay-over, the guest is not checking out. It is
+  // spelled several ways on the floor, so the tool description carries the
+  // vocabulary and these cases check the model actually uses it.
+  ['manager', 'Make day task rooms today we have 90 rooms to clean add that work list and 10 blibe',
+    'set_day_summary (as reported)', picks('calendar.set_day_summary')],
+  ['admin', 'today we have 90 rooms to clean and 10 stay-over', 'set_day_summary (admin)',
+    picks('calendar.set_day_summary')],
+  ['manager', 'heute 60 Zimmer, 20 bleiben, 40 Abreise', 'set_day_summary (de)',
+    picks('calendar.set_day_summary')],
+  ['manager', 'how many rooms do we have today?', 'day_summary', picks('calendar.day_summary')],
+  // THE COLLISION THAT MATTERS. "rooms" and "working" appear in three
+  // families: the day's PLAN (these tools), what a worker has actually
+  // CLEANED (rooms.log_cleaned), and who has actually CLOCKED IN
+  // (attendance.team_status). A manager asking who turned up must not get the
+  // planned headcount read back at them.
+  ['manager', 'who has actually turned up today?', 'summary must not steal team_status',
+    (t) => t !== 'calendar.day_summary'],
+  ['worker', 'I finished room 214', 'summary must not steal log_cleaned',
+    (t) => t !== 'calendar.set_day_summary'],
 
   ['manager', 'who is waiting for approval?', 'review_queue', picks('employees.review_queue')],
   ['manager', 'approve Anna', 'approve_application', picks('employees.approve_application')],

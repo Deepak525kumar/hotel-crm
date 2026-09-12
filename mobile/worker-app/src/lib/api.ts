@@ -436,6 +436,32 @@ export const api = {
       }
     },
 
+    /**
+     * Availability AND the chips, in one request.
+     *
+     * `isAvailable()` above fetches /chatbot/commands, throws the response
+     * away, and returns a boolean -- so the store then fetched the SAME
+     * endpoint a second time, sequentially, to get the chips. Two round
+     * trips for one answer, before the person has typed anything.
+     *
+     * On a phone on mobile data that is a visible wait, which is how it was
+     * reported (2026-09-12: the assistant "takes a little more time" on the
+     * apps than on the web). The request was always redundant; only the
+     * network made it matter.
+     *
+     * `null` means no assistant -- a 404 (flag off) and a 403 (not for this
+     * user) collapse deliberately, as in `isAvailable()`: the right UI is the
+     * same for both, and telling them apart leaks whether an unreleased
+     * feature exists.
+     */
+    probeCommands: async (): Promise<ChatbotCommandDto[] | null> => {
+      try {
+        return await request<ChatbotCommandDto[]>('/chatbot/commands');
+      } catch {
+        return null;
+      }
+    },
+
     commands: () => request<ChatbotCommandDto[]>('/chatbot/commands'),
 
     startConversation: () =>

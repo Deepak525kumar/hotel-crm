@@ -55,7 +55,10 @@ export const queryTeamData = registerTool<QueryArgs>({
     "Read the caller's TEAM data for any date range: assignments, attendance, absences " +
     'or rooms. Use for "how many shifts did we cover in August", "show me attendance ' +
     'from 2026-08-01 to 2026-08-31", "who was absent last month". Manager, regional ' +
-    'manager and admin only. Dates must be YYYY-MM-DD and the range at most 366 days.',
+    'manager and admin only. Dates must be YYYY-MM-DD and the range at most 366 days.\n\n' +
+    'Answers with the numbers themselves, on screen. It produces NO file -- if a PDF, ' +
+    'an Excel sheet, a download or "send me" is asked for, that is reports.export_team, ' +
+    'whichever dataset it is about.',
   tier: 'READ_ONLY',
   confirm: false,
 
@@ -114,9 +117,12 @@ type ExportArgs = z.infer<typeof ExportArgs>;
 export const exportTeamReport = registerTool<ExportArgs>({
   name: 'reports.export_team',
   description:
-    'Produce a downloadable Excel or PDF report of TEAM data for a date range. Use for ' +
-    '"export that to Excel", "give me a PDF of last month\'s attendance", "download ' +
-    'the August roster". Dates must be YYYY-MM-DD and the range at most 366 days. ' +
+    'Produce a downloadable Excel or PDF report of TEAM data for a date range -- the ' +
+    'same four datasets reports.query_team reads (assignments, attendance, ABSENCES or ' +
+    'rooms), delivered as a FILE. Use for "export that to Excel", "give me a PDF of ' +
+    'last month\'s attendance", "give me a pdf of August absences", "download the ' +
+    'August roster". The dataset does not decide between this and reports.query_team; ' +
+    'asking for a file does. Dates must be YYYY-MM-DD and the range at most 366 days. ' +
     'Manager, regional manager and admin only. Returns a download link that expires ' +
     'shortly.',
   // A file leaving the platform with other people's names, hours and absences

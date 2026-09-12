@@ -29,6 +29,7 @@ import { matchL0, resolveCommandId } from './router-l0.js';
 import { buildMessages, buildSystemPrompt, toolSpec, visibleTools } from './router-l1.js';
 import {
   renderBudgetFallback,
+  renderConversationClosed,
   renderDenied,
   renderProviderUnavailable,
   renderToolResult,
@@ -174,8 +175,30 @@ async function executeTurn(params: {
     return { reply: renderDenied(), status: conversation.status, route: 'none' };
   }
 
+  // A FINISHED CONVERSATION IS NOT AN AUTHORIZATION FAILURE.
+  //
+  // Reported from production 2026-09-12, and the transcript is the whole
+  // argument:
+  //
+  //     hello        -> You do not have access to that.
+  //     hello        -> You do not have access to that.
+  //     how are you  -> You do not have access to that.
+  //
+  // This branch used to return renderDenied(). Once a conversation closes --
+  // a budget cap, the turn ceiling, closeWithFallback() -- EVERY later
+  // message in it came back as an access refusal, for a greeting, forever.
+  // The person is told they lack permission to say hello, which is both
+  // false and unactionable: nothing they can do to their permissions will
+  // change it, and the one thing that would fix it (start a new
+  // conversation) is the one thing the message does not mention.
+  //
+  // The clients compound it -- they hold the conversation id until something
+  // clears it, so every subsequent message goes back to the same dead
+  // conversation. They now watch `status` and start a fresh one, but a
+  // client that does not must still be told something TRUE here, because
+  // this message is the only signal it gets.
   if (conversation.status !== ChatbotConversationStatus.IN_PROGRESS) {
-    return { reply: renderDenied(), status: conversation.status, route: 'none' };
+    return { reply: renderConversationClosed(), status: conversation.status, route: 'none' };
   }
 
   // Turn ceiling: bounds a loop of cheap turns that never individually trip
