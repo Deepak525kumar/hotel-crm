@@ -257,6 +257,32 @@ describe('conversation self-scoping (RULE-CHAT-09)', () => {
     expect(lastAssignmentWhere).toBeNull();
   });
 
+  /**
+   * A FINISHED CONVERSATION IS NOT A PERMISSION PROBLEM.
+   *
+   * Reported from production 2026-09-12: once a conversation closed, every
+   * later message in it -- "hello", "how are you" -- came back "You do not
+   * have access to that.", forever. False, and unactionable: no permission
+   * change fixes it, and the message never mentions the one thing that does.
+   */
+  it('tells a person whose conversation has closed how to start again', async () => {
+    const app = makeApp();
+    const started = await request(app).post('/chatbot/conversations').send({});
+
+    conversationRow.status = 'FALLBACK_TRIGGERED';
+
+    const res = await request(app)
+      .post(`/chatbot/conversations/${started.body.data.id}/messages`)
+      .send({ text: 'hello' });
+
+    expect(res.body.data.reply).not.toMatch(/do not have access/);
+    expect(res.body.data.reply).toMatch(/already finished/);
+    // The remedy, named -- this is the whole point of splitting the message.
+    expect(res.body.data.reply).toMatch(/start a new one/);
+    // And the status the clients now watch, so they can drop the dead id.
+    expect(res.body.data.status).toBe('FALLBACK_TRIGGERED');
+  });
+
   it('refuses an outcome read for another worker’s conversation', async () => {
     const app = makeApp();
     const started = await request(app).post('/chatbot/conversations').send({});

@@ -241,12 +241,26 @@ describe('rule: clear capability boundaries', () => {
 
   it('keeps argument surfaces small enough to reason about', () => {
     // A tool needing many arguments is usually several tools wearing a coat.
+    //
+    // SEVEN, not six, since 2026-09-12. `calendar.set_day_summary` writes the
+    // five columns of ONE row (four counts and a note) plus the hotel and the
+    // day that identify it, and mirrors a single form with exactly those
+    // boxes. That is not several tools wearing a coat -- it is one record --
+    // and the alternatives were both worse: nesting the counts in an object
+    // costs routing accuracy, and splitting the note into its own tool makes
+    // "90 rooms, and note the lift is broken" take two calls to say one
+    // thing.
+    //
+    // The heuristic still holds and is still worth failing on; it is the
+    // NUMBER that moved by one, for a case argued on its merits. A tool that
+    // wants an eighth argument should have to make the same argument again
+    // rather than find this already raised.
     for (const tool of TOOLS) {
       const shape = (tool.args as unknown as { _def?: { schema?: unknown } })._def;
       const inner = (shape as { schema?: { shape?: Record<string, unknown> } })?.schema?.shape;
       const direct = (tool.args as unknown as { shape?: Record<string, unknown> }).shape;
       const keys = Object.keys(inner ?? direct ?? {});
-      expect({ tool: tool.name, argCount: keys.length <= 6 }).toEqual({
+      expect({ tool: tool.name, argCount: keys.length <= 7 }).toEqual({
         tool: tool.name,
         argCount: true,
       });

@@ -17,6 +17,7 @@ import './tools/definitions/broadcast.tools.js';
 import './tools/definitions/team-management.tools.js';
 import './tools/definitions/self-care.tools.js';
 import './tools/definitions/planning.tools.js';
+import './tools/definitions/shift-summary.tools.js';
 
 /**
  * SPEC-CHATBOT-001 (ADR-013) — backend-chatbot's service.

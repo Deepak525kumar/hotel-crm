@@ -10,12 +10,16 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
  * than assumed.
  */
 
-const mockIsAvailable = jest.fn();
+// `probeCommands` answers BOTH questions in one request -- null means no
+// assistant, an array means it is available and these are the chips. The
+// store used to call isAvailable() and then commands(), fetching the same
+// endpoint twice; see probeCommands() in lib/api.ts.
+const mockProbe = jest.fn();
 const mockCommands = jest.fn();
 
 jest.mock("@/lib/api", () => ({
   chatbotApi: {
-    isAvailable: () => mockIsAvailable(),
+    probeCommands: () => mockProbe(),
     commands: () => mockCommands(),
     startConversation: jest.fn(),
     sendMessage: jest.fn(),
@@ -54,7 +58,7 @@ describe("ChatWidget feature gate", () => {
   });
 
   it("renders NOTHING when the backend does not serve the chatbot", async () => {
-    mockIsAvailable.mockResolvedValue(false);
+    mockProbe.mockResolvedValue(null);
     const { container } = render(<ChatWidget />);
     await waitFor(() => expect(useChatbotStore.getState().available).toBe(false));
     expect(container).toBeEmptyDOMElement();
@@ -63,19 +67,19 @@ describe("ChatWidget feature gate", () => {
 
   it("renders nothing while the probe is still in flight", () => {
     // No flash of a button that may then vanish.
-    mockIsAvailable.mockReturnValue(new Promise(() => {}));
+    mockProbe.mockReturnValue(new Promise(() => {}));
     const { container } = render(<ChatWidget />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows the launcher only once the backend confirms availability", async () => {
-    mockIsAvailable.mockResolvedValue(true);
+    mockProbe.mockResolvedValue([]);
     render(<ChatWidget />);
     expect(await screen.findByRole("button", { name: "Zelle" })).toBeInTheDocument();
   });
 
   it("opens and closes, keeping aria-expanded truthful", async () => {
-    mockIsAvailable.mockResolvedValue(true);
+    mockProbe.mockResolvedValue([]);
     render(<ChatWidget />);
     const launcher = await screen.findByRole("button", { name: "Zelle" });
     expect(launcher).toHaveAttribute("aria-expanded", "false");
@@ -86,7 +90,7 @@ describe("ChatWidget feature gate", () => {
   });
 
   it("closes on Escape, so keyboard users are not trapped", async () => {
-    mockIsAvailable.mockResolvedValue(true);
+    mockProbe.mockResolvedValue([]);
     render(<ChatWidget />);
     fireEvent.click(await screen.findByRole("button", { name: "Zelle" }));
     await waitFor(() => expect(useChatbotStore.getState().open).toBe(true));
@@ -99,7 +103,7 @@ describe("ChatWidget feature gate", () => {
     // The page already IS the assistant; a floating copy on top would be two
     // views of one conversation competing for the same input.
     currentPath = "/assistant";
-    mockIsAvailable.mockResolvedValue(true);
+    mockProbe.mockResolvedValue([]);
     useChatbotStore.setState({ available: true });
     const { container } = render(<ChatWidget />);
     expect(container).toBeEmptyDOMElement();

@@ -44,6 +44,20 @@ export function renderProviderUnavailable(): string {
   return `I cannot answer typed questions right now. ${USE_THE_BUTTONS}`;
 }
 
+/**
+ * A conversation that has already finished.
+ *
+ * Kept SEPARATE from renderDenied() on purpose. Merging the two is what
+ * produced the 2026-09-12 report where "hello" was answered "You do not have
+ * access to that." -- a permission message for a condition that has nothing
+ * to do with permissions, offered to someone whose only remedy is to start
+ * again. Says the remedy, and does not blame the person for a cap they never
+ * saw.
+ */
+export function renderConversationClosed(): string {
+  return `This conversation has already finished. Send your message again to start a new one, or ${USE_THE_BUTTONS.toLowerCase()}`;
+}
+
 export function renderDenied(): string {
   // One message for every denial reason: which specific gate refused is not
   // something the caller should be able to probe for.

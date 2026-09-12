@@ -168,6 +168,32 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
 
 
 
+  // Added 2026-09-12 with calendar.set_day_summary. THE FIRST CASE IS THE
+  // REPORTED SENTENCE, verbatim, from the transcript that opened the bug --
+  // misspellings and all. It refused for both an admin and a manager because
+  // no tool existed; keeping the exact words is what proves it still routes
+  // once someone reorganises the descriptions.
+  //
+  // "blibe" is `bleiben` -- a stay-over, the guest is not checking out. It is
+  // spelled several ways on the floor, so the tool description carries the
+  // vocabulary and these cases check the model actually uses it.
+  ['manager', 'Make day task rooms today we have 90 rooms to clean add that work list and 10 blibe',
+    'set_day_summary (as reported)', picks('calendar.set_day_summary')],
+  ['admin', 'today we have 90 rooms to clean and 10 stay-over', 'set_day_summary (admin)',
+    picks('calendar.set_day_summary')],
+  ['manager', 'heute 60 Zimmer, 20 bleiben, 40 Abreise', 'set_day_summary (de)',
+    picks('calendar.set_day_summary')],
+  ['manager', 'how many rooms do we have today?', 'day_summary', picks('calendar.day_summary')],
+  // THE COLLISION THAT MATTERS. "rooms" and "working" appear in three
+  // families: the day's PLAN (these tools), what a worker has actually
+  // CLEANED (rooms.log_cleaned), and who has actually CLOCKED IN
+  // (attendance.team_status). A manager asking who turned up must not get the
+  // planned headcount read back at them.
+  ['manager', 'who has actually turned up today?', 'summary must not steal team_status',
+    (t) => t !== 'calendar.day_summary'],
+  ['worker', 'I finished room 214', 'summary must not steal log_cleaned',
+    (t) => t !== 'calendar.set_day_summary'],
+
   ['manager', 'who is waiting for approval?', 'review_queue', picks('employees.review_queue')],
   ['manager', 'approve Anna', 'approve_application', picks('employees.approve_application')],
   ['manager', 'which hotels do I look after?', 'my_hotels', picks('hotels.my_hotels')],
