@@ -236,7 +236,11 @@ export const checkInToMyShift = registerTool<CheckInArgs>({
     'day. If someone says they forgot to clock in yesterday, or gives any time other ' +
     'than now, do NOT call this -- it would clock them in for today instead, which ' +
     'is a different and wrong thing. Tell them a manager has to correct a past ' +
-    'record.',
+    'record.\n\n' +
+    'ONLY FOR SOMEONE ANNOUNCING THEY HAVE ARRIVED. A QUESTION about attendance is ' +
+    'not an arrival: "give me a summary of today\'s attendance", "my attendance", ' +
+    '"how many hours have I done" are all reads -- use attendance.my_hours. The word ' +
+    '"attendance" on its own never means clock me in.',
   tier: 'HIGH_RISK_WRITE',
   confirm: true,
 
@@ -566,6 +570,10 @@ export const myHours = registerTool<MyHoursArgs>({
     'much have I worked this month". Pass from and to as YYYY-MM-DD -- both, or ' +
     'neither, in which case it answers for today. Returns the total hours and how ' +
     'many shifts they came from.\n\n' +
+    'This is also the tool for the worker\'s own ATTENDANCE as a question: "give me a ' +
+    "summary of today's attendance\", \"my attendance\", \"was I on time\". Asking about " +
+    'attendance is a READ -- it never means clock me in (attendance.check_in is only ' +
+    'for someone announcing they have just arrived).\n\n' +
     'This is TIME WORKED. For how many shifts or rooms were completed, or a ' +
     'rating, use analytics.my_stats instead -- that one does not report hours.',
   tier: 'READ_ONLY',
