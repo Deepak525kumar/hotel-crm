@@ -22,6 +22,29 @@
  *
  * Needs AWS credentials with Bedrock mantle access in eu-central-1.
  * Baseline at 2026-09-08, twenty tools: 32/32.
+ *
+ * READ THE SCORE AS A RANGE, NOT A NUMBER (measured 2026-09-12, 40 tools).
+ * Two consecutive runs of the identical tree scored 70/74 and 72/74 -- and
+ * they failed DIFFERENT cases. Run 1 lost "im here", "Feierabend" and "I'm
+ * done for today"; run 2 passed all three and lost "I am sick tomorrow"
+ * instead. The model samples, so a handful of borderline cases land either
+ * way on any given run.
+ *
+ * The consequence for anyone using this script: a single run showing 70/74
+ * is NOT evidence that the last edit broke four things. Before believing a
+ * regression, check whether the failing case's tool is even VISIBLE to that
+ * role (`visibleTools` filters by permission, so a worker's prompt is
+ * unchanged by adding a manager-only tool -- that alone explained three of
+ * run 1's four failures), then re-run and see whether the same case fails
+ * twice. A case that fails in both runs is a finding; one that moves is
+ * noise.
+ *
+ * ONE CASE FAILED BOTH RUNS and is a real, open defect, unrelated to any
+ * recent change: "give me a pdf of absences for August 2026" routes to
+ * `reports.query_team` instead of `reports.export_team`. A manager asking
+ * for a PDF gets numbers on screen and no file. The discriminator the model
+ * is missing is FILE vs DATA -- "absences" appears in query_team's examples
+ * and not in export_team's, and query_team never says it produces no file.
  */
 process.env.CHATBOT_PROVIDER = 'mantle';
 process.env.FEATURE_CHATBOT = 'true';
