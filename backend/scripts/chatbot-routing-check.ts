@@ -197,6 +197,22 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['worker', 'wie viele Stunden habe ich gearbeitet', 'my_hours (de)', picks('attendance.my_hours')],
   // The arrival/leaving phrasings that produced prose instead of a clock action.
   ['worker', 'im here', 'im here = check in', picks('attendance.check_in')],
+  // FOUND BY THE PRODUCTION STRESS TEST, 2026-09-12 -- and graded a PASS in
+  // its report, which is why it is cased here rather than left to a probe.
+  //
+  // "Give me a summary of today's attendance." proposed attendance.check_in,
+  // a HIGH_RISK_WRITE that clocks the person in, on 2 of 5 identical runs. A
+  // pure question was answered by offering to change a payroll record. The
+  // confirmation gate would have caught it, but it should never have been
+  // proposed -- and a worker shown "This will clock you in" after asking for
+  // a summary learns not to trust the confirmation.
+  //
+  // The collision was vocabulary: "attendance" is check_in's own namespace
+  // and appeared nowhere in my_hours' description, which spoke only of
+  // "hours". Both descriptions now say which side of it a QUESTION falls on.
+  ['worker', "Give me a summary of today's attendance.", 'a question is not an arrival',
+    picks('attendance.my_hours')],
+  ['worker', 'my attendance', 'attendance alone is a read', picks('attendance.my_hours')],
   ['worker', 'im off now', 'im off = check out', picks('attendance.check_out')],
 
   // Added 2026-09-10 with attendance.correct_times. The risk is not that a
