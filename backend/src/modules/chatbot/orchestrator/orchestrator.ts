@@ -32,6 +32,8 @@ import {
   renderConversationClosed,
   renderDenied,
   renderIncompleteRequest,
+  isUnbackedActionClaim,
+  renderUnbackedClaim,
   renderProviderUnavailable,
   renderToolResult,
   renderUnrecognized,
@@ -659,6 +661,22 @@ async function executeTurn(params: {
       completion.text,
       tools.map((t) => t.name)
     );
+
+    // No write ran in this turn (writes end the turn with their own summary),
+    // so prose announcing a completed change is unbacked -- unless the
+    // previous turn genuinely completed one. See templates.ts.
+    if (spoken && !promptContext.lastAction?.ok && isUnbackedActionClaim(spoken)) {
+      logger.warn('chatbot_unbacked_action_claim', {
+        requestId: params.requestId,
+        conversationId: params.conversationId,
+      });
+      return {
+        reply: renderUnbackedClaim(),
+        status: ChatbotConversationStatus.IN_PROGRESS,
+        route: 'L1',
+      };
+    }
+
     return {
       reply: spoken || renderUnrecognized(),
       status: ChatbotConversationStatus.IN_PROGRESS,
@@ -925,6 +943,28 @@ async function executeTurn(params: {
       denial_code: outcome.denialCode,
       requestId: params.requestId,
     });
+
+    // BAD ARGUMENTS ARE NOT A PERMISSION PROBLEM.
+    //
+    // Live end-to-end run, 2026-09-15: a manager typed "I want make id more
+    // next employe", the model chose the new-account tool without a name, the
+    // executor rejected the arguments -- and the manager, who holds every
+    // permission that tool needs, was told "You do not have access to that."
+    // Nothing about their access was wrong; one detail was missing. The same
+    // correction the confirmation path received applies here: name what is
+    // still needed. Only argument LABELS are named, never a value, and no
+    // other denial code is softened -- those stay one uniform message.
+    if (outcome.denialCode === 'INVALID_ARGS' && l1Tool) {
+      const parsed = l1Tool.args.safeParse(completion.toolUse.input ?? {});
+      const missing = parsed.success ? [] : parsed.error.issues.map((issue) => String(issue.path[0] ?? ''));
+      return {
+        reply: renderIncompleteRequest(completion.toolUse.name, missing),
+        status: ChatbotConversationStatus.IN_PROGRESS,
+        route: 'L1',
+        toolInvoked: completion.toolUse.name,
+      };
+    }
+
     return {
       reply: renderDenied(),
       status: ChatbotConversationStatus.IN_PROGRESS,
@@ -969,6 +1009,38 @@ async function executeTurn(params: {
   // presence booleans by the time observation.ts sees them -- the fence
   // narrows further, it does not have to catch those.
   alreadyRead.set(callKey, safe);
+
+  // SOME RESULTS ARE THE ANSWER, WORD FOR WORD.
+  //
+  // Found by the live end-to-end run of 2026-09-15. Two results went back into
+  // the loop and the model rewrote them:
+  //
+  //   - the new-account tool's reply carried the pre-filled form LINK; the
+  //     model's rewrite said "The account for Mukesh Kumar has been started"
+  //     -- false -- and dropped the link, the one thing the manager needed;
+  //   - the work summary's exact counts and ISO dates came back as the model's
+  //     own prose, in its own date format.
+  //
+  // The rule this file's comments already state -- the sentence a person reads
+  // is built in code, not phrased by a model -- held only on the LAST step.
+  // It now holds wherever it matters:
+  //
+  //   - a WRITE that ran (only unconfirmed low-risk writes reach here): it has
+  //     happened, and its summary is the authoritative record of what; there is
+  //     nothing further to look up before telling the person;
+  //   - a tool registered with `finalAnswer`: its summary must reach the person
+  //     unaltered -- a link, or numbers people act on.
+  //
+  // Ordinary reads still loop, so "who can cover Anna tomorrow?" can still take
+  // two lookups.
+  if (l1Tool && (l1Tool.tier !== 'READ_ONLY' || l1Tool.finalAnswer)) {
+    return {
+      reply: renderToolResult(safe),
+      status: ChatbotConversationStatus.IN_PROGRESS,
+      route: 'L1',
+      toolInvoked: completion.toolUse.name,
+    };
+  }
 
   if (!isLastStep) {
     messages.push({ role: 'user', content: buildObservation(completion.toolUse.name, safe) });

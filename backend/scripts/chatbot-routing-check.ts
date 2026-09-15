@@ -192,6 +192,10 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['manager', '07.09.2026 data how much work', 'S09 day-first date',
     (t, a) => t === 'reports.work_summary' && a?.['from'] === '2026-09-07'],
   ['manager', 'parveen didi today 10 rooms', 'S13 room count', picks('rooms.record_worker_count')],
+  // The owner said "make me plans" and later "ok make" -- asking for the
+  // placement is a reasonable reading. Either read is acceptable; a plan tool
+  // is not, because nobody is off. (calendar.apply_plan would still place
+  // correctly, but it is the wrong capability to confirm.)
   ['manager', 'make me plans. for parveen 17 18 19 September', 'S10 availability or placement',
     (t) => t === 'calendar.check_availability' || t === 'assignments.place_many'],
 
@@ -217,6 +221,8 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
     picks('calendar.withdraw_worker_absence')],
   ['manager', 'which staffing requests are still open', 'list_for_my_team', picks('job_requests.list_for_my_team')],
   ['manager', 'cancel the cleaner request for Friday', 'cancel_request', picks('job_requests.cancel_request')],
+  ['worker', 'my new number is 0160 1234567', 'update_my_profile (phone)', picks('users.update_my_profile')],
+  ['worker', 'stell die App auf Deutsch um', 'update_my_profile (language, de)', picks('users.update_my_profile')],
   ['manager', 'list my checkers', 'find_team_member (role)', picks('users.find_team_member')],
   ['manager', 'I need 3 cleaners on 2026-09-17 from 08:00 to 16:00', 'create_broadcast', picks('job_requests.create_broadcast')],
   ['manager', 'ich brauche zwei Reinigungskraefte am 2026-09-17 von 08:00 bis 16:00', 'create_broadcast (de)', picks('job_requests.create_broadcast')],

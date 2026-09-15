@@ -159,6 +159,8 @@ export const teamRoomsToday = registerTool<TeamRoomsArgs>({
     'reports.work_summary.',
   tier: 'READ_ONLY',
   confirm: false,
+  // Per-person counts a manager acts on; shown as computed, not paraphrased.
+  finalAnswer: true,
 
   interfaceRef: 'IF-ROOM-ListRoomsForHotels (rooms/service.ts listRoomsForHotels())',
   approvalRef:

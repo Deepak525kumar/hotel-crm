@@ -153,6 +153,19 @@ export interface ToolRegistration<A extends SafeArgs = SafeArgs> {
    */
   precheck?: (args: A, actor: ActorContext) => Promise<unknown>;
 
+  /**
+   * Optional: this READ's summary is the reply, exactly as written.
+   *
+   * By default a read's result goes back to the model so it can look further
+   * before answering -- and the model then phrases the answer itself. That is
+   * wrong for a result whose exact text matters: the live run of 2026-09-15
+   * lost a pre-filled form link and restated exact counts in the model's own
+   * words. Set this when the person must see the tool's own sentence. (Writes
+   * that execute here always answer with their own summary; this flag is
+   * for reads.)
+   */
+  finalAnswer?: boolean;
+
   /** Mandatory: bounds tokens and strips fields the model has no need for. */
   compress: (raw: unknown) => CompactResult;
   maxResultTokens: number;

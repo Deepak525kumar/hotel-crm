@@ -5,7 +5,7 @@ import { creatableRolesFor } from '../../../../lib/role-hierarchy.js';
 import { refuseUnresolvedHotel, resolveHotelReference } from '../worker-reference.js';
 import { registerTool, type CompactResult } from '../registry.js';
 import { asRefusal, refuse } from '../tool-errors.js';
-import { APPROVED_2026_09_15_FIELD_REPORT } from '../approvals.js';
+import { APPROVED_2026_09_15_FIELD_REPORT, APPROVED_2026_09_15_PROFILE } from '../approvals.js';
 
 /**
  * A NEW EMPLOYEE'S ACCOUNT, prepared from a sentence.
@@ -106,6 +106,9 @@ export const newAccountLink = registerTool<NewAccountArgs>({
     'created on that form, because every new account needs a profile photo.',
   tier: 'READ_ONLY',
   confirm: false,
+  // The reply carries the form LINK. Rewritten by the model in the live run of
+  // 2026-09-15, it lost the link and claimed the account "has been started".
+  finalAnswer: true,
 
   interfaceRef:
     'IF-USR-CreateUser (users/service.ts createUser(), reached through the New user form; this tool writes nothing)',
@@ -186,4 +189,97 @@ export const newAccountLink = registerTool<NewAccountArgs>({
     };
   },
   maxResultTokens: 250,
+});
+
+/* ------------------------------------------------------------------ *
+ * users.update_my_profile
+ * ------------------------------------------------------------------ */
+
+/**
+ * "CHANGE MY PHONE NUMBER" / "SPEAK GERMAN TO ME" -- the person's own profile.
+ *
+ * Found by the 2026-09-15 route map as the one daily self-service write with
+ * no tool, and left unbuilt until the owner approved the token it needed the
+ * same day: `PUT /auth/profile` enforced no permission at all, and the
+ * registry refuses the `null` escape hatch for a write. `users:profile:write-own`
+ * is held by every role and denies nobody; the route now enforces it.
+ *
+ * ONLY PHONE AND LANGUAGE. The route also accepts first and last name, and
+ * they are deliberately not exposed: a name is how colleagues, rosters and
+ * contracts identify a person, and changing it by a sentence to a chat model
+ * is identity mutation of the kind the 2026-09-09 gap analysis refused. The
+ * phone is normalised exactly as the form's (lib/phone.ts), and the language
+ * is one of the six the apps ship.
+ */
+const LANGUAGE_WORDS: Record<string, string> = {
+  de: 'German', en: 'English', ur: 'Urdu', ar: 'Arabic', fr: 'French', uk: 'Ukrainian',
+};
+
+const MyProfileArgs = z
+  .object({
+    phone: phoneNumber.optional(),
+    language: z.enum(['de', 'en', 'ur', 'ar', 'fr', 'uk']).optional(),
+  })
+  .strict()
+  .refine((a) => a.phone !== undefined || a.language !== undefined, {
+    message: 'give a new phone number or a language',
+    path: ['phone'],
+  });
+
+type MyProfileArgs = z.infer<typeof MyProfileArgs>;
+
+export const updateMyProfile = registerTool<MyProfileArgs>({
+  name: 'users.update_my_profile',
+  description:
+    "Changes the person's OWN phone number or the language the app speaks to them. Use when " +
+    'someone asks to change or add their number or language: "my new number is 0160 1234567", ' +
+    '"change my phone to +49 176 5550000", "switch the app to German", "ich möchte die App auf ' +
+    'Englisch". Give the phone as written, and the language as de, en, ur, ar, fr or uk. Returns ' +
+    "what was changed. It cannot change a name, email or anyone else's details.",
+  tier: 'LOW_RISK_WRITE',
+  // Confirmed: a misheard digit in a phone number is exactly what reading it
+  // back catches, and the number is how the person is reached.
+  confirm: true,
+
+  interfaceRef: 'IF-AUTH-UpdateProfile (auth/service.ts updateProfile())',
+  approvalRef:
+    APPROVED_2026_09_15_PROFILE +
+    " Registration note: the caller's own phone and app language only; names and email are not exposed.",
+
+  args: MyProfileArgs,
+  permission: 'users:profile:write-own',
+  scopeCheck: 'self',
+
+  invoke: async (args, actor) => {
+    const { authService } = await import('../../../auth/service.js');
+    try {
+      await authService.updateProfile(actor.userId, {
+        ...(args.phone ? { phone: args.phone } : {}),
+        ...(args.language ? { preferred_language: args.language } : {}),
+      } as never);
+    } catch (error) {
+      // User.phone is unique. The message says so without naming whose number
+      // it is -- that would tell anyone who types a number whether it is in use
+      // by a colleague, and by whom.
+      const code = (error as { code?: string })?.code;
+      if (code === 'P2002' || /unique/i.test(String((error as Error)?.message))) {
+        return refuse('NEEDS_INPUT', 'That phone number is already used by another account. Check the number and try again.');
+      }
+      throw error;
+    }
+    return { phone: args.phone ?? null, language: args.language ?? null };
+  },
+
+  compress: (raw: unknown): CompactResult => {
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+    const r = raw as { phone: string | null; language: string | null };
+    const parts = [
+      ...(r.phone ? [`your phone number is now ${r.phone}`] : []),
+      ...(r.language ? [`the app will speak ${LANGUAGE_WORDS[r.language]} to you (next time it loads)`] : []),
+    ];
+    const sentence = parts.join(', and ');
+    return { summary: `Done: ${sentence}.`, data: { phone_changed: Boolean(r.phone), language: r.language } };
+  },
+  maxResultTokens: 80,
 });

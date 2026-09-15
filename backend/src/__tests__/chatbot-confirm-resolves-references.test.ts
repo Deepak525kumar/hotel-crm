@@ -371,6 +371,74 @@ describe('a tool precheck runs before the confirmation', () => {
 });
 
 /**
+ * WHAT A PERSON READS AFTER A TOOL RUNS WITHOUT CONFIRMATION.
+ *
+ * Live end-to-end run, 2026-09-15: a new-account link went back into the tool
+ * loop and the model's rewrite dropped it; a manager missing one argument was
+ * told "You do not have access to that".
+ */
+const readInvoke = jest.fn(async () => ({ ok: true })) as any;
+const makeRead = (name: string, finalAnswer: boolean, tier: 'READ_ONLY' | 'LOW_RISK_WRITE' = 'READ_ONLY') =>
+  registerTool({
+    name,
+    description: 'fixture: an unconfirmed tool whose summary matters',
+    tier,
+    confirm: false,
+    ...(finalAnswer ? { finalAnswer: true } : {}),
+    interfaceRef: 'none (test fixture)',
+    approvalRef: 'none (test fixture)',
+    args: z.object({ first_name: z.string() }).strict(),
+    permission: 'staffing:write',
+    scopeCheck: 'none',
+    invoke: readInvoke,
+    compress: () => ({ summary: 'The form is filled in: /users/new#first_name=Mukesh', data: null }),
+    maxResultTokens: 50,
+  });
+makeRead('test.final_read', true);
+makeRead('test.looping_read', false);
+makeRead('test.unconfirmed_write', false, 'LOW_RISK_WRITE');
+
+const callTool = (name: string, input: Record<string, unknown>) => {
+  providerCall.mockReset();
+  providerCall
+    .mockResolvedValueOnce({ text: '', toolUse: { name, input }, usage: { promptTokens: 10, completionTokens: 2 } })
+    .mockResolvedValueOnce({ text: 'The account has been started.', toolUse: null, usage: { promptTokens: 10, completionTokens: 2 } });
+  return runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'create id for Mukesh' });
+};
+
+describe('a result that must be read exactly is not handed back to the model', () => {
+  // Each case queues two model replies; one that returns early leaves the
+  // second queued, and it would answer the NEXT describe's turn instead of
+  // that describe's own mock. Reset so nothing leaks between tests.
+  afterEach(() => providerCall.mockReset());
+
+  it('answers with a finalAnswer tool\'s own summary, link intact, in one model call', async () => {
+    const result = await callTool('test.final_read', { first_name: 'Mukesh' });
+    expect(result.reply).toBe('The form is filled in: /users/new#first_name=Mukesh');
+    expect(providerCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers with an unconfirmed WRITE\'s own summary -- it has already happened', async () => {
+    const result = await callTool('test.unconfirmed_write', { first_name: 'Mukesh' });
+    expect(result.reply).toBe('The form is filled in: /users/new#first_name=Mukesh');
+    expect(providerCall).toHaveBeenCalledTimes(1);
+  });
+
+  it('still lets an ordinary read loop, so a second lookup remains possible', async () => {
+    const result = await callTool('test.looping_read', { first_name: 'Mukesh' });
+    expect(providerCall).toHaveBeenCalledTimes(2);
+    expect(result.reply).toBe('The account has been started.');
+  });
+
+  it('says what is missing when the arguments are wrong, not that access is denied', async () => {
+    const result = await callTool('test.final_read', {});
+    expect(result.reply).not.toMatch(/do not have access/);
+    expect(result.reply).toMatch(/still need: first name/);
+    expect(readInvoke).not.toHaveBeenCalled();
+  });
+});
+
+/**
  * "Sorry, I did not catch that" was the reply to a request that WAS caught --
  * production, 2026-09-15. When the model picks a write and misses an argument,
  * the person is told what is missing.

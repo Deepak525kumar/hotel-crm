@@ -1,10 +1,13 @@
 # 21 — Zelle: the field-report conversations (2026-09-15)
 
 **Status:** written 2026-09-15 from conversations the owner had with Zelle in real use, every
-one of which failed. Tool-level behaviour is verified against a real PostgreSQL database
-(run log `runs/2026-09-15-zelle-field-conversations.md`). **The live-model routing half is NOT yet
-verified** — see "Could not test" in that run log. Re-run this whole file against a live model before
-calling it passed.
+one of which failed. **Run live end to end the same day, and passing:**
+- 19/19 through the real app, login, consent gate, live model and database
+  (`runs/2026-09-15-zelle-live-end-to-end.md`).
+- The tool layer was verified first against PostgreSQL (`runs/2026-09-15-zelle-field-conversations.md`).
+- Live routing check: 99/100 (see that run log).
+
+**Executable:** `backend/scripts/chatbot-e2e-conversations.ts` runs every row below (S01–S13, S04 excepted — it is the web form, covered by the run log) through the real app, login, consent gate, live model and database. Follow-on tools are scenario 22.
 
 **Why this file exists.** Each row below is a sentence a hotel manager actually typed, in the
 spelling they typed it. They are deliberately not cleaned up: "blibe", "didi", "manger" and

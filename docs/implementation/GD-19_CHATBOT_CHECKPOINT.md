@@ -197,6 +197,14 @@ took the request). Recorded as `APPROVED_2026_09_15_EVERYDAY`. No role gained a 
 `job_requests.create_broadcast`'s approval note still says "creates a DRAFT only" while the tool
 creates OPEN requests (a stale string in an approved record).
 
+**Same day, eighth decision — the owner approved the two open items.** (1) `users.update_my_profile`
+(LOW_RISK_WRITE, confirmed, self-scoped) with a **new** permission token, `users:profile:write-own`,
+granted to every role and now enforced on `PUT /auth/profile` — the only permission added in this
+session, added on explicit approval (`APPROVED_2026_09_15_PROFILE`). It covers phone number and app
+language only; names and email are not exposed. (2) `job_requests.create_broadcast`'s stale
+"DRAFT only" registration note corrected to what the tool does. Also verified the same day against
+the live EC2 host: its `.env` pins no `CHATBOT_*_CAP`, so the new code defaults apply on deploy.
+
 A new registry seam, `ToolRegistration.precheck`, lets a write prove its target exists before a
 confirmation is issued. It is read-only by contract and is not an authorization layer: `invoke`
 repeats every check at execution.

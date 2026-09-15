@@ -97,8 +97,8 @@ export const applyPlan = registerTool<ApplyPlanArgs>({
   name: 'calendar.apply_plan',
   description:
     "Applies a plan the manager dictates for their OWN workers -- sick and holiday days AND " +
-    'shifts together -- in one confirmed step. Use when one message mixes who is away with who ' +
-    'works: "Anna is off sick Monday, put Tomasz on Monday and Tuesday", "Maria Urlaub am ' +
+    'shifts together -- in one confirmed step. Use when one message names BOTH someone ' +
+    'being off (sick or on holiday) AND someone working, and not otherwise: "Anna is off sick Monday, put Tomasz on Monday and Tuesday", "Maria Urlaub am ' +
     'Freitag wegen Hochzeit, Parveen übernimmt Freitag und Samstag". Days are YYYY-MM-DD; each ' +
     'absence is SICK or VACATION, and a holiday needs its reason. Returns what was recorded and ' +
     'anything that could not be. For shifts alone use assignments.place_many; for one absence ' +

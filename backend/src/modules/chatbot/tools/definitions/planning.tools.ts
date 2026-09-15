@@ -232,7 +232,11 @@ export const createBroadcast = registerTool<CreateBroadcastArgs>({
   interfaceRef: 'IF-JR-CreateWorkRequest (job-requests/service.ts create())',
   approvalRef:
     APPROVED_2026_09_09_PLANNING +
-    ' Registration note: creates a DRAFT only; publishing to OPEN stays a human action in the UI.',
+    // Corrected 2026-09-15 with the owner's approval: this note said "creates
+    // a DRAFT only" for months after the tool was changed to create OPEN
+    // requests (see the header above). The capability is unchanged; only the
+    // record of it was wrong.
+    ' Registration note: creates an OPEN request after confirmation; pay rate and requirements stay in the app.',
 
   args: CreateBroadcastArgs,
   permission: 'staffing:write',

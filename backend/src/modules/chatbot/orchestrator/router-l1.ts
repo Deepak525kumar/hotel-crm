@@ -406,8 +406,14 @@ export function buildSystemPrompt(
     // text, and keep the list short: this model gets chattier as the rule
     // list grows.
     '',
+    // NAMES ONLY, since 2026-09-15. Every description used to be written out
+    // here AND sent again in the tool schemas on every model step -- about
+    // 5,000 of a manager's ~12,700 prompt tokens were the same text twice, and
+    // a turn is two or three steps. The schemas are what the model routes on;
+    // this line only says which tools exist. Changed only after a live
+    // `chatbot-routing-check.ts` comparison (CHATBOT_HANDOFF §6a records it).
     tools.length > 0
-      ? `Tools available to this user:\n${tools.map((t) => `- ${t.name}: ${t.description}`).join('\n')}`
+      ? `Tools available to this user (each is described in the tool list): ${tools.map((t) => t.name).join(', ')}.`
       : 'No tools are available to this user, so you can only answer general questions about using the app.',
   ].join('\n');
 }

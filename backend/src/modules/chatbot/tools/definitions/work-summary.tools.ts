@@ -8,6 +8,7 @@ import { toServiceActor } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
 import { asRefusal } from '../tool-errors.js';
 import { APPROVED_2026_09_15_FIELD_REPORT } from '../approvals.js';
+import { todayIso } from './daily-operations.tools.js';
 
 /**
  * "HOW MUCH WORK DID WE DO" -- one answer, not a choice of four datasets.
@@ -48,20 +49,45 @@ const ROW_CAP = 5_000;
 const dayCount = (from: string, to: string): number =>
   Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000) + 1;
 
+/**
+ * THE RANGE IS OPTIONAL, defaulting to the last two weeks up to today.
+ *
+ * The live routing check of 2026-09-15 put the owner's own sentence to the
+ * model -- "give me record data previews weeks how much work we did" -- and it
+ * called NO tool, twice: "previews weeks" names no dates, both dates were
+ * required, so the model wrote a question instead of acting. A manager asking
+ * how much work was done recently wants recent work, and two weeks is the
+ * reading a person would give it. The summary states the dates it used, so a
+ * different intent is one short correction away. One date alone means that
+ * single day.
+ */
+const DEFAULT_DAYS = 14;
+
 const WorkSummaryArgs = z
   .object({
-    from: plausibleDate,
-    to: plausibleDate,
+    from: plausibleDate.optional(),
+    to: plausibleDate.optional(),
     hotel_name: z.string().trim().min(2).max(120).optional(),
   })
   .strict()
-  .refine((a) => a.from <= a.to, { message: 'from must not be after to', path: ['from'] })
-  .refine((a) => dayCount(a.from, a.to) <= MAX_DAYS, {
+  .refine((a) => !a.from || !a.to || a.from <= a.to, { message: 'from must not be after to', path: ['from'] })
+  .refine((a) => !a.from || !a.to || dayCount(a.from, a.to) <= MAX_DAYS, {
     message: `the range can be at most ${MAX_DAYS} days`,
     path: ['to'],
   });
 
 type WorkSummaryArgs = z.infer<typeof WorkSummaryArgs>;
+
+function resolveRange(args: WorkSummaryArgs): { from: string; to: string } {
+  if (args.from && args.to) return { from: args.from, to: args.to };
+  if (args.from || args.to) {
+    const day = (args.from ?? args.to)!;
+    return { from: day, to: day };
+  }
+  const to = todayIso();
+  const from = new Date(Date.parse(`${to}T12:00:00Z`) - (DEFAULT_DAYS - 1) * 86_400_000).toISOString().slice(0, 10);
+  return { from, to };
+}
 
 async function readAll<T>(
   fetch: (page: number) => Promise<{ data: T[]; total: number }>
@@ -98,11 +124,15 @@ export const teamWorkSummary = registerTool<WorkSummaryArgs>({
     'planned, finished and cancelled, how many people worked, hours clocked, late arrivals, ' +
     'no-shows and rooms logged. Use when a manager asks how much work was done: "how much work ' +
     'did we do last week", "give me the data for 07.09.2026", "wie viel haben wir im August ' +
-    'geschafft". Dates are YYYY-MM-DD, at most 92 days apart; add hotel_name to narrow it to one ' +
+    'geschafft". Dates are YYYY-MM-DD, at most 92 days apart; leave them out for the last two weeks, ' +
+    'and add hotel_name to narrow it to one ' +
     'hotel. Returns the totals as numbers. For the individual rows use reports.query_team, and ' +
     'for a file use reports.export_team.',
   tier: 'READ_ONLY',
   confirm: false,
+  // Exact counts and the dates they cover, as computed. The live run of
+  // 2026-09-15 got them back reworded, with the dates in another format.
+  finalAnswer: true,
 
   interfaceRef:
     'IF-ASG-ListAssignments + IF-ATT-ListAttendance + IF-ROOM-ListRoomsForHotels (each with the caller as actor)',
@@ -114,8 +144,9 @@ export const teamWorkSummary = registerTool<WorkSummaryArgs>({
   permission: 'reports:read-team',
   scopeCheck: 'none',
 
-  invoke: async (args, actor) => {
+  invoke: async (rawArgs, actor) => {
     const serviceActor = toServiceActor(actor);
+    const args = { ...rawArgs, ...resolveRange(rawArgs) };
 
     // A hotel only when one was named. Without a name the owning modules
     // already narrow to the caller's scope, which is "all of my hotels" --

@@ -71,9 +71,11 @@ replace them.
 | 18 | `scenarios/18-worker-room-log-and-room-first-check.md` | Worker's room log, one-room-per-day collision, room-first inspection picker + per-role scope matrix, rework state round-trip |
 | 19 | `scenarios/19-admin-creates-any-role.md` | Admin creates regional_manager/manager/worker/checker directly (2026-09-01/02 RULE A amendment); admin-creates-admin still refused; skills validation. **Partially verified** — see the file's own status note |
 | 20 | `scenarios/20-archive-delete-scope-vacating.md` | Deleting a user/hotel/group must not leave ghost assignments or dangling scope pointers; an archived hotel/group must confer no scope, fresh login or stale token alike. **Run live 2026-09-02** — 5/6 steps passed as designed (one stronger than predicted); found and fixed a real defect (`assign()` would bind a live manager/RM to an archived target) |
-| 21 | `scenarios/21-zelle-field-conversations.md` | The thirteen conversations the owner had with Zelle in real use on 2026-09-15, verbatim: day summary, new-account link, copy/history, German phone numbers, scheduling a manager, cancelling a shift, team work summary, the daily cap, room counts. **Tool layer verified against real PostgreSQL 2026-09-15; live-model routing NOT yet run** — see the file's status note |
+| 21 | `scenarios/21-zelle-field-conversations.md` | The thirteen conversations the owner had with Zelle in real use on 2026-09-15, verbatim: day summary, new-account link, copy/history, German phone numbers, scheduling a manager, cancelling a shift, team work summary, the daily cap, room counts. **Run live end to end 2026-09-15: 19/19** (real app, login, consent, live model, database) — found and fixed four product defects, including a claimed schedule change that nothing made |
+| 22 | `scenarios/22-zelle-rota-and-everyday-tools.md` | Swap a shift, apply a dictated plan (absences + shifts), withdraw a worker's absence, staffing requests list/cancel, team rooms today, fixing a logged room, own phone number, worker boundary. **Executable:** `backend/scripts/chatbot-e2e-conversations.ts` runs 21 and 22 through the real app, login, consent, live model and database |
 
-**Start with 00. Then 01-21 in order (skipping 08).** 08 is not a test — it is the backlog and the
+**Start with 00. Then 01-22 in order (skipping 08).** Scenarios 21-22 are also automated end to end
+by `backend/scripts/chatbot-e2e-conversations.ts` (paid model calls, not in CI). 08 is not a test — it is the backlog and the
 "what we still haven't checked" list. Read it at the end of a run and update it.
 
 > **18 changes how an inspection starts.** Until 2026-09-01 a checker picked a

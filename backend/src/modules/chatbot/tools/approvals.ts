@@ -172,6 +172,20 @@ export const APPROVED_2026_09_15_EVERYDAY =
   'Covers this tool as registered on that date, using only permissions its roles already ' +
   'held; a later change to scope, risk tier or permission requires re-approval.';
 
+/**
+ * THE OWN-PROFILE TOOL AND ITS TOKEN, approved 2026-09-15 ("approval for the
+ * decisions"). This is the one change in the session that ADDED a permission,
+ * and it was asked for before it was built: `users:profile:write-own` is held
+ * by every role and denies nobody, exactly like `calendar:absence:write-own`,
+ * and `PUT /auth/profile` now enforces it. Covers the caller's own phone
+ * number and app language only.
+ */
+export const APPROVED_2026_09_15_PROFILE =
+  'APPROVED 2026-09-15 by the commissioning human under ADR-053 item 4, together with ' +
+  'the new users:profile:write-own token (held by every role). Covers changing the ' +
+  "caller's own phone number and app language as registered on that date; a later " +
+  'change to scope, risk tier or permission requires re-approval.';
+
 export const APPROVED_2026_09_12_SHIFT_SUMMARY =
   'APPROVED 2026-09-12 by the commissioning human under ADR-053 item 4, on the ' +
   'transcripts showing both an admin and a manager refused when asked to record ' +

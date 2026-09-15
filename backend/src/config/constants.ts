@@ -230,6 +230,13 @@ const MANAGER_PERMISSIONS = Object.freeze([
     // now enforces it too (calendar/routes.ts), so this is a no-op for HTTP
     // callers and the declaration is true rather than merely convenient.
     'calendar:absence:write-team',
+    // Changing your OWN phone number or app language, added 2026-09-15 (owner
+    // approval). Held by EVERY role and denies nobody: PUT /auth/profile is
+    // open to any authenticated user and must stay so. It exists for the same
+    // reason as `calendar:absence:write-own` -- a write tool may not use the
+    // registry's `null` escape hatch, so without a name the assistant could
+    // not offer "change my number" at all. The route now enforces it.
+    'users:profile:write-own',
 ]) as string[];
 
 // ADR-031 D-1 (PR-3): ROLE_PERMISSIONS is now consulted on the request path
@@ -341,6 +348,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // now enforces it too (calendar/routes.ts), so this is a no-op for HTTP
     // callers and the declaration is true rather than merely convenient.
     'calendar:absence:write-team',
+    // See MANAGER_PERMISSIONS' note on this token (2026-09-15).
+    'users:profile:write-own',
   ]) as string[],
   MANAGER: MANAGER_PERMISSIONS,
   // ADR-060 / ADR-030 §3 C-33: RM = Manager's operational set plus
@@ -426,6 +435,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // NAME the capability (and let a chatbot tool declare it), never to
     // withhold it.
     'reports:export-own',
+    // See MANAGER_PERMISSIONS' note on this token (2026-09-15).
+    'users:profile:write-own',
   ]) as string[],
   WORKER: Object.freeze([
     'hotels:read',
@@ -521,6 +532,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // NAME the capability (and let a chatbot tool declare it), never to
     // withhold it.
     'reports:export-own',
+    // See MANAGER_PERMISSIONS' note on this token (2026-09-15).
+    'users:profile:write-own',
   ]) as string[],
 });
 

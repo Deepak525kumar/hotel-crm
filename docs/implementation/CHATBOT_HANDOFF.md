@@ -271,6 +271,30 @@ team-view tools declare `staffing:read` as well — otherwise they sit in a work
 the worker-facing tool with a near-identical description, which costs routing accuracy and
 least privilege at once.
 
+**The tool loop let the model reword results people must read exactly.** Found by the first live
+end-to-end run (`scripts/chatbot-e2e-conversations.ts`, 2026-09-15): a read's result went back to
+the model, which rewrote the new-account reply as "The account … has been started" — false — and
+dropped the pre-filled form link; the work summary's counts came back in the model's own words and
+date format. A read registered with `finalAnswer: true` now answers with its own summary, and so
+does any unconfirmed write that ran (it has happened; its summary is the record). Ordinary reads
+still loop.
+
+**Invalid arguments were answered "You do not have access to that."** The L2 path rendered every
+executor denial as an access denial, including `INVALID_ARGS` — so a manager who simply left out a
+name was told they lacked permission. `INVALID_ARGS` now names the missing argument, as the
+confirmation path already did; every other denial code keeps the single uniform message.
+
+**The prompt no longer lists every tool description.** Descriptions were in the system prompt AND
+in the tool schemas on every step. The prompt now names the tools only. Measured with
+`chatbot-routing-check.ts` on the same branch: 93/98 before, 99/100 after; a manager's per-step
+prompt with 50 tools is ~11,200 tokens instead of an estimated ~16,500.
+
+**Three traps in running the live harness, all hit on its first runs.** ES-module imports are
+hoisted above `loadEnv()`, so app modules must be imported dynamically after it. The chatbot's own
+per-user turn limiter answers a fast script with 429, which must be waited out rather than read as
+a product failure. And an "after" check is not evidence unless the "before" state is asserted too —
+one step passed while testing nothing, because an earlier rate-limited step never created its data.
+
 **History does not weaken ADR-074 §5.1.** That control governs what reaches a prompt. A person
 reading their own transcript on their own screen is not a prompt; the one part a tool passes back
 to the model is the person's own opening message.

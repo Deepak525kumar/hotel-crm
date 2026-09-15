@@ -386,6 +386,19 @@ describe('reports.work_summary -- "give me record data previews weeks how much w
     expect(summaryOf(teamWorkSummary, out)).toMatch(/rooms are counted for ranges of up to 31 days/);
   });
 
+  /**
+   * The owner's own sentence named no dates and the live model called no tool.
+   * No dates now means the last two weeks; one date means that day.
+   */
+  it('defaults to the last two weeks when no dates are given, and one date means that day', async () => {
+    const none = await teamWorkSummary.invoke({} as never, manager());
+    expect(summaryOf(teamWorkSummary, none)).toMatch(/2026-09-02 to 2026-09-15/);
+    expect(mockList.mock.calls[0]![0]).toMatchObject({ from: '2026-09-02', to: '2026-09-15' });
+
+    const one = await teamWorkSummary.invoke({ from: '2026-09-07' } as never, manager());
+    expect(summaryOf(teamWorkSummary, one)).toMatch(/^On 2026-09-07/);
+  });
+
   it('refuses a range longer than 92 days and a backwards one', () => {
     expect(teamWorkSummary.args.safeParse({ from: '2026-01-01', to: '2026-06-30' }).success).toBe(false);
     expect(teamWorkSummary.args.safeParse({ from: '2026-09-08', to: '2026-09-07' }).success).toBe(false);

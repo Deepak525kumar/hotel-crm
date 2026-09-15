@@ -50,6 +50,31 @@ describe('a confirmation lists a plan as lines, not JSON', () => {
   });
 });
 
+describe('a claimed change that nothing made', () => {
+  it.each([
+    'Harvir Singh has been placed on the schedule as a manager for 16 September.',
+    'I have scheduled Parveen for Monday.',
+    "I've cancelled Tomasz's shift.",
+    'We have recorded 90 rooms for today.',
+    'Ich habe Anna für Montag eingeplant.',
+    'Die Schicht wurde storniert.',
+  ])('recognises: %s', async (text) => {
+    const { isUnbackedActionClaim } = await import('../modules/chatbot/orchestrator/templates.js');
+    expect(isUnbackedActionClaim(text)).toBe(true);
+  });
+
+  it.each([
+    '3 shifts were cancelled last week.',
+    'Parveen is available on 17, 18 and 19 September.',
+    'You can copy this conversation with the Copy button.',
+    'Harvir Singh is a manager, so he cannot be scheduled.',
+    'Who should I put on Monday?',
+  ])('leaves an honest answer alone: %s', async (text) => {
+    const { isUnbackedActionClaim } = await import('../modules/chatbot/orchestrator/templates.js');
+    expect(isUnbackedActionClaim(text)).toBe(false);
+  });
+});
+
 describe('the messages a capped or incomplete turn produces', () => {
   it('never exposes the cap\'s value', () => {
     expect(renderBudgetFallback('daily-user-cap-exhausted')).not.toMatch(/\d/);
