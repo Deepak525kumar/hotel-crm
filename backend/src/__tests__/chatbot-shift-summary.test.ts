@@ -212,6 +212,20 @@ describe('what it will not infer', () => {
     );
     expect(summaryOf(out)).not.toMatch(/worth a check/);
   });
+
+  /**
+   * Production, 2026-09-15: "90 rooms to clean ... and 10 blibe". A total and a
+   * stay-over, no checkout yet -- and the reply flagged it as "come to 10, not
+   * 90 -- worth a check". The comment always said EITHER part at zero is
+   * mid-entry; the code only checked both.
+   */
+  it('stays quiet when only one of the two parts has been given', async () => {
+    const out = await setDaySummary.invoke(
+      { day: '2026-09-12', total_rooms: 90, stay_over_rooms: 10 } as never,
+      manager()
+    );
+    expect(summaryOf(out)).not.toMatch(/worth a check/);
+  });
 });
 
 describe('reading it back', () => {

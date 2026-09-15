@@ -27,6 +27,21 @@ describe('self-scoped write tokens (2026-09-04)', () => {
     }
   });
 
+  /**
+   * `users:profile:write-own`, 2026-09-15. PUT /auth/profile was open to every
+   * authenticated user and gained the token so a chatbot tool could declare
+   * it. Every role must hold it, or someone loses the ability to change their
+   * own phone number or language -- the lockout this file exists to prevent.
+   */
+  it('REGRESSION: every role holds users:profile:write-own, and the route enforces it', () => {
+    for (const role of Object.keys(ROLE_PERMISSIONS)) {
+      const held = ROLE_PERMISSIONS[role] ?? [];
+      expect({ role, ok: held.includes('admin:*') || held.includes('users:profile:write-own') }).toEqual({ role, ok: true });
+    }
+    const auth = readFileSync('src/modules/auth/routes.ts', 'utf8');
+    expect(auth).toMatch(/router\.put\('\/profile', authMiddleware, requirePermission\('users:profile:write-own'\)/);
+  });
+
   it('covers every role the constant defines, not just the five named here', () => {
     // Guards against a role being added later without these tokens, which
     // would silently lock it out of both routes.

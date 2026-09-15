@@ -185,7 +185,19 @@ function describeCounts(row: SummaryRow): string {
  */
 function mismatchNote(row: SummaryRow): string {
   const split = row.stay_over_rooms + row.checkout_rooms;
-  if (split === 0 || row.total_rooms === 0 || split === row.total_rooms) return '';
+  // EITHER part, as the comment above always said -- the code checked only
+  // that BOTH were zero. Production, 2026-09-15: "90 rooms to clean ... and 10
+  // blibe" gave a total and a stay-over and no checkout, and the reply added
+  // "stay-over and checkout come to 10, not 90 -- worth a check", flagging the
+  // manager's own correct sentence as a discrepancy.
+  if (
+    row.stay_over_rooms === 0 ||
+    row.checkout_rooms === 0 ||
+    row.total_rooms === 0 ||
+    split === row.total_rooms
+  ) {
+    return '';
+  }
   return ` (stay-over and checkout come to ${split}, not ${row.total_rooms} -- worth a check.)`;
 }
 

@@ -13,6 +13,31 @@ import { BackLink } from "@/components/ui/BackLink";
 import type { CreateUserInput } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
+/**
+ * The error, with WHICH FIELD failed.
+ *
+ * Reported 2026-09-15: an admin creating a worker saw only "Request body
+ * validation failed" under a fully filled-in form. The server had said which
+ * field -- `details: [{ field: "phone", message: "Invalid phone number" }]` --
+ * and this page threw that away and showed the envelope's generic message, so
+ * the admin had nine fields to suspect and no way to tell which one. (It was
+ * the phone: a German number written with its leading 0, which the server now
+ * accepts.)
+ */
+function describeApiError(err: ApiError): string {
+  const details = Array.isArray(err.details) ? err.details : [];
+  const lines = details
+    .map((d) => {
+      const item = d as { field?: unknown; message?: unknown };
+      if (typeof item.message !== "string") return null;
+      return typeof item.field === "string" && item.field
+        ? `${item.field.replace(/_/g, " ")}: ${item.message}`
+        : item.message;
+    })
+    .filter((line): line is string => Boolean(line));
+  return lines.length > 0 ? lines.join(" · ") : err.message;
+}
+
 function NewUser() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -110,7 +135,7 @@ function NewUser() {
     } catch (err) {
       setError(
         err instanceof ApiError
-          ? err.message
+          ? describeApiError(err)
           : "Something went wrong. Please try again.",
       );
       setSubmitting(false);

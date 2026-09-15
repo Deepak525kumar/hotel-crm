@@ -6,6 +6,7 @@ import type { ActorContext } from './tools/actor.js';
 import { actorHasPermission, executeTool, type ExecutionOutcome } from './tools/executor.js';
 import { listTools } from './tools/registry.js';
 import type { ToolDescriptorDto } from './types.js';
+import { listRecentConversations, readOwnTranscript } from './memory/transcript.js';
 
 // Registering the tool definitions is a side effect of importing them. Kept
 // as one explicit import so the set of registered tools is greppable from
@@ -18,6 +19,12 @@ import './tools/definitions/team-management.tools.js';
 import './tools/definitions/self-care.tools.js';
 import './tools/definitions/planning.tools.js';
 import './tools/definitions/shift-summary.tools.js';
+import './tools/definitions/shift-changes.tools.js';
+import './tools/definitions/accounts.tools.js';
+import './tools/definitions/conversation-history.tools.js';
+import './tools/definitions/work-summary.tools.js';
+import './tools/definitions/plan.tools.js';
+import './tools/definitions/everyday.tools.js';
 
 /**
  * SPEC-CHATBOT-001 (ADR-013) — backend-chatbot's service.
@@ -139,6 +146,40 @@ export class ChatbotService extends BaseService {
       throw new ForbiddenError('Cannot access this conversation');
     }
     return { id: conversation.id, status: conversation.status, purpose: conversation.purpose };
+  }
+
+  /**
+   * The caller's own recent conversations, for the History list. Self-scoped
+   * by construction: the only id used is the actor's own.
+   */
+  async listMyConversations(actor: ActorContext) {
+    const rows = await listRecentConversations(actor.userId, 30);
+    return rows.map((r) => ({
+      id: r.id,
+      started_at: r.startedAt.toISOString(),
+      status: r.status,
+      opening: r.opening,
+      message_count: r.messageCount,
+    }));
+  }
+
+  /**
+   * One of the caller's own conversations, both sides, for reading back.
+   *
+   * Someone else's conversation is NOT FOUND rather than forbidden, so a guessed
+   * id cannot confirm that a conversation exists.
+   */
+  async getMyTranscript(conversationId: string, actor: ActorContext) {
+    const messages = await readOwnTranscript(conversationId, actor.userId);
+    if (messages === null) throw new NotFoundError('Conversation not found');
+    return {
+      id: conversationId,
+      messages: messages.map((m) => ({
+        role: m.role === 'USER' ? 'user' : 'assistant',
+        text: m.content,
+        at: m.createdAt.toISOString(),
+      })),
+    };
   }
 
   /**

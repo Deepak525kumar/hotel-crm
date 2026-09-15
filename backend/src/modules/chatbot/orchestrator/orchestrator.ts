@@ -3,9 +3,9 @@ import { getEnv } from '../../../config/env.js';
 import { getPrisma } from '../../../lib/db.js';
 import { logger } from '../../../lib/logger.js';
 import type { ActorContext } from '../tools/actor.js';
-import { executeTool } from '../tools/executor.js';
+import { actorHasPermission, executeTool } from '../tools/executor.js';
 import { findPriorCall, recordToolCall } from '../tools/tool-call-log.js';
-import { describeToolError } from '../tools/tool-errors.js';
+import { asRefusal, describeToolError } from '../tools/tool-errors.js';
 import { resolveTool, type CompactResult } from '../tools/registry.js';
 import {
   actorHotelNames,
@@ -31,6 +31,9 @@ import {
   renderBudgetFallback,
   renderConversationClosed,
   renderDenied,
+  renderIncompleteRequest,
+  isUnbackedActionClaim,
+  renderUnbackedClaim,
   renderProviderUnavailable,
   renderToolResult,
   renderUnrecognized,
@@ -423,10 +426,19 @@ async function executeTurn(params: {
   }
 
   // ---- L0: deterministic, zero-cost ---------------------------------------
+  // A TYPED match is used only when this person may use its tool. Otherwise it
+  // falls through to L1, which sees their own manifest: a worker asking "how
+  // much work did we do" must not be answered "You do not have access to that"
+  // by a router that never considered who was asking. A tapped chip keeps its
+  // behaviour -- the manifest only offers chips the person can use.
+  const typed = !params.commandId && params.text ? matchL0(params.text) : undefined;
+  const typedTool = typed ? resolveTool(typed.tool) : undefined;
   const command = params.commandId
     ? resolveCommandId(params.commandId)
-    : params.text
-      ? matchL0(params.text)
+    : typed &&
+        typedTool &&
+        (typedTool.permission === null || actorHasPermission(params.actor, typedTool.permission))
+      ? typed
       : undefined;
 
   if (command) {
@@ -658,6 +670,22 @@ async function executeTurn(params: {
       completion.text,
       tools.map((t) => t.name)
     );
+
+    // No write ran in this turn (writes end the turn with their own summary),
+    // so prose announcing a completed change is unbacked -- unless the
+    // previous turn genuinely completed one. See templates.ts.
+    if (spoken && !promptContext.lastAction?.ok && isUnbackedActionClaim(spoken)) {
+      logger.warn('chatbot_unbacked_action_claim', {
+        requestId: params.requestId,
+        conversationId: params.conversationId,
+      });
+      return {
+        reply: renderUnbackedClaim(),
+        status: ChatbotConversationStatus.IN_PROGRESS,
+        route: 'L1',
+      };
+    }
+
     return {
       reply: spoken || renderUnrecognized(),
       status: ChatbotConversationStatus.IN_PROGRESS,
@@ -686,8 +714,28 @@ async function executeTurn(params: {
         tool: proposed.name,
         requestId: params.requestId,
       });
+      // SAY WHAT IS MISSING, not "did not catch that".
+      //
+      // Production, 2026-09-15: "cancel shift for parveen kumar 16 September"
+      // came back "Sorry, I did not catch that." The request had been
+      // understood perfectly well -- the model chose a write and filled in
+      // most of it -- and the one thing wrong was an argument. Telling the
+      // person they were not understood makes them rephrase the whole
+      // sentence, when one word would have done. The labels are the same ones
+      // the confirmation screen uses; the model's own values are not echoed.
+      await prisma.chatbotConversation.update({
+        where: { id: params.conversationId },
+        data: {
+          turn_count: { increment: 1 },
+          tokens_input: { increment: completion.usage.promptTokens },
+          tokens_output: { increment: completion.usage.completionTokens },
+        },
+      });
       return {
-        reply: renderUnrecognized(),
+        reply: renderIncompleteRequest(
+          proposed.name,
+          parsedArgs.error.issues.map((issue) => String(issue.path[0] ?? ''))
+        ),
         status: ChatbotConversationStatus.IN_PROGRESS,
         route: 'L1',
       };
@@ -731,6 +779,45 @@ async function executeTurn(params: {
 
     // Canonical names from here on, so what the person reads is what runs.
     const confirmedArgs = references.args;
+
+    // AND THE THING IT ACTS ON MUST EXIST. See `ToolRegistration.precheck`:
+    // a real worker and a real day can still have no shift to cancel, and a
+    // confirmation for that is the same fiction the reference check closed.
+    //
+    // A precheck that THROWS does not block: it is an early warning, and the
+    // tool repeats every check at execution. Failing the turn over it would
+    // trade a slightly later refusal for no answer at all.
+    if (proposed.precheck) {
+      let blocked: ReturnType<typeof asRefusal> = null;
+      try {
+        const reparsed = proposed.args.safeParse(confirmedArgs);
+        if (reparsed.success) {
+          blocked = asRefusal(await proposed.precheck(reparsed.data, params.actor));
+        }
+      } catch (error) {
+        logger.warn('chatbot_tool_precheck_failed', {
+          tool: proposed.name,
+          requestId: params.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      if (blocked) {
+        await prisma.chatbotConversation.update({
+          where: { id: params.conversationId },
+          data: {
+            turn_count: { increment: 1 },
+            tokens_input: { increment: completion.usage.promptTokens },
+            tokens_output: { increment: completion.usage.completionTokens },
+          },
+        });
+        return {
+          reply: blocked.message,
+          status: ChatbotConversationStatus.IN_PROGRESS,
+          route: 'L1',
+        };
+      }
+    }
 
     await writePendingConfirmation(params.conversationId, {
       toolName: proposed.name,
@@ -865,6 +952,28 @@ async function executeTurn(params: {
       denial_code: outcome.denialCode,
       requestId: params.requestId,
     });
+
+    // BAD ARGUMENTS ARE NOT A PERMISSION PROBLEM.
+    //
+    // Live end-to-end run, 2026-09-15: a manager typed "I want make id more
+    // next employe", the model chose the new-account tool without a name, the
+    // executor rejected the arguments -- and the manager, who holds every
+    // permission that tool needs, was told "You do not have access to that."
+    // Nothing about their access was wrong; one detail was missing. The same
+    // correction the confirmation path received applies here: name what is
+    // still needed. Only argument LABELS are named, never a value, and no
+    // other denial code is softened -- those stay one uniform message.
+    if (outcome.denialCode === 'INVALID_ARGS' && l1Tool) {
+      const parsed = l1Tool.args.safeParse(completion.toolUse.input ?? {});
+      const missing = parsed.success ? [] : parsed.error.issues.map((issue) => String(issue.path[0] ?? ''));
+      return {
+        reply: renderIncompleteRequest(completion.toolUse.name, missing),
+        status: ChatbotConversationStatus.IN_PROGRESS,
+        route: 'L1',
+        toolInvoked: completion.toolUse.name,
+      };
+    }
+
     return {
       reply: renderDenied(),
       status: ChatbotConversationStatus.IN_PROGRESS,
@@ -909,6 +1018,38 @@ async function executeTurn(params: {
   // presence booleans by the time observation.ts sees them -- the fence
   // narrows further, it does not have to catch those.
   alreadyRead.set(callKey, safe);
+
+  // SOME RESULTS ARE THE ANSWER, WORD FOR WORD.
+  //
+  // Found by the live end-to-end run of 2026-09-15. Two results went back into
+  // the loop and the model rewrote them:
+  //
+  //   - the new-account tool's reply carried the pre-filled form LINK; the
+  //     model's rewrite said "The account for Mukesh Kumar has been started"
+  //     -- false -- and dropped the link, the one thing the manager needed;
+  //   - the work summary's exact counts and ISO dates came back as the model's
+  //     own prose, in its own date format.
+  //
+  // The rule this file's comments already state -- the sentence a person reads
+  // is built in code, not phrased by a model -- held only on the LAST step.
+  // It now holds wherever it matters:
+  //
+  //   - a WRITE that ran (only unconfirmed low-risk writes reach here): it has
+  //     happened, and its summary is the authoritative record of what; there is
+  //     nothing further to look up before telling the person;
+  //   - a tool registered with `finalAnswer`: its summary must reach the person
+  //     unaltered -- a link, or numbers people act on.
+  //
+  // Ordinary reads still loop, so "who can cover Anna tomorrow?" can still take
+  // two lookups.
+  if (l1Tool && (l1Tool.tier !== 'READ_ONLY' || l1Tool.finalAnswer)) {
+    return {
+      reply: renderToolResult(safe),
+      status: ChatbotConversationStatus.IN_PROGRESS,
+      route: 'L1',
+      toolInvoked: completion.toolUse.name,
+    };
+  }
 
   if (!isLastStep) {
     messages.push({ role: 'user', content: buildObservation(completion.toolUse.name, safe) });

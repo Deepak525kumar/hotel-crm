@@ -65,6 +65,9 @@ import {
   toolSpec,
 } from '../src/modules/chatbot/orchestrator/router-l1.js';
 import { ROLE_PERMISSIONS } from '../src/config/constants.js';
+import { matchL0 } from '../src/modules/chatbot/orchestrator/router-l0.js';
+import { resolveTool } from '../src/modules/chatbot/tools/registry.js';
+import { actorHasPermission } from '../src/modules/chatbot/tools/executor.js';
 import '../src/modules/chatbot/service.js';
 
 const provider = new MantleProvider({
@@ -177,6 +180,57 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['manager', 'wer ist heute da?', 'team_status (de)', picks('attendance.team_status')],
   ['manager', 'is anyone missing this morning?', 'team_status (missing)', picks('attendance.team_status')],
   ['manager', 'who is on my team?', 'find_team_member', picks('users.find_team_member')],
+
+  // Added 2026-09-15: the field report (E2E scenario 21), VERBATIM. Every one
+  // of these was typed by the owner in real use and failed. The spelling is the
+  // input -- "didi", "blibe", "manger", "previews weeks" -- and correcting it
+  // here would test a tidier product than the one people use.
+  ['manager', 'Make day task rooms today we have 90 rooms to clean add that work list and 10 blibe',
+    'S01 day summary', picks('calendar.set_day_summary')],
+  // NO NAME IS GIVEN, so asking for one is as correct as calling the tool
+  // (which then answers "I still need: first name"). Scored as a failure on
+  // 2026-09-15 when the model asked -- the expectation was wrong, not the
+  // model. What must not happen is some OTHER tool, or a claim it was done.
+  ['manager', 'yes create id for the next employee', 'S02 new account link (or ask for the name)',
+    (t) => t === 'users.new_account_link' || t === null],
+  ['manager', 'I want previous chats', 'S08 history', picks('chatbot.recent_conversations')],
+  ['manager', 'cancel shift for parveen kumar 16 September', 'S07 cancel', picks('assignments.cancel_shift')],
+  ['manager', 'give me record data previews weeks how much work we did', 'S09 work summary',
+    picks('reports.work_summary')],
+  ['manager', '07.09.2026 data how much work', 'S09 day-first date',
+    (t, a) => t === 'reports.work_summary' && a?.['from'] === '2026-09-07'],
+  ['manager', 'parveen didi today 10 rooms', 'S13 room count', picks('rooms.record_worker_count')],
+  // The owner said "make me plans" and later "ok make" -- asking for the
+  // placement is a reasonable reading. Either read is acceptable; a plan tool
+  // is not, because nobody is off. (calendar.apply_plan would still place
+  // correctly, but it is the wrong capability to confirm.)
+  ['manager', 'make me plans. for parveen 17 18 19 September', 'S10 availability or placement',
+    (t) => t === 'calendar.check_availability' || t === 'assignments.place_many'],
+
+  // Added 2026-09-15 with the rota tools. The risk is the family, not each
+  // tool: swap vs move vs cancel, and a mixed plan vs place_many.
+  ['manager', "Parveen can't come Thursday, give it to Anna", 'swap_worker', picks('assignments.swap_worker')],
+  ['manager', 'Anna übernimmt Tomaszs Schicht am Freitag', 'swap_worker (de)', picks('assignments.swap_worker')],
+  ['manager', 'Anna is off sick Monday, put Tomasz on Monday and Tuesday', 'apply_plan (mixed)',
+    picks('calendar.apply_plan')],
+  ['manager', 'put Anna on Monday and Tuesday and Tomasz on Wednesday', 'place_many stays place_many',
+    picks('assignments.place_many')],
+  ['manager', "Parveen's phone died, she started at 07:00 today", 'correct_times (today)',
+    picks('attendance.correct_times')],
+
+  // Added 2026-09-15 with the everyday tools. Collision probes: fix vs log,
+  // team rooms vs my rooms vs work summary, withdraw worker vs own absence,
+  // team requests vs open shifts.
+  ['worker', 'I logged 214 but it was 241', 'fix_my_room', picks('rooms.fix_my_room')],
+  ['worker', 'Zimmer 118 löschen, das habe ich nicht gemacht', 'fix_my_room (remove, de)', picks('rooms.fix_my_room')],
+  ['worker', 'done with room 305', 'log stays log_cleaned', picks('rooms.log_cleaned')],
+  ['manager', 'how many rooms has everyone done today', 'team_today', picks('rooms.team_today')],
+  ['manager', 'Anna is better, she is not off tomorrow', 'withdraw_worker_absence',
+    picks('calendar.withdraw_worker_absence')],
+  ['manager', 'which staffing requests are still open', 'list_for_my_team', picks('job_requests.list_for_my_team')],
+  ['manager', 'cancel the cleaner request for Friday', 'cancel_request', picks('job_requests.cancel_request')],
+  ['worker', 'my new number is 0160 1234567', 'update_my_profile (phone)', picks('users.update_my_profile')],
+  ['worker', 'stell die App auf Deutsch um', 'update_my_profile (language, de)', picks('users.update_my_profile')],
   ['manager', 'list my checkers', 'find_team_member (role)', picks('users.find_team_member')],
   ['manager', 'I need 3 cleaners on 2026-09-17 from 08:00 to 16:00', 'create_broadcast', picks('job_requests.create_broadcast')],
   ['manager', 'ich brauche zwei Reinigungskraefte am 2026-09-17 von 08:00 bis 16:00', 'create_broadcast (de)', picks('job_requests.create_broadcast')],
@@ -316,6 +370,23 @@ async function main() {
   for (const [role, phrase, label, check] of CASES) {
     const a = actor(role);
     const tools = visibleTools(a);
+
+    // THE PRODUCTION PATH ASKS L0 FIRST. Before 2026-09-15 this script sent
+    // every phrase straight to the model, so a question L0 answers for free
+    // was scored on what the model would have done instead -- and the owner's
+    // "record data previews weeks" read as a failure users would never see.
+    // Same permission rule as the orchestrator: a match counts only if this
+    // role may use the tool.
+    const l0 = matchL0(phrase);
+    const l0Tool = l0 ? resolveTool(l0.tool) : undefined;
+    if (l0 && l0Tool && (l0Tool.permission === null || actorHasPermission(a, l0Tool.permission))) {
+      const ok = check(l0.tool, l0.args);
+      if (ok) pass += 1;
+      else failures.push(`${role} | "${phrase}"\n    want ${label}, got ${l0.tool} (L0)`);
+      console.log(`${ok ? 'PASS' : 'FAIL'}  ${label.padEnd(30)} -> ${l0.tool} (L0, no model call)`);
+      continue;
+    }
+
     try {
       const res = await provider.completeWithTools({
         system: buildSystemPrompt(a, tools),

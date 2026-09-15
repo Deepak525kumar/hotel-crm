@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { UI_LOCALES } from '../../lib/locales.js';
+import { phoneNumber } from '../../lib/phone.js';
 
 export const SignupSchema = z.object({
   email: z.string().email('Invalid email address').toLowerCase(),
@@ -9,7 +10,7 @@ export const SignupSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one digit'),
   first_name: z.string().min(2).max(50),
   last_name: z.string().min(2).max(50),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').optional(),
+  phone: phoneNumber.optional(),
   // SECURITY (HOTFIX-AUTH-001): public signup must never accept a client-supplied
   // role. Privileged roles are assigned server-side only (via the users module).
   // The `role` field is intentionally excluded so any injected value is stripped.
@@ -38,7 +39,7 @@ export const RefreshTokenSchema = z.object({
 export const UpdateProfileSchema = z.object({
   first_name: z.string().min(2).max(50).optional(),
   last_name: z.string().min(2).max(50).optional(),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').optional(),
+  phone: phoneNumber.optional(),
   // No profile_photo_url field: see auth/service.ts#updateProfile for why
   // accepting an arbitrary URL string here was removed rather than kept.
   // 2026-08-16: the user's own UI language choice. This route (PUT

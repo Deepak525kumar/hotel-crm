@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authController } from './controller.js';
 import { authMiddleware } from '../../middleware/auth.js';
+import { requirePermission } from '../../middleware/permissions.js';
 import { loginRateLimit, passwordResetRateLimit } from '../../middleware/rateLimit.js';
 
 const router = Router();
@@ -34,6 +35,9 @@ router.post('/password-reset', passwordResetLimiter, ...authController.requestPa
 router.post('/password-reset/confirm', passwordResetLimiter, ...authController.confirmPasswordReset);
 router.post('/logout', authMiddleware, (req, res, next) => authController.logout(req, res, next));
 router.get('/me', authMiddleware, (req, res, next) => authController.getCurrentUser(req, res, next));
-router.put('/profile', authMiddleware, ...authController.updateProfile);
+// `users:profile:write-own` (2026-09-15): held by EVERY role, so this denies
+// nobody who could call the route before. It names the capability so the
+// assistant's own-profile tool can declare a real token -- see constants.ts.
+router.put('/profile', authMiddleware, requirePermission('users:profile:write-own'), ...authController.updateProfile);
 
 export default router;

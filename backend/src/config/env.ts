@@ -587,7 +587,12 @@ const envSchema = z.object({
   // repeats much of it -- one such conversation was estimated at 20,000+
   // tokens on its own, so the old ceiling could end a conversation midway
   // through the task it was opened for.
-  CHATBOT_CONVERSATION_TOKEN_CAP: z.coerce.number().int().positive().default(120000),
+  //
+  // Raised again, to 300,000, on 2026-09-15. A manager's prompt measured
+  // ~12,700 tokens PER MODEL STEP (system prompt plus 37 tool schemas), and a
+  // turn that reads before answering takes two or three steps -- so 120,000
+  // ended a planning conversation after four or five messages, mid-task.
+  CHATBOT_CONVERSATION_TOKEN_CAP: z.coerce.number().int().positive().default(300000),
 
   // OD-CHAT-010 abuse-prevention: per-worker daily cap, distinct from the
   // CRR §2/§3 login-rate-limiting exclusion (SPEC-CHATBOT-001 is explicit
@@ -608,7 +613,15 @@ const envSchema = z.object({
   // CHATBOT_CONVERSATION_TOKEN_CAP, or a single permitted conversation could
   // not complete inside one user's daily allowance -- enforced below rather
   // than left to whoever edits these next.
-  CHATBOT_USER_DAILY_TOKEN_CAP: z.coerce.number().int().positive().default(250000),
+  //
+  // 1,000,000 since 2026-09-15 (owner decision). "A handful of turns" turned
+  // out not to be what 250,000 bought: at ~12,700 tokens per model step for a
+  // manager, and two to three steps per turn, it was about seven messages a
+  // day. Production transcript: a manager checked Parveen's availability,
+  // said "ok make", and got "You have asked me as much as I can answer
+  // today" -- four times, for four one-line follow-ups. 1M is 4% of the
+  // month; a runaway user still hits it well before the platform cap.
+  CHATBOT_USER_DAILY_TOKEN_CAP: z.coerce.number().int().positive().default(1000000),
   // Provider selection. 'none' is the default and a supported runtime state:
   // L0 answers the highest-frequency questions with no model at all, and the
   // orchestrator degrades to the confirmed fallback (RULE-CHAT-03) rather

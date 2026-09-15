@@ -14,7 +14,12 @@ import {
  */
 describe('users/types.ts — phone E.164 validation', () => {
   const VALID = ['+14155552671', '447911123456', '+919876543210'];
-  const INVALID = ['not-a-phone', '0123456789', '+', 'abc123', '++14155552671'];
+  // `0123456789` was on this list until 2026-09-15. It is a national-format
+  // German number, and refusing it refused every German number typed the way
+  // it is written -- an admin creating a worker with `016090744182` got
+  // "Request body validation failed". It is now CONVERTED to E.164 rather
+  // than rejected; see the normalisation cases below and lib/phone.ts.
+  const INVALID = ['not-a-phone', '+', 'abc123', '++14155552671', '00', '0'];
 
   describe('CreateUserSchema', () => {
     // ADR-065 (Universal Onboarding Gate): role defaults to 'worker', which
@@ -54,6 +59,36 @@ describe('users/types.ts — phone E.164 validation', () => {
         last_name: 'B',
       });
       expect(result.success).toBe(false);
+    });
+  });
+
+  /**
+   * THE PRODUCTION REPORT, 2026-09-15: the New user form, a German mobile
+   * number written the way Germans write it, and "Request body validation
+   * failed". Stored as ONE spelling (E.164), so the unique index on phone
+   * still means one account per number.
+   */
+  describe('national and spaced formats are stored as E.164', () => {
+    const base = { email: 'a@b.com', password: 'password123', first_name: 'A', last_name: 'B' };
+
+    it.each([
+      ['016090744182', '+4916090744182'],
+      ['0160 907 441 82', '+4916090744182'],
+      ['0160/90744182', '+4916090744182'],
+      ['+49 (0) 160 90744182', '+4916090744182'],
+      ['0049 160 90744182', '+4916090744182'],
+      ['+49 160 90744182', '+4916090744182'],
+      ['0123456789', '+49123456789'],
+      ['+91 98765 43210', '+919876543210'],
+    ])('stores %s as %s', (typed, stored) => {
+      const result = CreateUserSchema.safeParse({ ...base, phone: typed });
+      expect(result.success).toBe(true);
+      expect(result.success && result.data.phone).toBe(stored);
+    });
+
+    it('normalises on profile edits too, so one number never has two spellings', () => {
+      const result = UpdateUserProfileSchema.safeParse({ phone: '0160 90744182' });
+      expect(result.success && result.data.phone).toBe('+4916090744182');
     });
   });
 

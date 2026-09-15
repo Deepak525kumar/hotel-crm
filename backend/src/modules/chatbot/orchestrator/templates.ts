@@ -124,6 +124,12 @@ const ARG_LABELS: Record<string, string> = {
   format: 'Format',
   staff_type: 'Staff type',
   count: 'Count',
+  rooms: 'Rooms',
+  placements: 'Shifts',
+  absences: 'Away',
+  new_worker_name: 'Give it to',
+  new_room_number: 'Change it to',
+  worker: 'Worker',
 };
 
 /**
@@ -153,7 +159,104 @@ const TOOL_ACTIONS: Record<string, string> = {
   'rooms.log_cleaned': 'Log a room as cleaned',
   'hr.request_payslip': 'Request your payslip',
   'notifications.mark_read': 'Mark a message as read',
+  'assignments.cancel_shift': 'Cancel a shift',
+  'assignments.move_shift': 'Move a shift to another day',
+  'rooms.record_worker_count': "Record a worker's rooms cleaned",
+  'assignments.swap_worker': 'Give a shift to someone else',
+  'calendar.apply_plan': 'Apply this plan to the calendar',
+  'rooms.fix_my_room': 'Change or remove a room in your log',
+  'calendar.withdraw_worker_absence': "Withdraw a worker's day off",
+  'job_requests.cancel_request': 'Cancel a staffing request',
+  'users.update_my_profile': 'Update your phone or language',
 };
+
+/**
+ * One list entry, as a person reads it: "Anna Braun, 2026-09-21, sick".
+ *
+ * A plan used to be shown as raw JSON -- `[{"worker_name":"Anna Braun",...}]`
+ * -- on the one screen whose entire purpose is to be checked by a manager on a
+ * phone. Every VALUE is still shown; only the braces and internal keys go.
+ */
+function describeListEntry(entry: unknown): string {
+  if (!entry || typeof entry !== 'object') return String(entry);
+  return Object.values(entry as Record<string, unknown>)
+    .filter((v) => v !== undefined && v !== null && v !== '')
+    .map((v) => (typeof v === 'string' ? v : JSON.stringify(v)))
+    // Enum values read as words: "sick", not "SICK".
+    .map((v) => (/^(SICK|VACATION)$/.test(v) ? v.toLowerCase() : v))
+    .join(', ');
+}
+
+/**
+ * A write the model understood but could not fully fill in.
+ *
+ * Kept apart from renderUnrecognized(): "I did not catch that" is true when
+ * nothing was understood, and false -- and costly, because it makes the
+ * person start over -- when the action was clear and one detail was missing.
+ * Only the argument LABELS are named, never a value the model produced.
+ */
+export function renderIncompleteRequest(toolName: string, argKeys: string[]): string {
+  const labels = [...new Set(argKeys.filter(Boolean))].map(
+    (key) => (ARG_LABELS[key] ?? key.replace(/_/g, ' ')).toLowerCase()
+  );
+  // Only a MAPPED action reads as a verb phrase. The fallback built from a
+  // tool name does not -- the live run of 2026-09-15 produced "you want to new
+  // account link" -- so an unmapped tool gets a sentence with no action in it.
+  const mapped = TOOL_ACTIONS[toolName] ?? READ_ACTIONS[toolName];
+  const understood = mapped ? `I understood that you want to ${mapped.toLowerCase()}, but` : 'To do that';
+  if (labels.length === 0) {
+    return `${understood} something in the request did not fit. Could you say it again with the name and the date?`;
+  }
+  return `${understood} I still need: ${labels.join(', ')}. Dates can be written like "16 September" or "tomorrow".`;
+}
+
+/** Verb phrases for READ tools, used only by renderIncompleteRequest. */
+const READ_ACTIONS: Record<string, string> = {
+  'users.new_account_link': 'prepare an account for a new employee',
+  'reports.work_summary': 'see how much work was done',
+  'reports.query_team': 'see team data',
+  'rooms.team_today': "see the team's rooms",
+  'calendar.check_availability': 'check whether someone is free',
+  'calendar.team_absences': 'see who is off',
+  'assignments.list_for_my_team': "see the team's shifts",
+  'job_requests.list_for_my_team': 'see the open staffing requests',
+};
+
+/**
+ * A CLAIM OF A CHANGE THAT NOTHING MADE.
+ *
+ * Live end-to-end run, 2026-09-15. After "manger not worker", Zelle answered in
+ * prose: "Harvir Singh has been placed on the schedule as a manager for 16, 17
+ * and 18 September." No tool ran and nothing was written. A manager reading
+ * that would believe the rota was covered.
+ *
+ * The prompt already says to answer only from what a tool returns; a prompt is
+ * a request, not a control, and adding another rule there costs routing
+ * accuracy (measured). This is the control, and it is narrow on purpose: it is
+ * applied ONLY to a prose answer in a turn where no write ran -- writes end the
+ * turn with their own summary, so on that path any completed-change claim is
+ * unbacked by construction -- and not when the PREVIOUS turn really did
+ * complete an action ("yes, I scheduled her" after a confirmed placement is
+ * true). It matches first-person and "has been put on the schedule" claims,
+ * not a report of what the data shows ("3 shifts were cancelled last week").
+ */
+const UNBACKED_CLAIM = [
+  /\b(i|we)(['’]ve| have| had)?\s+(now\s+|just\s+|successfully\s+|also\s+)?(placed|scheduled|booked|cancell?ed|recorded|created|added|removed|moved|assigned|marked|updated|changed|approved|rejected|withdrawn|swapped)\b/i,
+  /\b(has|have)\s+been\s+(placed|put|added|scheduled|booked|assigned|moved|cancell?ed|recorded|withdrawn)\s+(on|onto|to|for|from|in)\b/i,
+  /\b(ich habe|wir haben)\b[^.]*\b(eingetragen|eingeplant|storniert|angelegt|gebucht|gespeichert|verschoben|zugewiesen)\b/i,
+  /\b(wurde|wurden)\b[^.]*\b(eingetragen|eingeplant|storniert|angelegt|gebucht|verschoben|zugewiesen)\b/i,
+];
+
+export function isUnbackedActionClaim(text: string): boolean {
+  return UNBACKED_CLAIM.some((pattern) => pattern.test(text));
+}
+
+export function renderUnbackedClaim(): string {
+  return (
+    'I have not changed anything. To make a change, tell me exactly what to do -- for example ' +
+    '"put Anna on Monday" -- and I will show it to you to confirm before it happens.'
+  );
+}
 
 /** "assignments.place_worker" -> "Place worker", as a last resort. */
 function describeToolAction(toolName: string): string {
@@ -197,6 +300,9 @@ export function renderConfirmationRequest(toolName: string, args: unknown): stri
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => {
       const label = ARG_LABELS[key] ?? key.replace(/_/g, ' ');
+      if (Array.isArray(value)) {
+        return [`  ${label}:`, ...value.map((entry) => `    - ${describeListEntry(entry)}`)].join('\n');
+      }
       const shown = typeof value === 'string' ? value : JSON.stringify(value);
       return `  ${label}: ${shown}`;
     });

@@ -1,7 +1,7 @@
 "use client";
 
 import { SKILL_OPTIONS } from "@/lib/skills";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UserRound, UploadCloud } from "lucide-react";
 import {
   Button,
@@ -54,6 +54,41 @@ export interface UserFormValues {
   skills: SkillTag[];
   hotel_id?: string;
   hotel_group_id?: string;
+}
+
+/**
+ * Details handed over by Zelle in the URL fragment (`/users/new#first_name=…`).
+ *
+ * Added 2026-09-15. A manager asked the assistant to "create id" for a new
+ * employee and was told to contact HR. The account needs a profile photo, so
+ * the assistant cannot create it -- but it can fill this form in, and the
+ * person adds the photo and presses Create here, through exactly the path an
+ * account has always been created by.
+ *
+ * A FRAGMENT, not a query string: it never reaches a server, so an email and a
+ * phone number do not land in request logs. Every value is still only a
+ * suggestion -- the fields stay editable, a role this viewer may not create is
+ * ignored, and the server validates the submit as it always has.
+ */
+function readPrefill(hash: string, allowedRoles: readonly Role[]): Partial<UserFormValues> {
+  if (!hash || hash.length < 2) return {};
+  const params = new URLSearchParams(hash.replace(/^#/, ""));
+  const out: Partial<UserFormValues> = {};
+
+  for (const key of ["first_name", "last_name", "email", "phone", "hotel_id"] as const) {
+    const value = params.get(key);
+    if (value) out[key] = value.slice(0, 200);
+  }
+
+  const role = params.get("role");
+  if (role && (allowedRoles as readonly string[]).includes(role)) out.role = role as Role;
+
+  const skills = params.get("skills");
+  if (skills) {
+    const known = new Set<string>(SKILL_OPTIONS.map((o) => o.value));
+    out.skills = skills.split(",").filter((s): s is SkillTag => known.has(s));
+  }
+  return out;
 }
 
 /** Submitted shape: unlike form state, blank phone becomes `null`, not `""`. */
@@ -134,6 +169,31 @@ export function UserForm({
   const defaultCreateRole: Role = allowedCreateRoles[0] ?? "worker";
 
   const [form, setForm] = useState<UserFormValues>(() => toValues(user, defaultCreateRole));
+
+  // READ AFTER MOUNT, NOT DURING THE FIRST RENDER.
+  //
+  // This read `window.location.hash` inside the useState initializer, and a
+  // real browser proved it wrong on 2026-09-15: clicking Zelle's link is an
+  // in-app navigation, and Next's router renders the new page BEFORE it
+  // updates the address bar. During that first render the URL was still
+  // /assistant, the fragment did not exist yet, and the form opened empty --
+  // while every unit test passed, because jsdom sets the URL first. After
+  // mount the address bar is current, whichever way the page was reached.
+  //
+  // The prefill is then taken out of the address bar, so a reload or a copied
+  // URL does not carry someone's email and phone along.
+  useEffect(() => {
+    if (mode !== "create" || typeof window === "undefined" || !window.location.hash) return;
+    const prefill = readPrefill(window.location.hash, allowedCreateRoles);
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (Object.keys(prefill).length === 0) return;
+    // A one-time sync FROM an external system (the address bar) into form
+    // state, which is the case effects exist for.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setForm((prev) => ({ ...prev, ...prefill }));
+    // Runs once per mount: the roles list is stable for a signed-in viewer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const set = <K extends keyof UserFormValues>(key: K, value: UserFormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));

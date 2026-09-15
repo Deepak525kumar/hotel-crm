@@ -372,10 +372,67 @@ for (const command of L0_COMMANDS) {
   }
 }
 
-/** Exact-phrase match only. Returns undefined so the caller escalates to L1. */
+/**
+ * INTENTS: questions whose MEANING is fixed but whose wording is not.
+ *
+ * Added 2026-09-15 for one question, asked by the owner in real use and then
+ * put to the live model: "give me record data previews weeks how much work we
+ * did". In a full conversation the model called the work summary; sent on its
+ * own it answered in prose, twice, across routing runs. A question this
+ * common should not depend on how a model reads a misspelling -- and "how
+ * much work did we do" has exactly one reading and no arguments to extract.
+ *
+ * An exact phrase could not cover it: nobody types the same sentence twice.
+ * So an intent requires SEVERAL signals together, and steps aside rather than
+ * guess:
+ *
+ *   - wording that asks about work done ("how much work", "record data",
+ *     "wie viel ... geschafft");
+ *   - wording about the TEAM ("we", "our", "team", "wir"), so "how much work
+ *     did I do" is left to the self-service tools;
+ *   - and NO date, period or number at all. "last month", "07.09.2026",
+ *     "im August" carry an argument this router cannot parse, so those go to
+ *     the model, which reads dates. Without one, the tool's own default (the
+ *     last two weeks, stated in the answer) is the right reading.
+ *
+ * The orchestrator uses a text match only when the person holds the tool's
+ * permission, so a worker asking this falls through to the model instead of
+ * meeting "You do not have access to that."
+ */
+interface L0Intent {
+  command: L0Command;
+  matches: (normalized: string) => boolean;
+}
+
+const WORK_QUESTION =
+  /\b(how much work|how much did we|how much have we|how many shifts|record data|work data|work record|arbeitsdaten|wie ?viel(e)? (arbeit|haben wir|habt ihr)|was haben wir geschafft)\b/;
+const TEAM_WORDS = /\b(we|our|us|team|everyone|everybody|wir|unser|unsere|alle)\b/;
+const PERIOD_OR_DATE =
+  /\d|\b(today|yesterday|tomorrow|tonight|last|this|next|past|since|until|between|month|months|year|years|january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|heute|gestern|morgen|letzte|letzten|letzter|diese|dieser|diesen|naechste|naechsten|seit|bis|monat|monate|jahr|januar|februar|maerz|mai|juni|juli|oktober|dezember|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b/;
+
+export const L0_INTENTS: readonly L0Intent[] = [
+  {
+    command: {
+      id: 'intent_work_summary',
+      label: 'How much work we did',
+      tool: 'reports.work_summary',
+      // No arguments: the tool's default range is the last two weeks, and it
+      // names the dates in its answer.
+      args: {},
+      phrases: [],
+    },
+    matches: (text) => WORK_QUESTION.test(text) && TEAM_WORDS.test(text) && !PERIOD_OR_DATE.test(text),
+  },
+];
+
+/**
+ * Exact phrase first, then an intent. Returns undefined so the caller
+ * escalates to L1.
+ */
 export function matchL0(text: string): L0Command | undefined {
   if (typeof text !== 'string') return undefined;
-  return BY_PHRASE.get(normalize(text));
+  const normalized = normalize(text);
+  return BY_PHRASE.get(normalized) ?? L0_INTENTS.find((intent) => intent.matches(normalized))?.command;
 }
 
 /** Chip tap / slash command: resolves by id, no text parsing at all. */

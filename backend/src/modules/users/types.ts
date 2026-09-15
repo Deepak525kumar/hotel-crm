@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { SkillTag } from '@prisma/client';
+import { phoneNumber } from '../../lib/phone.js';
 
 // ADR-065 (Universal Onboarding Gate, ratified 2026-08-11): every non-Admin
 // account -- Worker, Checker, Manager, AND Regional Manager -- must get an
@@ -21,7 +22,9 @@ export const CreateUserSchema = z
     password: z.string().min(8),
     first_name: z.string().min(1).max(100),
     last_name: z.string().min(1).max(100),
-    phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number'),
+    // National German format ("0160 ...") is converted to E.164 before the
+    // check -- see lib/phone.ts for the 2026-09-15 report that needed it.
+    phone: phoneNumber,
     role: z.enum(['worker', 'checker', 'manager', 'admin', 'regional_manager']).default('worker'),
     // Onboarding fields removed from schema per request
     // The assignment the creating actor intends for this account: a hotel for
@@ -91,7 +94,7 @@ export const CreateUserSchema = z
 export const UpdateUserSchema = z.object({
   first_name: z.string().min(1).max(100).optional(),
   last_name: z.string().min(1).max(100).optional(),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').nullable().optional(),
+  phone: phoneNumber.nullable().optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -105,7 +108,7 @@ export const UpdateUserProfileSchema = z
   .object({
     first_name: z.string().min(1).max(100).optional(),
     last_name: z.string().min(1).max(100).optional(),
-    phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').nullable().optional(),
+    phone: phoneNumber.nullable().optional(),
     is_active: z.boolean().optional(),
   })
   .strict();

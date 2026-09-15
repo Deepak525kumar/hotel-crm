@@ -173,6 +173,40 @@ export async function getConversation(
   }
 }
 
+/** GET /chatbot/conversations — the caller's own recent conversations (History). */
+export async function listConversations(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const actor = actorFromRequest(req);
+    sendSuccess(res, await chatbotService.listMyConversations(actor), { requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /chatbot/conversations/:id/messages — one of the caller's own
+ * conversations, read back. The person's own data on their own screen; see
+ * memory/transcript.ts for why this does not touch ADR-074 §5.1.
+ */
+export async function getConversationMessages(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const actor = actorFromRequest(req);
+    sendSuccess(res, await chatbotService.getMyTranscript(req.params.id, actor), {
+      requestId: req.requestId,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 /** GET /chatbot/commands — the L0 manifest the client renders as chips. */
 export async function listCommands(
   req: Request,

@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   TextInput,
   View,
@@ -18,7 +19,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BackLink } from '@/components/BackLink';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useChatbotStore, type ChatMessage } from '@/stores/chatbot-store';
+import { conversationAsText, useChatbotStore, type ChatMessage } from '@/stores/chatbot-store';
 
 /**
  * The assistant screen.
@@ -27,13 +28,38 @@ import { useChatbotStore, type ChatMessage } from '@/stores/chatbot-store';
  * state in production (`FEATURE_CHATBOT` is off). A route that resolves to a
  * dead screen is worse than one that does not resolve, and rendering an
  * empty shell would confirm an unreleased feature exists.
+ *
+ * HISTORY, SHARE AND NEW (2026-09-15). "I want previous chats" and "make me
+ * that chat copy" were both refused in real use, because nothing on screen
+ * could do either. Share rather than a clipboard button: these apps carry no
+ * clipboard module, and the system share sheet already offers Copy alongside
+ * WhatsApp and mail, which is where a copied chat goes next anyway.
  */
 export default function AssistantScreen() {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { available, probe, messages, commands, sending, send, runCommand, confirm, cancelConfirmation, retry } =
-    useChatbotStore();
+  const {
+    available,
+    probe,
+    messages,
+    commands,
+    sending,
+    send,
+    runCommand,
+    confirm,
+    cancelConfirmation,
+    retry,
+    view,
+    history,
+    historyLoading,
+    historyFailed,
+    transcript,
+    openHistory,
+    openTranscript,
+    backToChat,
+    newChat,
+  } = useChatbotStore();
   const [draft, setDraft] = useState('');
 
   // What the field held when dictation started. Speech ADDS to it rather
@@ -78,6 +104,30 @@ export default function AssistantScreen() {
     void send(text);
   }, [draft, send]);
 
+  const shareSource = view === 'transcript' ? (transcript?.messages ?? []) : view === 'chat' ? messages : [];
+
+  const share = async () => {
+    if (shareSource.length === 0) return;
+    try {
+      await Share.share({ message: conversationAsText(shareSource) });
+    } catch {
+      // Dismissed or unavailable: nothing was lost, and nothing to report.
+    }
+  };
+
+  // Berlin, like every other time on this platform.
+  const when = (iso: string) => {
+    try {
+      return new Intl.DateTimeFormat(i18n?.language ?? 'en', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Europe/Berlin',
+      }).format(new Date(iso));
+    } catch {
+      return iso;
+    }
+  };
+
   if (available !== true) {
     return (
       <SafeAreaView style={[styles.fill, { backgroundColor: theme.background }]}>
@@ -98,11 +148,74 @@ export default function AssistantScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={styles.header}>
-          <BackLink />
-          <ThemedText type="subtitle">{t('chatbot.title', 'Zelle')}</ThemedText>
+          {view === 'chat' ? (
+            <BackLink />
+          ) : (
+            <HeaderAction label={t('chatbot.historyBack', 'Back to chat')} onPress={backToChat} />
+          )}
+          <ThemedText type="subtitle" style={styles.title}>
+            {t('chatbot.title', 'Zelle')}
+          </ThemedText>
+          <HeaderAction label={t('chatbot.history', 'History')} onPress={() => void openHistory()} />
+          <HeaderAction
+            label={t('chatbot.copy', 'Copy')}
+            disabled={shareSource.length === 0}
+            onPress={() => void share()}
+          />
+          <HeaderAction label={t('chatbot.newChat', 'New chat')} disabled={sending} onPress={newChat} />
         </View>
 
-        {messages.length === 0 ? (
+        {view === 'history' ? (
+          <FlatList
+            data={history ?? []}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            ListHeaderComponent={
+              <View style={styles.historyHeader}>
+                <ThemedText type="subtitle">{t('chatbot.historyTitle', 'Earlier conversations')}</ThemedText>
+                {historyLoading ? <ActivityIndicator color={theme.textSecondary} /> : null}
+                {!historyLoading && historyFailed ? (
+                  <ThemedText style={{ color: theme.textSecondary }}>
+                    {t('chatbot.historyFailed', 'Could not load your conversations.')}
+                  </ThemedText>
+                ) : null}
+                {!historyLoading && !historyFailed && (history ?? []).length === 0 ? (
+                  <ThemedText style={{ color: theme.textSecondary }}>
+                    {t('chatbot.historyEmpty', 'No conversations from the last 30 days.')}
+                  </ThemedText>
+                ) : null}
+              </View>
+            }
+            renderItem={({ item }) => (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void openTranscript(item.id)}
+                style={[styles.historyItem, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+              >
+                <ThemedText style={[styles.historyWhen, { color: theme.textSecondary }]}>
+                  {when(item.started_at)}
+                </ThemedText>
+                <ThemedText numberOfLines={2}>{item.opening ?? '…'}</ThemedText>
+              </Pressable>
+            )}
+          />
+        ) : view === 'transcript' ? (
+          <FlatList
+            data={(transcript?.messages ?? []).map((m, i) => ({ id: `t${i}`, role: m.role, text: m.text }))}
+            keyExtractor={(m) => m.id}
+            contentContainerStyle={styles.list}
+            ListHeaderComponent={
+              historyLoading ? (
+                <ActivityIndicator color={theme.textSecondary} />
+              ) : historyFailed ? (
+                <ThemedText style={{ color: theme.textSecondary }}>
+                  {t('chatbot.historyFailed', 'Could not load your conversations.')}
+                </ThemedText>
+              ) : null
+            }
+            renderItem={({ item }) => <Bubble message={item} />}
+          />
+        ) : messages.length === 0 ? (
           <View style={styles.centre}>
             <ThemedText type="subtitle" style={styles.greeting}>
               {t('chatbot.greeting', 'How can I help?')}
@@ -153,78 +266,104 @@ export default function AssistantScreen() {
           />
         )}
 
-        <View style={[styles.composer, { borderTopColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-          {speech.error ? (
-            <ThemedText style={[styles.micError, { color: theme.textSecondary }]}>
-              {speech.error === 'denied'
-                ? t('chatbot.micDenied', 'Microphone access is off. Turn it on in Settings to dictate.')
-                : t('chatbot.micFailed', 'Dictation did not work. You can type instead.')}
-            </ThemedText>
-          ) : null}
-
-          {/* ONE surface, not a boxed field beside a word-button. The row owns
-              the border; the field and its two round controls sit inside it,
-              which is the shape every assistant on a phone already uses. */}
-          <View style={[styles.inputRow, { borderColor: theme.border, backgroundColor: theme.background }]}>
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={
-                speech.listening
-                  ? t('chatbot.listening', 'Listening…')
-                  : t('chatbot.placeholder', 'Ask about your shifts, contract or messages…')
-              }
-              placeholderTextColor={theme.textSecondary}
-              accessibilityLabel={t('chatbot.inputLabel', 'Message')}
-              multiline
-              style={[styles.input, { color: theme.text }]}
-            />
-
-            {/* Dictation. A microphone glyph rather than an icon component:
-                these apps ship no vector library, and one drawn shape is not
-                worth a native dependency. */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: speech.listening }}
-              accessibilityLabel={
-                speech.listening
-                  ? t('chatbot.stopDictation', 'Stop dictating')
-                  : t('chatbot.dictate', 'Dictate a message')
-              }
-              disabled={sending}
-              onPress={onMicPress}
-              style={[
-                styles.circle,
-                speech.listening
-                  ? { backgroundColor: '#DC2626' }
-                  : { backgroundColor: 'transparent' },
-              ]}
-            >
-              <ThemedText style={[styles.glyph, speech.listening ? styles.glyphOnColor : { color: theme.textSecondary }]}>
-                {speech.listening ? '\u25A0' : '\uD83C\uDFA4'}
+        {view === 'chat' ? (
+          <View style={[styles.composer, { borderTopColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+            {speech.error ? (
+              <ThemedText style={[styles.micError, { color: theme.textSecondary }]}>
+                {speech.error === 'denied'
+                  ? t('chatbot.micDenied', 'Microphone access is off. Turn it on in Settings to dictate.')
+                  : t('chatbot.micFailed', 'Dictation did not work. You can type instead.')}
               </ThemedText>
-            </Pressable>
+            ) : null}
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('chatbot.send', 'Send')}
-              disabled={sending || draft.trim().length === 0}
-              onPress={submit}
-              style={[
-                styles.circle,
-                {
-                  backgroundColor:
-                    draft.trim().length === 0 || sending ? theme.border : theme.primary,
-                },
-              ]}
-            >
-              {/* An upward arrow, the same affordance as the web composer. */}
-              <ThemedText style={[styles.glyph, styles.glyphOnColor]}>{'\u2191'}</ThemedText>
-            </Pressable>
+            {/* ONE surface, not a boxed field beside a word-button. The row owns
+                the border; the field and its two round controls sit inside it,
+                which is the shape every assistant on a phone already uses. */}
+            <View style={[styles.inputRow, { borderColor: theme.border, backgroundColor: theme.background }]}>
+              <TextInput
+                value={draft}
+                onChangeText={setDraft}
+                placeholder={
+                  speech.listening
+                    ? t('chatbot.listening', 'Listening…')
+                    : t('chatbot.placeholder', 'Ask about your shifts, contract or messages…')
+                }
+                placeholderTextColor={theme.textSecondary}
+                accessibilityLabel={t('chatbot.inputLabel', 'Message')}
+                multiline
+                style={[styles.input, { color: theme.text }]}
+              />
+
+              {/* Dictation. A microphone glyph rather than an icon component:
+                  these apps ship no vector library, and one drawn shape is not
+                  worth a native dependency. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: speech.listening }}
+                accessibilityLabel={
+                  speech.listening
+                    ? t('chatbot.stopDictation', 'Stop dictating')
+                    : t('chatbot.dictate', 'Dictate a message')
+                }
+                disabled={sending}
+                onPress={onMicPress}
+                style={[
+                  styles.circle,
+                  speech.listening
+                    ? { backgroundColor: '#DC2626' }
+                    : { backgroundColor: 'transparent' },
+                ]}
+              >
+                <ThemedText style={[styles.glyph, speech.listening ? styles.glyphOnColor : { color: theme.textSecondary }]}>
+                  {speech.listening ? '■' : '🎤'}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('chatbot.send', 'Send')}
+                disabled={sending || draft.trim().length === 0}
+                onPress={submit}
+                style={[
+                  styles.circle,
+                  {
+                    backgroundColor:
+                      draft.trim().length === 0 || sending ? theme.border : theme.primary,
+                  },
+                ]}
+              >
+                {/* An upward arrow, the same affordance as the web composer. */}
+                <ThemedText style={[styles.glyph, styles.glyphOnColor]}>{'↑'}</ThemedText>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/** A small text button in the header. Words, not glyphs: these apps ship no icon set. */
+function HeaderAction({
+  label,
+  onPress,
+  disabled = false,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.headerAction, disabled ? styles.disabled : null]}
+    >
+      <ThemedText style={[styles.headerActionText, { color: theme.primary }]}>{label}</ThemedText>
+    </Pressable>
   );
 }
 
@@ -235,9 +374,9 @@ function Bubble({
   onRetry,
 }: {
   message: ChatMessage;
-  onConfirm: () => void;
-  onCancel: () => void;
-  onRetry: () => void;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+  onRetry?: () => void;
 }) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -266,7 +405,7 @@ function Bubble({
               in gloves, having just watched it fail. The request is still
               held, so this resends it. Absent on a failed confirmation,
               which is not safe to replay -- see the store. */}
-          {message.failed && message.retry ? (
+          {message.failed && message.retry && onRetry ? (
             <Pressable
               accessibilityRole="button"
               onPress={onRetry}
@@ -283,7 +422,7 @@ function Bubble({
             proposed. The summary above comes from the server, rendered from
             the exact arguments the confirmation token authorises, so what a
             person reads is what runs. */}
-        {message.pendingConfirmation ? (
+        {message.pendingConfirmation && onConfirm && onCancel ? (
           message.resolved ? (
             <ThemedText style={[styles.resolved, { color: theme.textSecondary }]}>
               {message.resolved === 'confirmed'
@@ -320,9 +459,22 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Spacing.two,
     padding: Spacing.three,
   },
+  title: { flex: 1 },
+  headerAction: { paddingHorizontal: Spacing.one, paddingVertical: Spacing.one },
+  headerActionText: { fontSize: 13, fontWeight: '600' },
+  disabled: { opacity: 0.4 },
+  historyHeader: { gap: Spacing.two, marginBottom: Spacing.two },
+  historyItem: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    gap: Spacing.one,
+  },
+  historyWhen: { fontSize: 12 },
   greeting: { fontSize: 18, textAlign: 'center' },
   hint: { marginTop: Spacing.two, textAlign: 'center' },
   chips: {

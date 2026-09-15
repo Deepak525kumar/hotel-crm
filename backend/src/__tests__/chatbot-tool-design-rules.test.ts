@@ -164,6 +164,17 @@ describe('rule: least privilege', () => {
       'reports.query_team',
       'reports.export_team',
       'assignments.list_for_my_team',
+      // 2026-09-15 field report.
+      'assignments.cancel_shift',
+      'rooms.record_worker_count',
+      'reports.work_summary',
+      'users.new_account_link',
+      'assignments.swap_worker',
+      'calendar.apply_plan',
+      'rooms.team_today',
+      'calendar.withdraw_worker_absence',
+      'job_requests.list_for_my_team',
+      'job_requests.cancel_request',
     ];
     const worker = actorFor('WORKER');
 

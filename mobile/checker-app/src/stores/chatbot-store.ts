@@ -1,17 +1,25 @@
 import { create } from 'zustand';
 import { api } from '@/lib/api';
-import type { ChatbotCommandDto, ChatbotTurnDto } from '@/types/api';
+import type {
+  ChatbotCommandDto,
+  ChatbotConversationSummaryDto,
+  ChatbotTranscriptDto,
+  ChatbotTurnDto,
+} from '@/types/api';
 
 /**
- * Chat state for the worker app.
+ * Chat state for the app.
  *
- * MESSAGES LIVE HERE AND NOWHERE ELSE. Conversation transcripts are
- * deliberately not persisted server-side (`OD-CHAT-008` is open) and
- * `ADR-074` §5 depends on that: because no history is ever replayed into a
- * prompt, hostile text stored in the platform cannot be read back and
- * obeyed. Writing these bubbles to SecureStore or AsyncStorage would create
- * exactly the transcript store the backend declines to keep, so they last
- * only as long as the screen does. That is the intended behaviour.
+ * THE LIVE CONVERSATION'S BUBBLES LIVE HERE. Earlier conversations are kept
+ * by the server -- encrypted, 30 days, since the 2026-09-08 decision on
+ * `OD-CHAT-008` -- and since 2026-09-15 a person can read their own back
+ * through History. They are still never written to SecureStore or
+ * AsyncStorage: the server already holds them, and a copy on the phone would
+ * outlive the retention window the server enforces.
+ *
+ * `ADR-074` §5.1 is untouched by History. It governs what reaches a PROMPT
+ * (assistant text is never replayed into one); a person reading their own
+ * conversation on their own screen is not a prompt.
  */
 
 export interface ChatMessage {
@@ -32,6 +40,9 @@ export interface ChatMessage {
   retry?: { text?: string; commandId?: string };
 }
 
+/** What the screen is showing: the live chat, the History list, or one past conversation. */
+export type ChatView = 'chat' | 'history' | 'transcript';
+
 let seq = 0;
 const nextId = () => `m${++seq}`;
 
@@ -43,6 +54,12 @@ interface ChatbotState {
   messages: ChatMessage[];
   sending: boolean;
 
+  view: ChatView;
+  history: ChatbotConversationSummaryDto[] | null;
+  historyLoading: boolean;
+  historyFailed: boolean;
+  transcript: ChatbotTranscriptDto | null;
+
   probe: () => Promise<void>;
   send: (text: string) => Promise<void>;
   runCommand: (commandId: string, label: string) => Promise<void>;
@@ -51,6 +68,31 @@ interface ChatbotState {
   /** Resend the request behind a failed message, replacing that message. */
   retry: (messageId: string) => Promise<void>;
   reset: () => void;
+
+  /** Show the person's own conversations from the last 30 days. */
+  openHistory: () => Promise<void>;
+  /** Read one of them back. */
+  openTranscript: (conversationId: string) => Promise<void>;
+  backToChat: () => void;
+  /** Leave the current conversation and start clean on the next message. */
+  newChat: () => void;
+}
+
+/**
+ * A conversation as plain text, for sharing.
+ *
+ * Reported 2026-09-15: asked to "make me that chat copy", the assistant said
+ * copying was not supported -- because nothing on screen could do it. Labelled
+ * lines, so it pastes into a message and still reads as who said what.
+ */
+export function conversationAsText(
+  items: readonly { role: 'user' | 'assistant'; text: string }[],
+  assistantName = 'Zelle',
+): string {
+  return items
+    .filter((m) => m.text.trim().length > 0)
+    .map((m) => `${m.role === 'user' ? 'You' : assistantName}: ${m.text.trim()}`)
+    .join('\n\n');
 }
 
 export const useChatbotStore = create<ChatbotState>((set, get) => ({
@@ -59,6 +101,12 @@ export const useChatbotStore = create<ChatbotState>((set, get) => ({
   commands: [],
   messages: [],
   sending: false,
+
+  view: 'chat',
+  history: null,
+  historyLoading: false,
+  historyFailed: false,
+  transcript: null,
 
   probe: async () => {
     if (get().available !== null) return;
@@ -71,7 +119,8 @@ export const useChatbotStore = create<ChatbotState>((set, get) => ({
     set({ available: commands !== null, commands: commands ?? [] });
   },
 
-  reset: () => set({ conversationId: null, messages: [], sending: false }),
+  reset: () =>
+    set({ conversationId: null, messages: [], sending: false, view: 'chat', transcript: null }),
 
   send: async (text) => {
     const trimmed = text.trim();
@@ -97,11 +146,6 @@ export const useChatbotStore = create<ChatbotState>((set, get) => ({
   },
 
   /**
-   * Decline. Purely local — nothing was written, and the parked call expires
-   * on its own, so there is no cancellation endpoint to call. Inventing one
-   * would imply state that does not exist.
-   */
-  /**
    * Resend what failed, rather than making somebody retype it on a phone.
    *
    * The failed bubble is REMOVED first: two "I could not answer that"
@@ -117,6 +161,11 @@ export const useChatbotStore = create<ChatbotState>((set, get) => ({
     await exchange(set, get, input, null);
   },
 
+  /**
+   * Decline. Purely local — nothing was written, and the parked call expires
+   * on its own, so there is no cancellation endpoint to call. Inventing one
+   * would imply state that does not exist.
+   */
   cancelConfirmation: (messageId) => {
     markResolved(set, messageId, 'cancelled');
     set((s) => ({
@@ -126,6 +175,35 @@ export const useChatbotStore = create<ChatbotState>((set, get) => ({
       ],
     }));
   },
+
+  /**
+   * Fetched each time it is opened: the conversation just had should be at
+   * the top, and a stale list is the "where did my chat go" confusion History
+   * exists to remove. One small request, only when tapped.
+   */
+  openHistory: async () => {
+    set({ view: 'history', historyLoading: true, historyFailed: false, transcript: null });
+    try {
+      const history = await api.chatbot.listConversations();
+      set({ history, historyLoading: false });
+    } catch {
+      set({ history: null, historyLoading: false, historyFailed: true });
+    }
+  },
+
+  openTranscript: async (conversationId) => {
+    set({ view: 'transcript', transcript: null, historyLoading: true, historyFailed: false });
+    try {
+      const transcript = await api.chatbot.getTranscript(conversationId);
+      set({ transcript, historyLoading: false });
+    } catch {
+      set({ historyLoading: false, historyFailed: true });
+    }
+  },
+
+  backToChat: () => set({ view: 'chat', transcript: null, historyFailed: false }),
+
+  newChat: () => set({ conversationId: null, messages: [], view: 'chat', transcript: null }),
 }));
 
 function markResolved(
@@ -147,6 +225,9 @@ async function exchange(
 ) {
   set((s) => ({
     sending: true,
+    // A message sent while reading History belongs to the live conversation.
+    view: 'chat' as const,
+    transcript: null,
     messages: echo
       ? [...s.messages, { id: nextId(), role: 'user' as const, text: echo }]
       : s.messages,

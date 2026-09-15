@@ -348,6 +348,18 @@ export function buildSystemPrompt(
         ]
       : []),
     'For a date not listed above, count from today. Never use another year.',
+    // FACTS, not rules -- see the Zelle note above for why that distinction
+    // is measured rather than stylistic.
+    //
+    // Day-first dates. Asked for "07.09.2026 data" on 2026-09-15; in Germany
+    // that is the 7th of September, and a model trained mostly on US text
+    // reads it as July 9th with nothing downstream able to tell.
+    'Dates written with dots, like 07.09.2026 or 7.9., are day first: 07.09.2026 is 2026-09-07.',
+    // What is on the screen around the conversation. Asked "I want previous
+    // chats" and "make me that chat copy" on 2026-09-15, the model answered
+    // that neither was possible -- because nothing had told it the window has
+    // both.
+    'The chat window has a History button that lists this person\'s conversations from the last 30 days, and a Copy button that copies the current conversation.',
     '',
     'Rules:',
     '- Answer only from what a tool returns. If no tool can answer, say so plainly; never guess a shift, a date, a name or a number.',
@@ -394,8 +406,14 @@ export function buildSystemPrompt(
     // text, and keep the list short: this model gets chattier as the rule
     // list grows.
     '',
+    // NAMES ONLY, since 2026-09-15. Every description used to be written out
+    // here AND sent again in the tool schemas on every model step -- about
+    // 5,000 of a manager's ~12,700 prompt tokens were the same text twice, and
+    // a turn is two or three steps. The schemas are what the model routes on;
+    // this line only says which tools exist. Changed only after a live
+    // `chatbot-routing-check.ts` comparison (CHATBOT_HANDOFF §6a records it).
     tools.length > 0
-      ? `Tools available to this user:\n${tools.map((t) => `- ${t.name}: ${t.description}`).join('\n')}`
+      ? `Tools available to this user (each is described in the tool list): ${tools.map((t) => t.name).join(', ')}.`
       : 'No tools are available to this user, so you can only answer general questions about using the app.',
   ].join('\n');
 }

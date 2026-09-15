@@ -133,6 +133,39 @@ export interface ToolRegistration<A extends SafeArgs = SafeArgs> {
    */
   invoke: (args: A, actor: ActorContext) => Promise<unknown>;
 
+  /**
+   * Optional, and READ-ONLY by contract: may the call do anything at all?
+   *
+   * Runs after the arguments parse and their names resolve, and BEFORE a
+   * confirmation is issued. Returns a refusal (built with `refuse()`) when the
+   * call could only fail, or null to proceed to the confirmation.
+   *
+   * WHY IT EXISTS. `reference-precheck.ts` proves the people and hotels a call
+   * names exist. It cannot prove the THING it acts on exists: "cancel Parveen's
+   * shift on the 16th" names a real worker and a real day, and there may still
+   * be no shift. Without this the manager is asked to confirm, presses
+   * Confirm, sees "✓ Confirmed", and is then told there was nothing to cancel
+   * -- the 2026-09-15 report's worst moment, which was exactly that shape.
+   *
+   * It is not the authorization and not the last word: `invoke` repeats the
+   * same checks at execution, against state that may have changed while the
+   * confirmation sat on screen.
+   */
+  precheck?: (args: A, actor: ActorContext) => Promise<unknown>;
+
+  /**
+   * Optional: this READ's summary is the reply, exactly as written.
+   *
+   * By default a read's result goes back to the model so it can look further
+   * before answering -- and the model then phrases the answer itself. That is
+   * wrong for a result whose exact text matters: the live run of 2026-09-15
+   * lost a pre-filled form link and restated exact counts in the model's own
+   * words. Set this when the person must see the tool's own sentence. (Writes
+   * that execute here always answer with their own summary; this flag is
+   * for reads.)
+   */
+  finalAnswer?: boolean;
+
   /** Mandatory: bounds tokens and strips fields the model has no need for. */
   compress: (raw: unknown) => CompactResult;
   maxResultTokens: number;

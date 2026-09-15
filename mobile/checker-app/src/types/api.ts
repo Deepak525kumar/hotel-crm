@@ -683,6 +683,24 @@ export interface ChatbotConversationDto {
 }
 
 /**
+ * One of the caller's own earlier conversations, for History (2026-09-15).
+ * `opening` is their own first message, shortened -- never an assistant reply.
+ */
+export interface ChatbotConversationSummaryDto {
+  id: string;
+  started_at: string;
+  status: string;
+  opening: string | null;
+  message_count: number;
+}
+
+/** One of the caller's own conversations, both sides, read back. */
+export interface ChatbotTranscriptDto {
+  id: string;
+  messages: { role: 'user' | 'assistant'; text: string; at: string }[];
+}
+
+/**
  * One turn.
  *
  * Field names are camelCase because the API returns its TurnResult object

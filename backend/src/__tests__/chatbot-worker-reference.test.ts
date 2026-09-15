@@ -332,6 +332,39 @@ describe('resolving people the resolver used to be unable to find', () => {
     expect(r.status).toBe('AMBIGUOUS');
   });
 
+  /**
+   * THE MANAGER, production 2026-09-15:
+   *
+   *     Nothing was scheduled. No worker matching "Harvir Singh" is on your team.
+   *     > manger not worker
+   *
+   * Harvir Singh was on the team, as a manager. The rule stays (managers are
+   * not put on the cleaning calendar); the REASON given was false.
+   */
+  it('says a name belongs to a MANAGER instead of "not on your team"', async () => {
+    mockEligible.mockImplementation(async (_hotel: string, roles: string[]) =>
+      roles.includes('MANAGER') ? ['m7'] : ['w1']
+    );
+    mockFindMany.mockImplementation(async ({ where }: any) =>
+      where.id.in.includes('m7')
+        ? [{ id: 'm7', first_name: 'Harvir', last_name: 'Singh', role: 'MANAGER' }]
+        : [worker('w1', 'Anna', 'Braun')]
+    );
+
+    const r = await resolveWorkerReference('Harvir Singh', manager('h1'));
+
+    expect(r).toMatchObject({ status: 'NOT_STAFFABLE', fullName: 'Harvir Singh', role: 'manager' });
+    expect(describeUnresolved(r)).toMatch(/Harvir Singh is a manager, not a worker or checker/);
+    // The manager lookup reads the SAME hotel's roster, never a wider one.
+    expect(mockEligible).toHaveBeenLastCalledWith('h1', ['MANAGER', 'REGIONAL_MANAGER']);
+  });
+
+  it('still says NOT_FOUND when the name is nobody at all', async () => {
+    mockEligible.mockResolvedValue(['w1']);
+    mockFindMany.mockResolvedValue([worker('w1', 'Anna', 'Braun')]);
+    expect(await resolveWorkerReference('Bogdan', manager('h1'))).toEqual({ status: 'NOT_FOUND', query: 'Bogdan' });
+  });
+
   /** Two people with the SAME name are still ambiguous, and told apart by role. */
   it('does not let an exact match hide a real duplicate', async () => {
     mockEligible.mockResolvedValue(['w1', 'c1']);

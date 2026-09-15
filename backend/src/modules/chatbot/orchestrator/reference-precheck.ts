@@ -100,15 +100,80 @@ export async function precheckReferences(
     out['hotel_name'] = hotel.name;
   }
 
-  if (keys.has('worker_name')) {
-    const raw = typeof out['worker_name'] === 'string' ? (out['worker_name'] as string) : '';
+  // `new_worker_name` too (2026-09-15, `assignments.swap_worker`): the person
+  // a shift is being GIVEN to is exactly as capable of not existing as the
+  // person it is taken from, and a confirmation naming a guess is the same
+  // fiction either way.
+  for (const nameKey of ['worker_name', 'new_worker_name']) {
+    if (!keys.has(nameKey)) continue;
+    const raw = typeof out[nameKey] === 'string' ? (out[nameKey] as string) : '';
     if (raw.trim().length > 0) {
       const worker = await resolveWorkerReference(raw, actor, hotelId);
       if (worker.status !== 'RESOLVED') {
         return { status: 'REFUSED', message: describeUnresolved(worker) };
       }
-      out['worker_name'] = worker.fullName;
+      out[nameKey] = worker.fullName;
     }
+  }
+
+  // NAMES INSIDE A LIST, TOO.
+  //
+  // Production, 2026-09-15. A manager asked to schedule Harvir Singh on the
+  // 15th, 16th and 17th. `assignments.place_many` carries its names inside
+  // `placements[]`, and this precheck only ever looked at a top-level
+  // `worker_name` -- so the batch sailed through to the confirmation screen,
+  // the manager pressed Confirm, the UI showed "✓ Confirmed", and only then
+  // did the tool say:
+  //
+  //     Nothing was scheduled. No worker matching "Harvir Singh" is on your
+  //     team. No worker matching "Harvir Singh" is on your team. No worker
+  //     matching "Harvir Singh" is on your team.
+  //
+  // Exactly the "approving a fiction" defect this file was written to close,
+  // reintroduced by the one tool whose schema nests its references. The rule
+  // is unchanged: a confirmation states what will actually happen.
+  //
+  // Each distinct name is resolved once, and each distinct refusal is said
+  // once -- three identical sentences about one person read as three
+  // problems.
+  //
+  // EVERY list of people, not only `placements` (2026-09-15,
+  // `calendar.apply_plan` carries `absences[]` beside it). A list-shaped
+  // argument whose entries carry a `worker_name` is resolved the same way,
+  // so the next tool that nests names does not reopen this defect.
+  const seen = new Map<string, Awaited<ReturnType<typeof resolveWorkerReference>>>();
+  const refusals = new Set<string>();
+  for (const listKey of keys) {
+    if (!Array.isArray(out[listKey])) continue;
+    const rewritten: unknown[] = [];
+
+    for (const entry of out[listKey] as unknown[]) {
+      if (!entry || typeof entry !== 'object') {
+        rewritten.push(entry);
+        continue;
+      }
+      const row = { ...(entry as Record<string, unknown>) };
+      const raw = typeof row['worker_name'] === 'string' ? (row['worker_name'] as string) : '';
+      if (raw.trim().length > 0) {
+        const cacheKey = raw.trim().toLowerCase();
+        let worker = seen.get(cacheKey);
+        if (!worker) {
+          worker = await resolveWorkerReference(raw, actor, hotelId);
+          seen.set(cacheKey, worker);
+        }
+        if (worker.status === 'RESOLVED') {
+          row['worker_name'] = worker.fullName;
+        } else {
+          refusals.add(describeUnresolved(worker));
+        }
+      }
+      rewritten.push(row);
+    }
+    out[listKey] = rewritten;
+  }
+
+  if (refusals.size > 0) {
+    return { status: 'REFUSED', message: [...refusals].join(' ') };
   }
 
   return { status: 'RESOLVED', args: out };
