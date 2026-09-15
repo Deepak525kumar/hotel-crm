@@ -177,6 +177,14 @@ of "not on your team"), and accounts are still created on the New user form beca
 photo is mandatory (the tool pre-fills that form). The owner also raised the default
 `CHATBOT_USER_DAILY_TOKEN_CAP` from 250,000 to 1,000,000.
 
+**Same day, sixth decision — the rota tools.** On the follow-up instruction "build the tools that
+you think should and build the tools worth": `assignments.swap_worker` (HIGH_RISK_WRITE,
+`staffing:write` — the token `POST /assignments/:id/reassign` enforces) and `calendar.apply_plan`
+(HIGH_RISK_WRITE, `staffing:write` AND `calendar:absence:write-team`, both already held by admin,
+manager and regional manager). Recorded as `APPROVED_2026_09_15_ROTA`. Again no role gained a
+permission. `attendance.correct_times` kept its scope; only its description now names today as
+well as past days, which is what the tool already did.
+
 A new registry seam, `ToolRegistration.precheck`, lets a write prove its target exists before a
 confirmation is issued. It is read-only by contract and is not an authorization layer: `invoke`
 repeats every check at execution.

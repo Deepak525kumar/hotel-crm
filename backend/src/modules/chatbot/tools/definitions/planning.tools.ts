@@ -797,10 +797,11 @@ type CorrectTimesArgs = z.infer<typeof CorrectTimesArgs>;
 export const correctTimes = registerTool<CorrectTimesArgs>({
   name: 'attendance.correct_times',
   description:
-    "Correct the clock-in or clock-out time on one of the manager's OWN workers' " +
-    'timesheets for a past day. Use when you are told a time was missed or is wrong: ' +
+    "Correct or fill in the clock-in or clock-out time on one of the manager's OWN workers' " +
+    'timesheets, for today or a past day. Use when you are told a time was missed or is wrong: ' +
     '"Anna forgot to clock out yesterday, she left at 16:30", "Tomasz actually ' +
-    'started at 07:00 on Monday", "korrigiere Annas Stempelzeit". Give the worker\'s ' +
+    'started at 07:00 on Monday", "Parveen\'s phone died, she started at 07:00 today", ' +
+    '"korrigiere Annas Stempelzeit". Give the worker\'s ' +
     'name, the day as YYYY-MM-DD, the times as HH:MM, and a short reason. Returns ' +
     'the corrected times and the hours they now add up to.\n\n' +
     'ALWAYS ask for the actual time and the reason if you were not given them -- ' +

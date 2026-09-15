@@ -126,6 +126,8 @@ const ARG_LABELS: Record<string, string> = {
   count: 'Count',
   rooms: 'Rooms',
   placements: 'Shifts',
+  absences: 'Away',
+  new_worker_name: 'Give it to',
   worker: 'Worker',
 };
 
@@ -159,7 +161,26 @@ const TOOL_ACTIONS: Record<string, string> = {
   'assignments.cancel_shift': 'Cancel a shift',
   'assignments.move_shift': 'Move a shift to another day',
   'rooms.record_worker_count': "Record a worker's rooms cleaned",
+  'assignments.swap_worker': 'Give a shift to someone else',
+  'calendar.apply_plan': 'Apply this plan to the calendar',
 };
+
+/**
+ * One list entry, as a person reads it: "Anna Braun, 2026-09-21, sick".
+ *
+ * A plan used to be shown as raw JSON -- `[{"worker_name":"Anna Braun",...}]`
+ * -- on the one screen whose entire purpose is to be checked by a manager on a
+ * phone. Every VALUE is still shown; only the braces and internal keys go.
+ */
+function describeListEntry(entry: unknown): string {
+  if (!entry || typeof entry !== 'object') return String(entry);
+  return Object.values(entry as Record<string, unknown>)
+    .filter((v) => v !== undefined && v !== null && v !== '')
+    .map((v) => (typeof v === 'string' ? v : JSON.stringify(v)))
+    // Enum values read as words: "sick", not "SICK".
+    .map((v) => (/^(SICK|VACATION)$/.test(v) ? v.toLowerCase() : v))
+    .join(', ');
+}
 
 /**
  * A write the model understood but could not fully fill in.
@@ -222,6 +243,9 @@ export function renderConfirmationRequest(toolName: string, args: unknown): stri
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => {
       const label = ARG_LABELS[key] ?? key.replace(/_/g, ' ');
+      if (Array.isArray(value)) {
+        return [`  ${label}:`, ...value.map((entry) => `    - ${describeListEntry(entry)}`)].join('\n');
+      }
       const shown = typeof value === 'string' ? value : JSON.stringify(value);
       return `  ${label}: ${shown}`;
     });

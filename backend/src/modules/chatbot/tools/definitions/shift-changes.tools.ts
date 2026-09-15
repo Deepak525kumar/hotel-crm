@@ -13,7 +13,7 @@ import { toServiceActor } from '../actor.js';
 import type { ActorContext } from '../actor.js';
 import { registerTool, type CompactResult } from '../registry.js';
 import { asRefusal, refuse } from '../tool-errors.js';
-import { APPROVED_2026_09_15_FIELD_REPORT } from '../approvals.js';
+import { APPROVED_2026_09_15_FIELD_REPORT, APPROVED_2026_09_15_ROTA } from '../approvals.js';
 import { todayIso } from './daily-operations.tools.js';
 
 /**
@@ -374,6 +374,118 @@ export const recordWorkerRooms = registerTool<RecordRoomsArgs>({
     return {
       summary: `Recorded ${r.rooms} room${r.rooms === 1 ? '' : 's'} for ${r.worker} on ${r.day}${was}.`,
       data: { worker: r.worker, day: r.day, rooms: r.rooms, previous: r.previous ?? null },
+    };
+  },
+  maxResultTokens: 100,
+});
+
+/* ------------------------------------------------------------------ *
+ * assignments.swap_worker
+ * ------------------------------------------------------------------ */
+
+/**
+ * GIVING A SHIFT TO SOMEONE ELSE -- "Parveen can't come Thursday, give it to
+ * Anna".
+ *
+ * The honest path for that sentence used to be two confirmed calls, cancel
+ * then place, and the gap between them is exactly the failure the service's
+ * `reassign()` was written to remove (2026-08-05): cancel succeeds, the place
+ * fails -- the new worker already booked, or on a sick day -- and the shift is
+ * left with nobody on it while the manager believes it was handed over.
+ * `reassign()` does both halves in one transaction and re-checks the new
+ * worker's eligibility, free day and absences itself.
+ *
+ * BOTH NAMES are resolved in the caller's own scope, and the confirmation
+ * precheck resolves `new_worker_name` as well as `worker_name`, so a manager
+ * never approves handing a shift to a guess.
+ */
+const SwapWorkerArgs = z
+  .object({
+    worker_name: z.string().trim().min(2).max(80),
+    new_worker_name: z.string().trim().min(2).max(80),
+    day: isoDate,
+    hotel_name: z.string().trim().min(2).max(120).optional(),
+  })
+  .strict();
+
+type SwapWorkerArgs = z.infer<typeof SwapWorkerArgs>;
+
+async function prepareSwap(args: SwapWorkerArgs, actor: ActorContext) {
+  const shift = await findShift(args, actor);
+  if (isRefusal(shift)) return shift;
+
+  if (shift.status !== AssignmentStatus.CONFIRMED && shift.status !== AssignmentStatus.IN_PROGRESS) {
+    return refuse('ALREADY_DONE', `${shift.worker}'s shift on ${shift.day} is no longer live, so there is nothing to hand over.`);
+  }
+
+  const replacement = await resolveWorkerReference(args.new_worker_name, actor, (await hotelIdOf(args, actor))!);
+  if (replacement.status !== 'RESOLVED') return refuseUnresolved(replacement);
+  if (replacement.fullName === shift.worker) {
+    return refuse('ALREADY_DONE', `The shift on ${shift.day} is already ${shift.worker}'s.`);
+  }
+  return { shift, replacement };
+}
+
+/** The hotel id the shift lookup used, resolved the same way (a cache hit in practice). */
+async function hotelIdOf(args: { hotel_name?: string }, actor: ActorContext): Promise<string | null> {
+  const hotel = await resolveHotelReference(args.hotel_name, actor);
+  return hotel.status === 'RESOLVED' ? hotel.hotelId : null;
+}
+
+export const swapWorker = registerTool<SwapWorkerArgs>({
+  name: 'assignments.swap_worker',
+  description:
+    "Gives one of the manager's OWN workers' shifts on a day to a different worker, in one " +
+    'step, so the shift is never left empty. Use when a shift should go to someone else: ' +
+    '"Parveen can\'t come Thursday, give it to Anna", "swap Tomasz for Maria on 2026-09-21", ' +
+    '"Anna übernimmt Tomaszs Schicht am Freitag". Give the current worker\'s name, the new ' +
+    "worker's name, and the day as YYYY-MM-DD. Returns who had it, who has it now, and the day. " +
+    'To only remove someone use assignments.cancel_shift; to change the day use ' +
+    'assignments.move_shift.',
+  tier: 'HIGH_RISK_WRITE',
+  confirm: true,
+
+  interfaceRef: 'IF-ASG-Reassign (assignments/service.ts reassign()) + IF-ASG-ListAssignments',
+  approvalRef:
+    APPROVED_2026_09_15_ROTA +
+    " Registration note: atomic reassign of one in-scope live shift to another in-scope worker; the service re-checks eligibility, free day and absences.",
+
+  args: SwapWorkerArgs,
+  // The token POST /assignments/:id/reassign itself enforces.
+  permission: 'staffing:write',
+  scopeCheck: 'none',
+
+  precheck: async (args, actor) => {
+    const prepared = await prepareSwap(args, actor);
+    return 'refused' in prepared ? prepared : null;
+  },
+
+  invoke: async (args, actor) => {
+    const prepared = await prepareSwap(args, actor);
+    if ('refused' in prepared) return prepared;
+
+    await assignmentService.reassign(
+      prepared.shift.assignmentId,
+      { worker_id: prepared.replacement.workerId },
+      toServiceActor(actor)
+    );
+
+    return {
+      from: prepared.shift.worker,
+      to: prepared.replacement.fullName,
+      day: prepared.shift.day,
+      hotel: prepared.shift.hotel,
+    };
+  },
+
+  compress: (raw: unknown): CompactResult => {
+    const refusal = asRefusal(raw);
+    if (refusal) return { summary: refusal.message, data: { refusal_code: refusal.code } };
+    const r = raw as { from?: string; to?: string; day?: string; hotel?: string } | null;
+    if (!r) return { summary: 'Nothing was changed.', data: null };
+    return {
+      summary: `${r.to} now has the shift at ${r.hotel} on ${r.day}, instead of ${r.from}.`,
+      data: { from: r.from, to: r.to, day: r.day },
     };
   },
   maxResultTokens: 100,

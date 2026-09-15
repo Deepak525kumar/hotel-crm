@@ -194,6 +194,17 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['manager', 'parveen didi today 10 rooms', 'S13 room count', picks('rooms.record_worker_count')],
   ['manager', 'make me plans. for parveen 17 18 19 September', 'S10 availability or placement',
     (t) => t === 'calendar.check_availability' || t === 'assignments.place_many'],
+
+  // Added 2026-09-15 with the rota tools. The risk is the family, not each
+  // tool: swap vs move vs cancel, and a mixed plan vs place_many.
+  ['manager', "Parveen can't come Thursday, give it to Anna", 'swap_worker', picks('assignments.swap_worker')],
+  ['manager', 'Anna übernimmt Tomaszs Schicht am Freitag', 'swap_worker (de)', picks('assignments.swap_worker')],
+  ['manager', 'Anna is off sick Monday, put Tomasz on Monday and Tuesday', 'apply_plan (mixed)',
+    picks('calendar.apply_plan')],
+  ['manager', 'put Anna on Monday and Tuesday and Tomasz on Wednesday', 'place_many stays place_many',
+    picks('assignments.place_many')],
+  ['manager', "Parveen's phone died, she started at 07:00 today", 'correct_times (today)',
+    picks('attendance.correct_times')],
   ['manager', 'list my checkers', 'find_team_member (role)', picks('users.find_team_member')],
   ['manager', 'I need 3 cleaners on 2026-09-17 from 08:00 to 16:00', 'create_broadcast', picks('job_requests.create_broadcast')],
   ['manager', 'ich brauche zwei Reinigungskraefte am 2026-09-17 von 08:00 bis 16:00', 'create_broadcast (de)', picks('job_requests.create_broadcast')],

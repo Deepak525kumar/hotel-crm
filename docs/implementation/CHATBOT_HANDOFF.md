@@ -251,6 +251,15 @@ most likely source of "the count is 0". `reports.work_summary` reads the team's 
 **`role` cannot be an argument, even when it is the NEW account's role.** `SafeArgs` rejected it at
 compile time; the argument is `staff_type`. The guard is right not to tell the two apart.
 
+**The reference precheck now resolves every list of people, and `new_worker_name`.** Written first
+for `placements[]` alone, it would have reopened the same defect for `calendar.apply_plan`'s
+`absences[]`. Any array argument whose entries carry `worker_name` is resolved; a new
+person-naming top-level key must be added to the list in `reference-precheck.ts`.
+
+**A plan applies absences before shifts.** Marking someone sick auto-cancels their shift that day,
+which is what lets "Anna sick Monday, Tomasz on Monday" succeed in one confirmed call. Reversing
+the order fails on the one-active-assignment-per-day rule.
+
 **History does not weaken ADR-074 §5.1.** That control governs what reaches a prompt. A person
 reading their own transcript on their own screen is not a prompt; the one part a tool passes back
 to the model is the person's own opening message.

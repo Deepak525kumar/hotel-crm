@@ -43,3 +43,26 @@ Final data-layer run: **10/10 checks passed.** Automated gates: backend tsc clea
 
 - `scenarios/21-zelle-field-conversations.md` — created (13 verbatim conversations, pass criteria, history table).
 - `README.md` — index row 21.
+
+## Addendum (same day) — the rota tools, and the gaps closed
+
+Built on the owner's follow-up instruction ("build the tools worth"), and verified the same way:
+prerequisites seeded, then the real confirmation path (parse → reference precheck → tool
+precheck → executor, confirmed) against PostgreSQL, rows read back. **5/5 passed.**
+
+| Check | Result | Evidence |
+|---|---|---|
+| `assignments.swap_worker` hands a live shift over | PASS | Confirmation lists both canonical names; old assignment `REASSIGNED`, new one `CONFIRMED` with `previous_assignment_id` pointing at it — one atomic service call |
+| swap with no shift that day | PASS | Refused at the tool precheck, before any confirmation |
+| `calendar.apply_plan` "Anna sick Monday, Tomasz Monday and Tuesday" | PASS | Anna's existing Monday shift `CANCELLED` by the sick day, `CalendarAbsence` row written, Tomasz has 2 `CONFIRMED` shifts. Confirmation lists entries as lines, not JSON |
+| plan with an unknown name in `absences[]` | PASS | Refused at the reference precheck; **nothing** written for the other entries |
+| worker calls `apply_plan` | PASS | Executor DENIED |
+
+Also closed from "Could not test" above:
+
+- **S04 full `POST /users` path** — PASS. `CreateUserSchema` then `userService.createUser` with a
+  photo (stub storage, `RESEND_API_KEY` blanked; the welcome email only reaches the outbox, which
+  nothing drained): `User.phone = +4916090744182`, `profile_photo_key` set, `EmploymentRecord`
+  PENDING with skills `[CLEANER]`.
+
+Still open: live-model routing (AWS session expired) and the production `.env` caps.

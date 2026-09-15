@@ -23,6 +23,7 @@ import './tools/definitions/shift-changes.tools.js';
 import './tools/definitions/accounts.tools.js';
 import './tools/definitions/conversation-history.tools.js';
 import './tools/definitions/work-summary.tools.js';
+import './tools/definitions/plan.tools.js';
 
 /**
  * SPEC-CHATBOT-001 (ADR-013) — backend-chatbot's service.

@@ -27,6 +27,29 @@ describe('startOfBerlinDay', () => {
   });
 });
 
+describe('a confirmation lists a plan as lines, not JSON', () => {
+  it('shows every value of every entry, without braces or internal keys', async () => {
+    const { renderConfirmationRequest } = await import('../modules/chatbot/orchestrator/templates.js');
+    const text = renderConfirmationRequest('calendar.apply_plan', {
+      hotel_name: 'Hotel Adler',
+      absences: [{ worker_name: 'Anna Braun', day: '2026-09-21', kind: 'SICK' }],
+      placements: [{ worker_name: 'Tomasz Nowak', day: '2026-09-21' }],
+    });
+    expect(text).toBe(
+      [
+        'Apply this plan to the calendar:',
+        '  Hotel: Hotel Adler',
+        '  Away:',
+        '    - Anna Braun, 2026-09-21, sick',
+        '  Shifts:',
+        '    - Tomasz Nowak, 2026-09-21',
+        '',
+        'Nothing has been changed yet. Confirm to go ahead, or cancel.',
+      ].join('\n')
+    );
+  });
+});
+
 describe('the messages a capped or incomplete turn produces', () => {
   it('never exposes the cap\'s value', () => {
     expect(renderBudgetFallback('daily-user-cap-exhausted')).not.toMatch(/\d/);

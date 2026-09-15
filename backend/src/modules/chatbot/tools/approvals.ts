@@ -132,6 +132,27 @@ export const APPROVED_2026_09_15_FIELD_REPORT =
   'registered on that date, using only permissions its roles already held; a ' +
   'later change to scope, risk tier or permission requires re-approval.';
 
+/**
+ * THE ROTA TOOLS, approved 2026-09-15 on a second direct instruction in the
+ * same session: "build the tools that you think should and build the tools
+ * worth", given after the field-report tools were delivered and a shortlist
+ * of next tools was put to the commissioning human.
+ *
+ * WHAT IT COVERS. Giving an existing shift to a different in-scope worker
+ * (the service's atomic reassign), and applying a dictated plan -- placements
+ * and sick/vacation days together -- in one confirmed call. Both are things a
+ * manager already does by hand through routes that enforce the same tokens.
+ *
+ * NO ROLE GAINED A PERMISSION: `staffing:write` and
+ * `calendar:absence:write-team` are both held by admin, manager and regional
+ * manager and by no worker or checker, as they were before this date.
+ */
+export const APPROVED_2026_09_15_ROTA =
+  'APPROVED 2026-09-15 by the commissioning human under ADR-053 item 4, as the rota ' +
+  'batch (swap a shift, apply a dictated plan). Covers this tool as registered on that ' +
+  'date, using only permissions its roles already held; a later change to scope, risk ' +
+  'tier or permission requires re-approval.';
+
 export const APPROVED_2026_09_12_SHIFT_SUMMARY =
   'APPROVED 2026-09-12 by the commissioning human under ADR-053 item 4, on the ' +
   'transcripts showing both an admin and a manager refused when asked to record ' +

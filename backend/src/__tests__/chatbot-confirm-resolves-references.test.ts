@@ -283,6 +283,16 @@ describe('a confirmation is never issued when a name INSIDE a list cannot run', 
     expect(mockResolveWorker).toHaveBeenCalledTimes(1);
   });
 
+  it('refuses a name nested in ANY list, not only placements', async () => {
+    mockResolveWorker.mockImplementation(async (q: string) =>
+      q === 'Bogdan' ? { status: 'NOT_FOUND', query: q } : { status: 'RESOLVED', workerId: 'w1', fullName: 'Anna Braun' }
+    );
+    // Same fixture schema shape as calendar.apply_plan's second list.
+    const result = await askBatch({ ...HARVIR, placements: [{ worker_name: 'Bogdan', day: '2026-09-21' }] });
+    expect(result.pendingConfirmation).toBeUndefined();
+    expect(result.reply).toMatch(/Bogdan/);
+  });
+
   it('rewrites every nested name to its canonical form when they all resolve', async () => {
     await askBatch(HARVIR);
 

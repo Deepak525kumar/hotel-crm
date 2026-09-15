@@ -169,6 +169,8 @@ describe('rule: least privilege', () => {
       'rooms.record_worker_count',
       'reports.work_summary',
       'users.new_account_link',
+      'assignments.swap_worker',
+      'calendar.apply_plan',
     ];
     const worker = actorFor('WORKER');
 

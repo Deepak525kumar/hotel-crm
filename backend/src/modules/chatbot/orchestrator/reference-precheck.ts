@@ -100,14 +100,19 @@ export async function precheckReferences(
     out['hotel_name'] = hotel.name;
   }
 
-  if (keys.has('worker_name')) {
-    const raw = typeof out['worker_name'] === 'string' ? (out['worker_name'] as string) : '';
+  // `new_worker_name` too (2026-09-15, `assignments.swap_worker`): the person
+  // a shift is being GIVEN to is exactly as capable of not existing as the
+  // person it is taken from, and a confirmation naming a guess is the same
+  // fiction either way.
+  for (const nameKey of ['worker_name', 'new_worker_name']) {
+    if (!keys.has(nameKey)) continue;
+    const raw = typeof out[nameKey] === 'string' ? (out[nameKey] as string) : '';
     if (raw.trim().length > 0) {
       const worker = await resolveWorkerReference(raw, actor, hotelId);
       if (worker.status !== 'RESOLVED') {
         return { status: 'REFUSED', message: describeUnresolved(worker) };
       }
-      out['worker_name'] = worker.fullName;
+      out[nameKey] = worker.fullName;
     }
   }
 
@@ -131,12 +136,18 @@ export async function precheckReferences(
   // Each distinct name is resolved once, and each distinct refusal is said
   // once -- three identical sentences about one person read as three
   // problems.
-  if (keys.has('placements') && Array.isArray(out['placements'])) {
-    const seen = new Map<string, Awaited<ReturnType<typeof resolveWorkerReference>>>();
-    const refusals = new Set<string>();
+  //
+  // EVERY list of people, not only `placements` (2026-09-15,
+  // `calendar.apply_plan` carries `absences[]` beside it). A list-shaped
+  // argument whose entries carry a `worker_name` is resolved the same way,
+  // so the next tool that nests names does not reopen this defect.
+  const seen = new Map<string, Awaited<ReturnType<typeof resolveWorkerReference>>>();
+  const refusals = new Set<string>();
+  for (const listKey of keys) {
+    if (!Array.isArray(out[listKey])) continue;
     const rewritten: unknown[] = [];
 
-    for (const entry of out['placements'] as unknown[]) {
+    for (const entry of out[listKey] as unknown[]) {
       if (!entry || typeof entry !== 'object') {
         rewritten.push(entry);
         continue;
@@ -158,11 +169,11 @@ export async function precheckReferences(
       }
       rewritten.push(row);
     }
+    out[listKey] = rewritten;
+  }
 
-    if (refusals.size > 0) {
-      return { status: 'REFUSED', message: [...refusals].join(' ') };
-    }
-    out['placements'] = rewritten;
+  if (refusals.size > 0) {
+    return { status: 'REFUSED', message: [...refusals].join(' ') };
   }
 
   return { status: 'RESOLVED', args: out };

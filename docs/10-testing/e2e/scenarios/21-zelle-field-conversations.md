@@ -56,6 +56,14 @@ For every write: **read the row back.** A "Scheduled"/"Cancelled"/"Recorded" rep
 - **S11–S13 budget.** Measured 2026-09-15: ~12,700 prompt tokens per model step for a manager
   (37 tool schemas), 2–3 steps per turn, against a 250,000 daily cap — about seven messages a day.
 
+## Follow-on tools (same day)
+
+| Type exactly | Expected tool | Pass criteria |
+|---|---|---|
+| `Parveen can't come Thursday, give it to Anna` | `assignments.swap_worker` | Confirmation names both people; old assignment `REASSIGNED`, new `CONFIRMED` linked by `previous_assignment_id` |
+| `Anna is off sick Monday, put Tomasz on Monday and Tuesday` | `calendar.apply_plan` | One confirmation listing both; Anna's Monday shift `CANCELLED`, absence row written, Tomasz 2 shifts. Any unknown name → nothing written |
+| `Parveen's phone died, she started at 07:00 today` | `attendance.correct_times` | Check-in on today's attendance row is 07:00 Berlin; reason stored in notes |
+
 ## Knowingly untested here
 
 - Live-model routing of every phrase above (needs AWS credentials; run
@@ -73,3 +81,5 @@ For every write: **read the row back.** A "Scheduled"/"Cancelled"/"Recorded" rep
 | 2026-09-15 | German national phone format refused, form showed no field | `lib/phone.ts`, `users/new/page.tsx` |
 | 2026-09-15 | Daily cap ~7 manager messages; day boundary in UTC | `env.ts` 1M cap, `startOfBerlinDay` |
 | 2026-09-15 | "Previous chats"/"copy" refused — no surface existed | History routes + tool, Copy/Share |
+| 2026-09-15 | Work summary double-counted rooms across consecutive days (16 for 8) | `work-summary.tools.ts` counts by room day |
+| 2026-09-15 | Day summary flagged "90 rooms, 10 stay-over" as a discrepancy | `shift-summary.tools.ts` `mismatchNote` |
