@@ -61,6 +61,7 @@ const ONLY = new Set((process.env.ONLY ?? '').split(',').map((s) => s.trim()).fi
 type Turn = {
   reply: string;
   status: string;
+  route?: string;
   toolInvoked?: string;
   pendingConfirmation?: { token: string; summary: string; toolName: string };
 };
@@ -83,7 +84,7 @@ async function main() {
   await installConfiguredProvider();
   const app = createApp();
   assertAllToolsApproved();
-  const server = app.listen(0);
+  const server = app.listen(Number(process.env.E2E_PORT ?? 0));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
   const prisma = getPrisma();
   const tag = `e2e${Date.now().toString(36)}`;
@@ -163,6 +164,21 @@ async function main() {
 
   const managerToken = await login(maria.email);
   const workerToken = await login(parveen.email);
+
+  // SERVE_FOR_BROWSER=<file>: seed, grant today's consent through the real
+  // route, write the manager's credentials to <file>, and keep this real
+  // backend listening for the web app's /api proxy (run with E2E_PORT=3001).
+  // The Playwright spec frontend/e2e/zelle-live.spec.ts drives a real browser
+  // against it. No scenario runs here in that mode.
+  if (process.env.SERVE_FOR_BROWSER) {
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(
+      process.env.SERVE_FOR_BROWSER,
+      JSON.stringify({ email: maria.email, password: PASSWORD, hotel: hotel.name, tag })
+    );
+    console.log(`SERVING on ${base} for the browser spec; credentials in ${process.env.SERVE_FOR_BROWSER}`);
+    await new Promise(() => undefined);
+  }
 
   class Chat {
     id = '';
@@ -278,9 +294,17 @@ async function main() {
   await scenario('S09', async () => {
     const t1 = await c3.say('give me record data previews weeks how much work we did');
     const t2 = await c3.say('07.09.2026 data');
+    // The owner's sentence is answered by the L0 work-summary INTENT: no model
+    // call, no dependence on how a model reads "previews weeks". The date
+    // follow-up still goes to the model, which reads dates.
     return {
-      pass: /shifts?|no work recorded/i.test(t1.reply) && /2026-09-07/.test(t2.reply) && !never.test(t1.reply + t2.reply),
-      detail: `t1=${t1.toolInvoked} "${short(t1.reply)}" | t2=${t2.toolInvoked} "${short(t2.reply)}"`,
+      pass:
+        t1.route === 'L0' &&
+        t1.toolInvoked === 'reports.work_summary' &&
+        /shifts?|no work recorded/i.test(t1.reply) &&
+        /2026-09-07/.test(t2.reply) &&
+        !never.test(t1.reply + t2.reply),
+      detail: `t1=${t1.route}/${t1.toolInvoked} "${short(t1.reply)}" | t2=${t2.route}/${t2.toolInvoked} "${short(t2.reply)}"`,
     };
   });
 
@@ -300,7 +324,13 @@ async function main() {
     const before = await prisma.workerAssignment.count({ where: { worker_id: parveen.id } });
     const t = await c3.say('add that another dates also');
     const after = await prisma.workerAssignment.count({ where: { worker_id: parveen.id } });
-    return { pass: before === after && !never.test(t.reply), detail: `reply="${short(t.reply)}" rows ${before}->${after}` };
+    // No confirmation either. Run 5 "passed" this step while Zelle offered to
+    // re-schedule the three shifts it had just scheduled -- nothing was
+    // written only because nobody pressed Confirm.
+    return {
+      pass: before === after && !t.pendingConfirmation && !never.test(t.reply),
+      detail: `confirmation=${t.pendingConfirmation?.toolName ?? 'none'} reply="${short(t.reply)}" rows ${before}->${after}`,
+    };
   });
 
   await scenario('S13', async () => {
@@ -401,6 +431,70 @@ async function main() {
   await scenario('E6-worker-boundary', async () => {
     const t = await w1.say('cancel the shift for Anna Braun tomorrow');
     return { pass: !t.pendingConfirmation, detail: `confirmation=${Boolean(t.pendingConfirmation)} reply="${short(t.reply)}"` };
+  });
+
+  await scenario('E7-language', async () => {
+    // Last for the worker, deliberately: it changes the language every later
+    // reply to this person is written in.
+    const t = await w1.confirm(await w1.say('switch the app to German please'));
+    const row = await prisma.user.findUnique({ where: { id: parveen.id }, select: { preferred_language: true } });
+    return { pass: row?.preferred_language === 'de', detail: `reply="${short(t.reply)}" db=${row?.preferred_language}` };
+  });
+
+  // ===========================================================================
+  // Regional manager and admin -- the roles with no single hotel.
+  // ===========================================================================
+  const adler = await prisma.hotel.create({
+    data: { name: `Hotel Adler ${tag}`, city: 'Essen', address: 'Rüttenscheider Str. 2', hotel_group_id: group.id },
+  });
+  const rita = await prisma.user.create({
+    data: { email: `rita.regional.${tag}@example.test`, password_hash: hash, first_name: 'Rita', last_name: `Regional${tag}`, role: 'REGIONAL_MANAGER' as never, email_verified_at: new Date() } as never,
+  });
+  await prisma.employmentRecord.create({
+    data: { user_id: rita.id, employee_id: `${tag}-rm`, job_title: 'Regional Manager', start_date: new Date('2026-01-01'), employment_type: 'FULL_TIME', status: 'ACTIVE', hotel_group_id: group.id } as never,
+  });
+  await prisma.hotelGroup.update({ where: { id: group.id }, data: { regional_manager_user_id: rita.id, regional_manager_assigned_at: new Date() } });
+  const admin = await prisma.user.create({
+    data: { email: `ada.admin.${tag}@example.test`, password_hash: hash, first_name: 'Ada', last_name: `Admin${tag}`, role: 'ADMIN' as never, email_verified_at: new Date() } as never,
+  });
+
+  const rmToken = await login(rita.email);
+  const rmChat = await new Chat(rmToken).open();
+  const adminChat = await new Chat(await login(admin.email)).open();
+
+  await scenario('RM1-names-the-hotel', async () => {
+    // Two hotels in Rita's group: the placement must land at the one she NAMES.
+    const day = plus(12);
+    const t = await rmChat.confirm(await rmChat.say(`put Tomasz Nowak on ${words(day)} at Hotel Adler ${tag}`));
+    const row = await prisma.workerAssignment.findFirst({ where: { worker_id: tomasz.id, day: new Date(day) }, select: { hotel_id: true, status: true } });
+    return { pass: row?.hotel_id === adler.id && row?.status === 'CONFIRMED', detail: `reply="${short(t.reply)}" db=${row?.status}@${row?.hotel_id === adler.id ? 'Adler' : row?.hotel_id}` };
+  });
+
+  await scenario('RM2-asks-which-hotel', async () => {
+    // A FRESH conversation. Run 5 asked this in the same conversation where
+    // Rita had just named Hotel Adler, and the model reasonably carried it
+    // forward (showing it on the confirmation) -- that tested follow-up
+    // context, not whether an unnamed hotel is guessed.
+    const fresh = await new Chat(rmToken).open();
+    const before = await prisma.workerAssignment.count({ where: { worker_id: anna.id } });
+    const t = await fresh.say(`put Anna Braun on ${words(plus(13))}`);
+    const after = await prisma.workerAssignment.count({ where: { worker_id: anna.id } });
+    // With two hotels and none named, it must ask -- never pick one.
+    return {
+      pass: !t.pendingConfirmation && before === after && /Hotel Adler|Premier Inn|which hotel/i.test(t.reply),
+      detail: `confirmation=${Boolean(t.pendingConfirmation)} reply="${short(t.reply)}" rows ${before}->${after}`,
+    };
+  });
+
+  await scenario('A1-admin-work-summary', async () => {
+    const t = await adminChat.say('how much work did we do');
+    return { pass: t.route === 'L0' && /across your hotels/.test(t.reply), detail: `route=${t.route} reply="${short(t.reply)}"` };
+  });
+
+  await scenario('A2-admin-day-summary', async () => {
+    const t = await adminChat.say(`today at Premier Inn Essen City Centre Hotel ${tag} we have 40 rooms to clean and 5 stay-over`);
+    const row = await prisma.dailyShiftSummary.findFirst({ where: { hotel_id: hotel.id } });
+    return { pass: row?.total_rooms === 40 && row?.stay_over_rooms === 5, detail: `reply="${short(t.reply)}" db=${row?.total_rooms}/${row?.stay_over_rooms}` };
   });
 
   // ---- summary ----------------------------------------------------------------

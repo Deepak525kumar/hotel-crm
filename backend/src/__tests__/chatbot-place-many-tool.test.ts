@@ -168,3 +168,40 @@ describe('assignments.place_many — a whole week in one instruction', () => {
     expect(json).not.toContain('"h1"');
   });
 });
+
+/**
+ * NOTHING TO CONFIRM WHEN EVERY SHIFT ALREADY EXISTS -- live end-to-end run,
+ * 2026-09-15: "add that another dates also", right after scheduling Parveen
+ * for three days, produced a new confirmation for the same three shifts.
+ */
+describe('assignments.place_many precheck', () => {
+  let list: jest.MockedFunction<(...a: any[]) => any>;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    const mod = (await import('../modules/assignments/service.js')) as any;
+    list = mod.assignmentService.list;
+    mockResolveHotel.mockResolvedValue({ status: 'RESOLVED', hotelId: 'h1', name: 'Premier Inn' });
+    mockResolve.mockImplementation(async (name: string) =>
+      name === 'Anna' ? resolved('w1', 'Anna Schmidt') : resolved('w2', 'Tomasz Nowak'));
+  });
+
+  it('refuses before confirming when every placement is already on the schedule', async () => {
+    list.mockImplementation(async (q: any) => ({ data: [{ status: 'CONFIRMED', worker_id: q.worker_id }], total: 1 }));
+    const refusal = (await placeManyOnCalendar.precheck!({ placements: WEEK } as never, mgr())) as any;
+    expect(refusal?.refused?.code).toBe('ALREADY_DONE');
+    expect(refusal.refused.message).toMatch(/Already on the schedule: Anna Schmidt on 2026-09-14, Anna Schmidt on 2026-09-15, Tomasz Nowak on 2026-09-16/);
+    expect(mockPlace).not.toHaveBeenCalled();
+  });
+
+  it('lets the confirmation proceed when at least one placement is new', async () => {
+    list.mockImplementation(async (q: any) =>
+      q.from === '2026-09-16' ? { data: [], total: 0 } : { data: [{ status: 'CONFIRMED', worker_id: q.worker_id }], total: 1 });
+    expect(await placeManyOnCalendar.precheck!({ placements: WEEK } as never, mgr())).toBeNull();
+  });
+
+  it('does not count a cancelled shift as existing', async () => {
+    list.mockImplementation(async (q: any) => ({ data: [{ status: 'CANCELLED', worker_id: q.worker_id }], total: 1 }));
+    expect(await placeManyOnCalendar.precheck!({ placements: WEEK } as never, mgr())).toBeNull();
+  });
+});

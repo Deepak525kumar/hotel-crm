@@ -1283,6 +1283,42 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
   permission: 'staffing:write',
   scopeCheck: 'none',
 
+  /**
+   * NOTHING TO CONFIRM WHEN EVERY SHIFT IS ALREADY THERE.
+   *
+   * Live end-to-end run, 2026-09-15. Right after scheduling Parveen for three
+   * days, "add that another dates also" produced a NEW confirmation for the
+   * same three shifts. Confirming would have changed nothing -- each placement
+   * fails on the one-active-assignment-per-day rule -- so the manager was
+   * being asked to approve work that was already done. When every requested
+   * placement already exists, say so instead. When only some do, the
+   * confirmation proceeds and each existing one is reported as not placed.
+   * Read-only; the owning service still decides at execution.
+   */
+  precheck: async (args, actor) => {
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') return null;
+    const serviceActor = toServiceActor(actor);
+
+    const existing: string[] = [];
+    for (const placement of args.placements) {
+      const worker = await resolveWorkerReference(placement.worker_name, actor, hotel.hotelId);
+      if (worker.status !== 'RESOLVED') return null;
+      const { data } = await assignmentService.list(
+        { worker_id: worker.workerId, from: placement.day, to: placement.day, page: 1, per_page: 10 } as never,
+        serviceActor
+      );
+      const live = ((data ?? []) as Array<{ status: string; worker_id?: string }>).some(
+        (row) =>
+          (row.worker_id === undefined || row.worker_id === worker.workerId) &&
+          (row.status === 'CONFIRMED' || row.status === 'IN_PROGRESS' || row.status === 'COMPLETED')
+      );
+      if (!live) return null;
+      existing.push(`${worker.fullName} on ${placement.day}`);
+    }
+    return refuse('ALREADY_DONE', `Already on the schedule: ${existing.join(', ')}. Nothing new to add.`);
+  },
+
   invoke: async (args, actor) => {
     const serviceActor = toServiceActor(actor);
 

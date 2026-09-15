@@ -295,6 +295,26 @@ per-user turn limiter answers a fast script with 429, which must be waited out r
 a product failure. And an "after" check is not evidence unless the "before" state is asserted too —
 one step passed while testing nothing, because an earlier rate-limited step never created its data.
 
+**L0 now has INTENTS as well as exact phrases.** The owner's "give me record data previews weeks how
+much work we did" routed in a conversation but not on its own, across several live runs. An intent
+in `router-l0.ts` answers "how much work did we do" questions deterministically. It needs
+work-question wording and team wording together, and steps aside whenever the text holds a
+date, period or number, because L0 cannot parse arguments. Two rules that make it safe:
+
+- A typed L0 match is used only if the person holds the tool's permission, so a worker asking
+  falls through to the model rather than meeting "You do not have access to that".
+- `chatbot-routing-check.ts` asks L0 first, exactly as production does.
+
+**A confirmation for work already done is the same fiction as one for work that cannot run.**
+After scheduling three shifts, "add that another dates also" proposed the same three again.
+`assignments.place_many` now has a precheck that refuses when every placement already exists.
+
+**Only a real browser showed the New user form opening empty.** The prefill read
+`window.location.hash` during the first render. With in-app navigation, Next renders the new page
+before updating the address bar, so the fragment was not there yet. jsdom sets the URL first,
+so every unit test passed. It now reads after mount. `frontend/e2e/zelle-live.spec.ts` (live
+backend, live model) is what caught it.
+
 **History does not weaken ADR-074 §5.1.** That control governs what reaches a prompt. A person
 reading their own transcript on their own screen is not a prompt; the one part a tool passes back
 to the model is the person's own opening message.

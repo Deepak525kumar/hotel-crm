@@ -439,6 +439,26 @@ describe('a result that must be read exactly is not handed back to the model', (
 });
 
 /**
+ * A typed L0 match is used only if the person may use its tool. The fixture
+ * actor holds `staffing:write` and not `reports:read-team`, so "how much work
+ * did we do" -- an L0 intent for the work summary -- must reach the model
+ * rather than be answered "You do not have access to that".
+ */
+describe('a typed L0 match the person cannot use falls through to the model', () => {
+  it('asks the model instead of refusing', async () => {
+    providerCall.mockReset();
+    providerCall.mockResolvedValue({ text: 'Your manager can see the team totals.', toolUse: null, usage: { promptTokens: 5, completionTokens: 2 } });
+
+    const result = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'how much work did we do' });
+
+    expect(providerCall).toHaveBeenCalledTimes(1);
+    expect(result.route).toBe('L1');
+    expect(result.reply).not.toMatch(/do not have access/);
+    providerCall.mockReset();
+  });
+});
+
+/**
  * "Sorry, I did not catch that" was the reply to a request that WAS caught --
  * production, 2026-09-15. When the model picks a write and misses an argument,
  * the person is told what is missing.

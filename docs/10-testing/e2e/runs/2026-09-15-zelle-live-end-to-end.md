@@ -112,3 +112,55 @@ After every fix in this log, `chatbot-routing-check.ts` scored **99/100** with 0
 - **If it matters in production:** the next lever is an L0 phrase for "how much work" questions,
   which costs no tokens. A prompt rule is not the lever, because prompt rules have measurably cost
   routing accuracy.
+
+## Addendum 2 — every role, the owner's phrase by intent, and a real browser
+
+Driven by the owner's follow-up: "just fix what the user intends to do. you can also run end to end now."
+
+**Harness, final run: 24/24.** Earlier findings from these runs are listed below.
+
+| New check | Result | Evidence |
+|---|---|---|
+| S09 "record data previews weeks how much work we did" | PASS | `route = L0`, `reports.work_summary`, with no model call. Answered by intent, not an exact phrase |
+| S12 no re-confirmation of existing shifts | PASS | No confirmation; asks which dates |
+| E7 language change through chat | PASS | `preferred_language = de` |
+| RM1 regional manager names one of two hotels | PASS | Row `CONFIRMED` at Hotel Adler |
+| RM2 regional manager names no hotel (fresh conversation) | PASS | "Which hotel do you mean — Hotel Adler … or Premier Inn …?"; no row |
+| A1 admin "how much work did we do" | PASS | L0, totals across all hotels |
+| A2 admin names the hotel for a day summary | PASS | `DailyShiftSummary` 40 / 5 |
+
+**Real browser** (`frontend/e2e/zelle-live.spec.ts`: production build, live backend, live model): **PASS**.
+- Login, then the L0 answer.
+- The live model produces the account link.
+- **Copy** reads back from the real clipboard.
+- **History** reads a past conversation from the server, with no Confirm button in it.
+- The link opens the New user form showing `Mukesh` and `+4916090744182`, with the fragment removed from the URL.
+
+**Full backend suite:** 4767/4767.
+
+### New defects found in this pass (fixed, with tests)
+
+1. **The New user form opened empty from Zelle's link, in a real browser only.**
+   - The prefill read the URL fragment during the first render.
+   - Next's in-app navigation renders before it updates the address bar.
+   - jsdom does the opposite, so unit tests passed.
+   - Fix: read after mount (`UserForm.tsx`).
+2. **"add that another dates also" proposed re-scheduling three shifts that had just been scheduled.**
+   - Fix: `assignments.place_many` now prechecks and refuses when every placement already exists.
+3. **The owner's phrase depended on how the model read it.**
+   - Fix: an L0 intent (`router-l0.ts`), used only when the person holds the tool's permission.
+
+### Harness and spec corrections
+
+- **RM2** first ran in the same conversation where a hotel had been named, so the model reasonably
+  carried it forward. It now uses a fresh conversation.
+- **S12** now fails on any confirmation, not only on a write.
+- **The browser spec** now opens the newest of several matching History entries on a re-run.
+
+**Routing check** (asks L0 first, as production does): **99/100**, 0 failed model calls. 7 answered by
+L0 with no model call, including the owner's "record data previews weeks" sentence.
+
+The one miss is S02, "yes create id for the next employee": the model asked for the missing name
+instead of calling the tool with none. That is correct behaviour, and the case's expectation was
+changed afterwards to accept it. The paid check was **not** re-run for that one-line, deterministic
+change.

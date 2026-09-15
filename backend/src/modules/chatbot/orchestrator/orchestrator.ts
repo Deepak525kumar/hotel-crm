@@ -3,7 +3,7 @@ import { getEnv } from '../../../config/env.js';
 import { getPrisma } from '../../../lib/db.js';
 import { logger } from '../../../lib/logger.js';
 import type { ActorContext } from '../tools/actor.js';
-import { executeTool } from '../tools/executor.js';
+import { actorHasPermission, executeTool } from '../tools/executor.js';
 import { findPriorCall, recordToolCall } from '../tools/tool-call-log.js';
 import { asRefusal, describeToolError } from '../tools/tool-errors.js';
 import { resolveTool, type CompactResult } from '../tools/registry.js';
@@ -426,10 +426,19 @@ async function executeTurn(params: {
   }
 
   // ---- L0: deterministic, zero-cost ---------------------------------------
+  // A TYPED match is used only when this person may use its tool. Otherwise it
+  // falls through to L1, which sees their own manifest: a worker asking "how
+  // much work did we do" must not be answered "You do not have access to that"
+  // by a router that never considered who was asking. A tapped chip keeps its
+  // behaviour -- the manifest only offers chips the person can use.
+  const typed = !params.commandId && params.text ? matchL0(params.text) : undefined;
+  const typedTool = typed ? resolveTool(typed.tool) : undefined;
   const command = params.commandId
     ? resolveCommandId(params.commandId)
-    : params.text
-      ? matchL0(params.text)
+    : typed &&
+        typedTool &&
+        (typedTool.permission === null || actorHasPermission(params.actor, typedTool.permission))
+      ? typed
       : undefined;
 
   if (command) {

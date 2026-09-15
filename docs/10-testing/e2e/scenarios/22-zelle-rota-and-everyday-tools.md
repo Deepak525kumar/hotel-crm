@@ -38,6 +38,11 @@ group and people and leaves them for inspection. Every turn is a paid model call
 | E4-fix-room | worker | `I logged 214 but it was 241` | `rooms.fix_my_room` | After Confirm: today's log has 241 and no 214 |
 | E5-profile | worker | `my new number is 0160 7654321` | `users.update_my_profile` | After Confirm: `User.phone = +491607654321` |
 | E6-worker-boundary | worker | `cancel the shift for Anna Braun tomorrow` | none | No confirmation is offered: the tool is not in a worker's manifest |
+| E7-language | worker | `switch the app to German please` | `users.update_my_profile` | After Confirm: `User.preferred_language = de`. Runs last for that worker (later replies change language) |
+| RM1-names-the-hotel | regional manager | `put Tomasz Nowak on <day> at Hotel Adler <tag>` | `assignments.place_worker` | Two hotels in her group; after Confirm the row is `CONFIRMED` at **Hotel Adler**, the one named |
+| RM2-asks-which-hotel | regional manager (fresh conversation) | `put Anna Braun on <day>` | none | No confirmation, no row; the reply names her hotels. A fresh conversation is required — in the same conversation a hotel named earlier is legitimately carried forward |
+| A1-admin-work-summary | admin | `how much work did we do` | L0 intent → `reports.work_summary` | `route = L0` (no model call); totals "across your hotels" |
+| A2-admin-day-summary | admin | `today at Premier Inn Essen City Centre Hotel <tag> we have 40 rooms to clean and 5 stay-over` | `calendar.set_day_summary` | Unscoped admin names the hotel; `DailyShiftSummary` 40 / 5 |
 
 Also covered by unit tests only, because they are refusals the model rarely produces on demand:
 swap with no shift (refused before confirming), a plan naming an unknown person (nothing written),
@@ -54,9 +59,16 @@ withdrawing a past absence (refused).
   A manager who assumed otherwise would find out the morning nobody came.
 - **E6.** The boundary is the manifest itself: a worker's model is never shown manager tools.
 
+## In a real browser
+
+`frontend/e2e/zelle-live.spec.ts` (skipped unless `ZELLE_LIVE=1`) drives the web app's production
+build against the real backend and the live model. It logs in, asks "how much work did we do" (L0),
+has the model prepare an account link, presses **Copy** and reads the real clipboard, opens
+**History** and a past conversation from the server, then follows the link and checks the New user
+form shows `Mukesh` and `+4916090744182` with the fragment cleared from the address bar. Start the
+backend in serve mode first — the spec's header has the three commands.
+
 ## Knowingly untested here
 
-- Regional manager and admin sessions (unscoped hotel resolution) — worth a run with an RM login.
-- Mobile History/Share and the web Copy/History UI in a browser (unit-tested only).
-- `users.update_my_profile` language change end to end (it changes the language the rest of a run
-  is answered in, so it is left out of an automated conversation).
+- Mobile History/Share on a device (store logic unit-tested; the web UI is covered in a real browser above).
+

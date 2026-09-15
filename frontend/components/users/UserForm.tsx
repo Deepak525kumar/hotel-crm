@@ -168,18 +168,31 @@ export function UserForm({
   // than fall back to a role they cannot create.
   const defaultCreateRole: Role = allowedCreateRoles[0] ?? "worker";
 
-  const [form, setForm] = useState<UserFormValues>(() => {
-    const base = toValues(user, defaultCreateRole);
-    return mode === "create" && typeof window !== "undefined"
-      ? { ...base, ...readPrefill(window.location.hash, allowedCreateRoles) }
-      : base;
-  });
+  const [form, setForm] = useState<UserFormValues>(() => toValues(user, defaultCreateRole));
 
-  // The prefill is read once and then taken out of the address bar, so a
-  // reload or a copied URL does not carry someone's email and phone along.
+  // READ AFTER MOUNT, NOT DURING THE FIRST RENDER.
+  //
+  // This read `window.location.hash` inside the useState initializer, and a
+  // real browser proved it wrong on 2026-09-15: clicking Zelle's link is an
+  // in-app navigation, and Next's router renders the new page BEFORE it
+  // updates the address bar. During that first render the URL was still
+  // /assistant, the fragment did not exist yet, and the form opened empty --
+  // while every unit test passed, because jsdom sets the URL first. After
+  // mount the address bar is current, whichever way the page was reached.
+  //
+  // The prefill is then taken out of the address bar, so a reload or a copied
+  // URL does not carry someone's email and phone along.
   useEffect(() => {
     if (mode !== "create" || typeof window === "undefined" || !window.location.hash) return;
+    const prefill = readPrefill(window.location.hash, allowedCreateRoles);
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (Object.keys(prefill).length === 0) return;
+    // A one-time sync FROM an external system (the address bar) into form
+    // state, which is the case effects exist for.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setForm((prev) => ({ ...prev, ...prefill }));
+    // Runs once per mount: the roles list is stable for a signed-in viewer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   const set = <K extends keyof UserFormValues>(key: K, value: UserFormValues[K]) =>

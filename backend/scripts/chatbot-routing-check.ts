@@ -65,6 +65,9 @@ import {
   toolSpec,
 } from '../src/modules/chatbot/orchestrator/router-l1.js';
 import { ROLE_PERMISSIONS } from '../src/config/constants.js';
+import { matchL0 } from '../src/modules/chatbot/orchestrator/router-l0.js';
+import { resolveTool } from '../src/modules/chatbot/tools/registry.js';
+import { actorHasPermission } from '../src/modules/chatbot/tools/executor.js';
 import '../src/modules/chatbot/service.js';
 
 const provider = new MantleProvider({
@@ -184,7 +187,12 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   // here would test a tidier product than the one people use.
   ['manager', 'Make day task rooms today we have 90 rooms to clean add that work list and 10 blibe',
     'S01 day summary', picks('calendar.set_day_summary')],
-  ['manager', 'yes create id for the next employee', 'S02 new account link', picks('users.new_account_link')],
+  // NO NAME IS GIVEN, so asking for one is as correct as calling the tool
+  // (which then answers "I still need: first name"). Scored as a failure on
+  // 2026-09-15 when the model asked -- the expectation was wrong, not the
+  // model. What must not happen is some OTHER tool, or a claim it was done.
+  ['manager', 'yes create id for the next employee', 'S02 new account link (or ask for the name)',
+    (t) => t === 'users.new_account_link' || t === null],
   ['manager', 'I want previous chats', 'S08 history', picks('chatbot.recent_conversations')],
   ['manager', 'cancel shift for parveen kumar 16 September', 'S07 cancel', picks('assignments.cancel_shift')],
   ['manager', 'give me record data previews weeks how much work we did', 'S09 work summary',
@@ -362,6 +370,23 @@ async function main() {
   for (const [role, phrase, label, check] of CASES) {
     const a = actor(role);
     const tools = visibleTools(a);
+
+    // THE PRODUCTION PATH ASKS L0 FIRST. Before 2026-09-15 this script sent
+    // every phrase straight to the model, so a question L0 answers for free
+    // was scored on what the model would have done instead -- and the owner's
+    // "record data previews weeks" read as a failure users would never see.
+    // Same permission rule as the orchestrator: a match counts only if this
+    // role may use the tool.
+    const l0 = matchL0(phrase);
+    const l0Tool = l0 ? resolveTool(l0.tool) : undefined;
+    if (l0 && l0Tool && (l0Tool.permission === null || actorHasPermission(a, l0Tool.permission))) {
+      const ok = check(l0.tool, l0.args);
+      if (ok) pass += 1;
+      else failures.push(`${role} | "${phrase}"\n    want ${label}, got ${l0.tool} (L0)`);
+      console.log(`${ok ? 'PASS' : 'FAIL'}  ${label.padEnd(30)} -> ${l0.tool} (L0, no model call)`);
+      continue;
+    }
+
     try {
       const res = await provider.completeWithTools({
         system: buildSystemPrompt(a, tools),
