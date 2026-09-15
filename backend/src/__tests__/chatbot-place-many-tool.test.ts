@@ -205,3 +205,70 @@ describe('assignments.place_many precheck', () => {
     expect(await placeManyOnCalendar.precheck!({ placements: WEEK } as never, mgr())).toBeNull();
   });
 });
+
+/** "17 add" with Parveen already on the 17th -- found replaying the owner's words verbatim. */
+describe('assignments.place_worker precheck', () => {
+  let list: jest.MockedFunction<(...a: any[]) => any>;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    const mod = (await import('../modules/assignments/service.js')) as any;
+    list = mod.assignmentService.list;
+    mockResolveHotel.mockResolvedValue({ status: 'RESOLVED', hotelId: 'h1', name: 'Premier Inn' });
+    mockResolve.mockResolvedValue(resolved('w1', 'Parveen Kumar'));
+  });
+
+  it('refuses before confirming when the person already has that day', async () => {
+    const { placeWorkerOnCalendar } = await import('../modules/chatbot/tools/definitions/self-service.tools.js');
+    list.mockResolvedValue({ data: [{ status: 'CONFIRMED', worker_id: 'w1' }], total: 1 });
+    const refusal = (await placeWorkerOnCalendar.precheck!({ worker_name: 'parveen', day: '2026-09-17' } as never, mgr())) as any;
+    expect(refusal?.refused).toMatchObject({ code: 'ALREADY_DONE', message: 'Parveen Kumar is already on the schedule for 2026-09-17. Nothing new to add.' });
+    expect(mockPlace).not.toHaveBeenCalled();
+  });
+
+  it('proceeds when the day is free or only has a cancelled shift', async () => {
+    const { placeWorkerOnCalendar } = await import('../modules/chatbot/tools/definitions/self-service.tools.js');
+    list.mockResolvedValue({ data: [{ status: 'CANCELLED', worker_id: 'w1' }], total: 1 });
+    expect(await placeWorkerOnCalendar.precheck!({ worker_name: 'parveen', day: '2026-09-17' } as never, mgr())).toBeNull();
+  });
+});
+
+/** "ok make" read as a plan of shifts that already exist -- found replaying the owner's words verbatim. */
+describe('calendar.apply_plan precheck', () => {
+  let list: jest.MockedFunction<(...a: any[]) => any>;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    const mod = (await import('../modules/assignments/service.js')) as any;
+    list = mod.assignmentService.list;
+    mockResolveHotel.mockResolvedValue({ status: 'RESOLVED', hotelId: 'h1', name: 'Premier Inn' });
+    mockResolve.mockResolvedValue(resolved('w1', 'Parveen Kumar'));
+    list.mockResolvedValue({ data: [{ status: 'CONFIRMED', worker_id: 'w1' }], total: 1 });
+  });
+
+  it('refuses before confirming a plan of shifts that are all already there', async () => {
+    const { applyPlan } = await import('../modules/chatbot/tools/definitions/plan.tools.js');
+    const refusal = (await applyPlan.precheck!(
+      { placements: [{ worker_name: 'parveen', day: '2026-09-17' }, { worker_name: 'parveen', day: '2026-09-18' }] } as never,
+      mgr()
+    )) as any;
+    expect(refusal?.refused).toMatchObject({
+      code: 'ALREADY_DONE',
+      message: 'Already on the schedule: Parveen Kumar on 2026-09-17, Parveen Kumar on 2026-09-18. Nothing new to add.',
+    });
+  });
+
+  it('always proceeds when the plan records an absence', async () => {
+    const { applyPlan } = await import('../modules/chatbot/tools/definitions/plan.tools.js');
+    expect(
+      await applyPlan.precheck!(
+        {
+          placements: [{ worker_name: 'parveen', day: '2026-09-17' }],
+          absences: [{ worker_name: 'anna', day: '2026-09-17', kind: 'SICK' }],
+        } as never,
+        mgr()
+      )
+    ).toBeNull();
+    expect(list).not.toHaveBeenCalled();
+  });
+});

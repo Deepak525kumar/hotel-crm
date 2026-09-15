@@ -264,6 +264,59 @@ export async function actorWorkerNames(actor: ActorContext): Promise<string[]> {
 
 
 /**
+ * The MANAGERS on this person's roster, for the system prompt.
+ *
+ * Replaying the owner's conversation word for word (2026-09-15), "harvir
+ * singh" was answered "Harvir Singh ist nicht im Team" -- false. The prompt
+ * listed only workers, so a manager in the same group looked like nobody at
+ * all. A fact, not a rule: the prompt already tells the model to match names
+ * against the lists it is given. Same scope as the worker search -- the
+ * hotel's own group roster -- and only for a hotel-scoped caller, where that
+ * roster is unambiguous.
+ */
+export async function actorManagerNames(actor: ActorContext): Promise<string[]> {
+  if (actor.role === 'worker' || actor.role === 'checker') return [];
+  const scope = actor.scope;
+  if (!scope || scope.type !== 'hotel') return [];
+  try {
+    const { listEligibleWorkerIds } = await import('../../../lib/roster-scope.js');
+    const { getPrisma } = await import('../../../lib/db.js');
+    const ids = await listEligibleWorkerIds(scope.hotel_id, ['MANAGER', 'REGIONAL_MANAGER']);
+    if (ids.length === 0 || ids.length > MAX_PROMPT_WORKERS) return [];
+    const people = await getPrisma().user.findMany({
+      where: { id: { in: ids, not: actor.userId }, deleted_at: null, is_active: true },
+      select: { first_name: true, last_name: true },
+    });
+    return people.map((p) => `${p.first_name} ${p.last_name}`);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The language a person has been WRITING in, when they have not chosen one.
+ *
+ * Same replay: an English-speaking manager with no language preference typed
+ * "harvir singh" -- a name, no language at all -- and got a German reply. The
+ * fallback "reply in the language the user wrote in" has nothing to go on in a
+ * two-word name, so the German surroundings won. Their EARLIER messages in the
+ * conversation say which language they use. Counted from common function words
+ * only; returns null when neither language clearly leads, and then nothing
+ * changes.
+ */
+const ENGLISH_WORDS = /\b(the|to|for|and|is|are|my|we|i|what|how|make|add|me|give|want|shift|rooms?|today|not|please|put|on|of|did|with)\b/gi;
+const GERMAN_WORDS = /\b(der|die|das|und|ist|ich|wir|mein|meine|was|wie|mach|heute|nicht|bitte|für|fuer|mit|zimmer|schicht|auf|von|am|ein|eine)\b/gi;
+
+export function detectWritingLanguage(texts: readonly string[]): string | null {
+  const joined = texts.join(' ');
+  const en = (joined.match(ENGLISH_WORDS) ?? []).length;
+  const de = (joined.match(GERMAN_WORDS) ?? []).length;
+  if (en >= 2 && en > de * 2) return 'English';
+  if (de >= 2 && de > en * 2) return 'German';
+  return null;
+}
+
+/**
  * The language this person chose for the app, named in full.
  *
  * The prompt said "Reply in the language the user wrote in. German and

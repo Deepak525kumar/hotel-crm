@@ -410,6 +410,9 @@ const TEAM_WORDS = /\b(we|our|us|team|everyone|everybody|wir|unser|unsere|alle)\
 const PERIOD_OR_DATE =
   /\d|\b(today|yesterday|tomorrow|tonight|last|this|next|past|since|until|between|month|months|year|years|january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|heute|gestern|morgen|letzte|letzten|letzter|diese|dieser|diesen|naechste|naechsten|seit|bis|monat|monate|jahr|januar|februar|maerz|mai|juni|juli|oktober|dezember|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b/;
 
+const CHAT_WORDS = /\b(chats?|conversations?|gespraeche?|unterhaltungen?|verlauf)\b/;
+const EARLIER_WORDS = /\b(previous|old|older|earlier|past|history|alte[nr]?|fruehere[nr]?|vorherige[nr]?|verlauf)\b/;
+
 export const L0_INTENTS: readonly L0Intent[] = [
   {
     command: {
@@ -422,6 +425,24 @@ export const L0_INTENTS: readonly L0Intent[] = [
       phrases: [],
     },
     matches: (text) => WORK_QUESTION.test(text) && TEAM_WORDS.test(text) && !PERIOD_OR_DATE.test(text),
+  },
+  /**
+   * "I want previous chats". Sent alone it routes to the history tool; in the
+   * owner's own conversation, replayed word for word (2026-09-15), the model
+   * answered in prose -- "Here are your previous chats from the last 30 days"
+   * -- and listed nothing, because it had fetched nothing. No arguments, one
+   * reading, so it does not go to the model at all. A date ("what did I ask
+   * yesterday") still goes to the model, which reads dates.
+   */
+  {
+    command: {
+      id: 'intent_recent_conversations',
+      label: 'Previous chats',
+      tool: 'chatbot.recent_conversations',
+      args: {},
+      phrases: [],
+    },
+    matches: (text) => CHAT_WORDS.test(text) && EARLIER_WORDS.test(text) && !PERIOD_OR_DATE.test(text),
   },
 ];
 

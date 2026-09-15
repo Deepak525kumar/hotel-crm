@@ -164,3 +164,53 @@ The one miss is S02, "yes create id for the next employee": the model asked for 
 instead of calling the tool with none. That is correct behaviour, and the case's expectation was
 changed afterwards to accept it. The paid check was **not** re-run for that one-line, deterministic
 change.
+
+## The owner's own words, replayed verbatim
+
+Every earlier run used the owner's conversations **adapted** into scenarios. Asked "have you tried
+the same prompts from the conversation I gave you?", the honest answer was no. `VERBATIM=1` in
+`backend/scripts/chatbot-e2e-conversations.ts` now replays the owner's exact messages, in order.
+It runs against the real app and the live model (qwen3-235b on Bedrock), reads every outcome back
+from the database, and checks 10 results.
+
+- **Differences from real use.** The harness presses **Confirm** whenever one is offered; the owner
+  often did not. One precondition line is not the owner's words: Parveen is put on 16 September
+  first, because the cancel conversation assumes it.
+- **Hotel.** An exact "Premier Inn Essen City Centre Hotel", tagged per run.
+- **Browser.** `frontend/e2e/zelle-live.spec.ts` S04 fills the New user form with the field report's
+  exact values and a real photo. It passed.
+
+| Run | Data checks | What it exposed |
+| --- | --- | --- |
+| 1 | 9/10 | 20–22 September invented for "add that another dates also"; "17 add" offered a duplicate shift; first name "next employee"; "Harvir Singh ist nicht im Team" (false, and German); the harness counted the browser test's account against the chat |
+| 2 | 10/10 | "I want previous chats" answered "Here are your previous chats" with nothing listed; a date hint appended to "I still need: first name" |
+| 3 | 10/10 | "ok make" read as `calendar.apply_plan` for three existing shifts; confirmed, it did nothing |
+| 4 | 9/10 | "I already created a link…" with no link made; the day summary offered in prose instead of recorded |
+
+### Fixed, with tests
+
+- **Invented dates.** `orchestrator/date-provenance.ts` refuses a confirmation that names a date the
+  person never gave, and asks which date.
+- **Duplicate single shift.** `assignments.place_worker` refuses before confirming when that person
+  already has a live shift that day.
+- **Duplicate plan.** `calendar.apply_plan` gets `place_many`'s check, delegated rather than copied,
+  when the plan is shifts only. Any absence still goes to confirmation.
+- **A description taken for a name.** `users.new_account_link` asks for the real name instead of
+  accepting "next employee" or "new worker".
+- **Managers.** The prompt now states the managers in the hotel group as a fact, so a manager is not
+  "not on the team".
+- **Language.** With no chosen language, the language of the person's own messages is used when it
+  is clear.
+- **Previous chats.** Now an L0 intent: the tool answers with the real list, with no model call.
+- **Date hint.** Only added when a date is what is missing.
+- **False link claims.** The unbacked-claim guard now covers a link nobody made.
+- **Harness.** "No account created" counts only accounts made after the replay started.
+
+### Still model-dependent (not fixed; no false claim made)
+
+- **Day summary.** The 90-room message was offered in prose ("Would you like me to record this?")
+  instead of recorded in 1 of 4 runs. The owner's "yes" would still be needed.
+- **"17 add".** It is answered correctly but in varying words.
+- **"manger not worker".** It gets a harmless but generic reply.
+- **Routing check.** 97/100 after these changes. All three misses are known model-variance cases;
+  the check builds its prompt without the new managers line, so the prompt change is not a cause.

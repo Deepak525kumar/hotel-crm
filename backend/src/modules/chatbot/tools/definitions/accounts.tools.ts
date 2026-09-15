@@ -121,6 +121,18 @@ export const newAccountLink = registerTool<NewAccountArgs>({
   scopeCheck: 'none',
 
   invoke: async (args, actor) => {
+    // A DESCRIPTION IS NOT A NAME. Replaying the owner's own words, "I want
+    // make id more next employe" pre-filled the form with first name "next
+    // employee" -- the model took the request for the person. Asked instead.
+    const placeholder =
+      /\b(next|new|neue[rn]?|another|some(one|body)?|employe+e?s?|worker|staff|mitarbeiter(in)?|person|user|id|account|cleaner|checker)\b/i;
+    if (placeholder.test(args.first_name) || (args.last_name && placeholder.test(args.last_name))) {
+      return refuse(
+        'NEEDS_INPUT',
+        "What is the new employee's name? Tell me their first and last name -- and their email and phone if you have them -- and I will fill in the form."
+      );
+    }
+
     const role = args.staff_type ?? 'worker';
 
     const allowed = creatableRolesFor(actor.role);

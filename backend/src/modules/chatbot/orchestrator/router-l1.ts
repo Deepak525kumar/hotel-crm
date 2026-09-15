@@ -228,6 +228,11 @@ export interface PromptContext {
    */
   workers?: string[];
   /**
+   * The managers on the same roster (2026-09-15), so a manager's name is
+   * recognised as a manager rather than answered "not on the team".
+   */
+  managers?: string[];
+  /**
    * The language the person chose for the app, in full ("German", "Urdu").
    *
    * An explicit preference beats inferring from one short message -- which
@@ -337,6 +342,12 @@ export function buildSystemPrompt(
             'name only, or a nickname -- and pass the FULL name from the list. If ' +
             'what they said matches nobody here, say so and show them these names ' +
             'rather than guessing.',
+        ]
+      : []),
+    ...(context.managers && context.managers.length > 0
+      ? [
+          '',
+          `Managers in their hotel group (not workers, and not put on the cleaning schedule): ${context.managers.join(', ')}.`,
         ]
       : []),
     ...(context.lastAction

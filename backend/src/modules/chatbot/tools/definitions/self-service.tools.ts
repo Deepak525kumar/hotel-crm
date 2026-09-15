@@ -1159,6 +1159,31 @@ export const placeWorkerOnCalendar = registerTool<PlaceWorkerArgs>({
   // isHotelInScope() regardless -- the same guard the HTTP route relies on.
   scopeCheck: 'none',
 
+  /**
+   * Replaying the owner's conversation word for word (2026-09-15), "17 add" --
+   * Parveen already on the 17th -- produced a confirmation; pressing it gave
+   * "Worker already has a calendar placement for this day". The person was
+   * asked to approve a change that could only fail. Same rule as place_many.
+   */
+  precheck: async (args, actor) => {
+    const hotel = await resolveHotelReference(args.hotel_name, actor);
+    if (hotel.status !== 'RESOLVED') return null;
+    const worker = await resolveWorkerReference(args.worker_name, actor, hotel.hotelId);
+    if (worker.status !== 'RESOLVED') return null;
+    const { data } = await assignmentService.list(
+      { worker_id: worker.workerId, from: args.day, to: args.day, page: 1, per_page: 10 } as never,
+      toServiceActor(actor)
+    );
+    const live = ((data ?? []) as Array<{ status: string; worker_id?: string }>).some(
+      (row) =>
+        (row.worker_id === undefined || row.worker_id === worker.workerId) &&
+        (row.status === 'CONFIRMED' || row.status === 'IN_PROGRESS' || row.status === 'COMPLETED')
+    );
+    return live
+      ? refuse('ALREADY_DONE', `${worker.fullName} is already on the schedule for ${args.day}. Nothing new to add.`)
+      : null;
+  },
+
   invoke: async (args, actor) => {
     // Hotel FIRST: the worker roster is a property of a hotel, so there is
     // nothing to search until we know which one.

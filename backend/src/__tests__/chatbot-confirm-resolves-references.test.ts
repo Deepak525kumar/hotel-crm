@@ -119,7 +119,9 @@ const ask = (input: Record<string, unknown>) => {
     toolUse: { name: TOOL, input },
     usage: { promptTokens: 10, completionTokens: 2 },
   });
-  return runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'place worker 1 at hotel 1' });
+  // Names the date the fixture proposes: a confirmation is refused for a date
+  // the person never gave (date-provenance.ts).
+  return runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'place worker 1 at hotel 1 on 17 September' });
 };
 
 beforeEach(() => {
@@ -435,6 +437,26 @@ describe('a result that must be read exactly is not handed back to the model', (
     expect(result.reply).not.toMatch(/do not have access/);
     expect(result.reply).toMatch(/still need: first name/);
     expect(readInvoke).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A DATE THE PERSON NEVER GAVE -- replaying the owner's words verbatim,
+ * "add that another dates also" was proposed as 20, 21 and 22 September.
+ */
+describe('a confirmation is never issued for a date the person did not give', () => {
+  it('asks which date instead of proposing one', async () => {
+    providerCall.mockReset();
+    providerCall.mockResolvedValue({
+      text: '',
+      toolUse: { name: TOOL, input: { worker_name: 'worker 1', day: '2026-09-21' } },
+      usage: { promptTokens: 10, completionTokens: 2 },
+    });
+    const result = await runTurn({ conversationId: 'conv_1', actor: ACTOR, text: 'add that another dates also' });
+    expect(result.pendingConfirmation).toBeUndefined();
+    expect(result.reply).toMatch(/Which date do you mean/);
+    expect((sessionState as any).pending_confirmation).toBeUndefined();
+    providerCall.mockReset();
   });
 });
 

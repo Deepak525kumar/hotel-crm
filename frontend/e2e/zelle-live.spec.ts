@@ -86,4 +86,42 @@ test.describe("Zelle, live", () => {
     // The details are taken out of the address bar once read.
     expect(page.url()).not.toContain("#");
   });
+
+  /**
+   * S04 VERBATIM: the admin's New user form from the field report, with its
+   * exact values. It failed in production with "Request body validation
+   * failed" and no field named -- the phone, a German number written with its
+   * leading 0.
+   */
+  test("S04: the New user form with the field report's exact values", async ({ page }) => {
+    const creds = JSON.parse(readFileSync(process.env.ZELLE_CREDS as string, "utf8")) as {
+      adminEmail: string;
+      password: string;
+      exactHotel: string;
+    };
+
+    await page.goto("/login");
+    await page.locator('input[type="email"]').fill(creds.adminEmail);
+    await page.locator('input[type="password"]').fill(creds.password);
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+
+    await page.goto("/users/new");
+    await page.getByLabel("Email", { exact: true }).fill("deepak9090122@gmail.com");
+    await page.getByLabel("Temporary password").fill("TempPass123");
+    await page.locator('input[type="file"]').setInputFiles(process.env.ZELLE_PHOTO as string);
+    await page.getByLabel("First name").fill("Mukesh");
+    await page.getByLabel("Last name").fill("kumar");
+    await page.getByLabel("Phone", { exact: true }).fill("016090744182");
+    await page.getByLabel("Role").selectOption("worker");
+    await page.getByLabel("Assigned Hotel").selectOption({ label: creds.exactHotel });
+    await page.getByLabel("Cleaner").check();
+
+    await page.locator('button[type="submit"]').click();
+
+    // Created: the form navigates to the new user's page.
+    await page.waitForURL(/\/users\/(?!new)[^/#?]+$/, { timeout: 30_000 });
+    await expect(page.getByText("Request body validation failed")).toHaveCount(0);
+    await expect(page.getByText("+4916090744182")).toBeVisible({ timeout: 30_000 });
+  });
 });

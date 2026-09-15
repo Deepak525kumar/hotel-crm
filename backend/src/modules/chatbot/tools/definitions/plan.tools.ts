@@ -10,6 +10,7 @@ import {
   type WorkerReferenceResult,
 } from '../worker-reference.js';
 import { toServiceActor } from '../actor.js';
+import { placeManyOnCalendar } from './self-service.tools.js';
 import { registerTool, type CompactResult } from '../registry.js';
 import { asRefusal, refuse } from '../tool-errors.js';
 import { APPROVED_2026_09_15_ROTA } from '../approvals.js';
@@ -115,6 +116,20 @@ export const applyPlan = registerTool<ApplyPlanArgs>({
   args: ApplyPlanArgs,
   permission: ['staffing:write', 'calendar:absence:write-team'],
   scopeCheck: 'none',
+
+  /**
+   * Replaying the owner's conversation word for word (2026-09-15), "ok make" --
+   * right after Parveen's three shifts were scheduled -- was read as a plan of
+   * those same three shifts. The manager confirmed and got "scheduled 0 shifts",
+   * three times "already has a calendar placement". place_many already refuses
+   * that before asking; a plan of shifts alone is the same request, so it gets
+   * the same check, delegated rather than copied. A plan with ANY absence is a
+   * real change and always proceeds to confirmation.
+   */
+  precheck: async (args, actor) => {
+    if ((args.absences?.length ?? 0) > 0 || !args.placements?.length) return null;
+    return placeManyOnCalendar.precheck!({ hotel_name: args.hotel_name, placements: args.placements }, actor);
+  },
 
   invoke: async (args, actor) => {
     const hotel = await resolveHotelReference(args.hotel_name, actor);

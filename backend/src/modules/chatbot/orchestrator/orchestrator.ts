@@ -10,10 +10,13 @@ import { resolveTool, type CompactResult } from '../tools/registry.js';
 import {
   actorHotelNames,
   actorLanguage,
+  actorManagerNames,
   actorWorkerNames,
+  detectWritingLanguage,
   precheckReferences,
 } from './reference-precheck.js';
 import { classifyConfirmationReply } from './confirmation-language.js';
+import { renderUnsupportedDates, unsupportedDates } from './date-provenance.js';
 import { buildObservation } from './observation.js';
 import { checkBudget, recordSpend } from '../guardrails/budget.js';
 import {
@@ -577,14 +580,19 @@ async function executeTurn(params: {
   // (router-l1.ts PromptContext).
   // In parallel: three small scoped reads, so the prompt costs one round trip
   // rather than three.
-  const [hotels, workers, language] = await Promise.all([
+  const [hotels, workers, managers, chosenLanguage] = await Promise.all([
     actorHotelNames(params.actor),
     actorWorkerNames(params.actor),
+    actorManagerNames(params.actor),
     actorLanguage(params.actor),
   ]);
+  // A chosen language wins; otherwise the language of their own messages in
+  // this conversation, when it is clear (see detectWritingLanguage).
+  const language = chosenLanguage ?? detectWritingLanguage([...history, params.text ?? '']);
   const promptContext = {
     hotels,
     workers,
+    managers,
     language,
     lastAction: readLastAction(conversation.session_state),
   };
@@ -817,6 +825,30 @@ async function executeTurn(params: {
           route: 'L1',
         };
       }
+    }
+
+    // AND EVERY DATE MUST BE ONE THE PERSON GAVE. Replaying the owner's own
+    // conversation, "add that another dates also" was proposed as 20, 21 and
+    // 22 September -- days nobody had mentioned. Checked against the person's
+    // OWN words in this conversation only (see date-provenance.ts).
+    if (unsupportedDates(confirmedArgs, [...history, params.text ?? '']).length > 0) {
+      logger.warn('chatbot_unsupported_dates_in_proposal', {
+        tool: proposed.name,
+        requestId: params.requestId,
+      });
+      await prisma.chatbotConversation.update({
+        where: { id: params.conversationId },
+        data: {
+          turn_count: { increment: 1 },
+          tokens_input: { increment: completion.usage.promptTokens },
+          tokens_output: { increment: completion.usage.completionTokens },
+        },
+      });
+      return {
+        reply: renderUnsupportedDates(),
+        status: ChatbotConversationStatus.IN_PROGRESS,
+        route: 'L1',
+      };
     }
 
     await writePendingConfirmation(params.conversationId, {

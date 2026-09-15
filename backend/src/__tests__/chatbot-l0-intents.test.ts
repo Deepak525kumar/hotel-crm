@@ -45,3 +45,25 @@ describe('it steps aside when it cannot be sure', () => {
     expect(matchL0(text)?.tool).not.toBe('reports.work_summary');
   });
 });
+
+/**
+ * "I want previous chats" -- in the owner's conversation, replayed word for
+ * word (2026-09-15), the model said "Here are your previous chats" and listed
+ * nothing. Answered by the tool, never by prose.
+ */
+describe('intent: previous chats', () => {
+  it.each(['I want previous chats', 'show my old conversations', 'chat history', 'zeig mir meine alten Chats', 'frühere Gespräche'])(
+    'routes "%s" to the history tool with no arguments',
+    (text) => {
+      expect(matchL0(text)?.tool).toBe('chatbot.recent_conversations');
+      expect(matchL0(text)?.args).toEqual({});
+    }
+  );
+
+  it.each(['what did I ask in chat yesterday', 'previous shifts', 'old rooms list', 'make me that chat copy'])(
+    'leaves "%s" to the model',
+    (text) => {
+      expect(matchL0(text)?.tool).not.toBe('chatbot.recent_conversations');
+    }
+  );
+});

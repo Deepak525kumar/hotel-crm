@@ -409,3 +409,16 @@ describe('reports.work_summary -- "give me record data previews weeks how much w
     expect(actorHasPermission(manager(), teamWorkSummary.permission!)).toBe(true);
   });
 });
+
+/** "I want make id more next employe" pre-filled first name "next employee" -- found replaying verbatim. */
+describe('users.new_account_link does not take a description for a name', () => {
+  it.each(['next employee', 'new worker', 'neuer Mitarbeiter', 'someone'])('asks for the real name instead of "%s"', async (name) => {
+    const out = await newAccountLink.invoke({ first_name: name } as never, manager());
+    expect(summaryOf(newAccountLink, out)).toMatch(/What is the new employee's name/);
+  });
+
+  it('still prepares the form for a real name', async () => {
+    const out = (await newAccountLink.invoke({ first_name: 'Mukesh', last_name: 'kumar' } as never, manager())) as { link?: string };
+    expect(out.link).toMatch(/first_name=Mukesh/);
+  });
+});

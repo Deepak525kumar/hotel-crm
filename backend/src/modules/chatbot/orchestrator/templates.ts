@@ -207,7 +207,11 @@ export function renderIncompleteRequest(toolName: string, argKeys: string[]): st
   if (labels.length === 0) {
     return `${understood} something in the request did not fit. Could you say it again with the name and the date?`;
   }
-  return `${understood} I still need: ${labels.join(', ')}. Dates can be written like "16 September" or "tomorrow".`;
+  // The date hint only when a DATE is what is missing. Replaying the owner's
+  // words (2026-09-15), "I still need: first name. Dates can be written like
+  // ..." answered a question about a new employee with advice about dates.
+  const needsDate = argKeys.some((key) => /(^|_)(day|days|date|from|to|start|end)$/.test(key));
+  return `${understood} I still need: ${labels.join(', ')}.${needsDate ? ' Dates can be written like "16 September" or "tomorrow".' : ''}`;
 }
 
 /** Verb phrases for READ tools, used only by renderIncompleteRequest. */
@@ -245,6 +249,13 @@ const UNBACKED_CLAIM = [
   /\b(has|have)\s+been\s+(placed|put|added|scheduled|booked|assigned|moved|cancell?ed|recorded|withdrawn)\s+(on|onto|to|for|from|in)\b/i,
   /\b(ich habe|wir haben)\b[^.]*\b(eingetragen|eingeplant|storniert|angelegt|gebucht|gespeichert|verschoben|zugewiesen)\b/i,
   /\b(wurde|wurden)\b[^.]*\b(eingetragen|eingeplant|storniert|angelegt|gebucht|verschoben|zugewiesen)\b/i,
+  // A LINK NOBODY MADE. Replaying the owner's words (2026-09-15): the account
+  // tool had only asked for the name, then "yes create id" got "I already
+  // created a link to make the new employee's account" and "make me that chat
+  // copy" got "I provided a link to set up a new user account". There was no
+  // link. A real one is the tool's own reply, returned verbatim, never prose.
+  /\bI\b[^.]*\b(created|provided|sent|made|generated|shared|gave you)\b[^.]*\blink\b/i,
+  /\b(ich habe|hier ist)\b[^.]*\blink\b/i,
 ];
 
 export function isUnbackedActionClaim(text: string): boolean {

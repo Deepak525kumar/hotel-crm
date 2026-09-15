@@ -172,9 +172,26 @@ async function main() {
   // against it. No scenario runs here in that mode.
   if (process.env.SERVE_FOR_BROWSER) {
     const { writeFileSync } = await import('node:fs');
+    // S04, VERBATIM: the admin fills the New user form with the field
+    // report's exact values, including its hotel's exact name.
+    const exactName = 'Premier Inn Essen City Centre Hotel';
+    const exactHotel =
+      (await prisma.hotel.findFirst({ where: { name: exactName, deleted_at: null, hotel_group_id: { not: null } } })) ??
+      (await prisma.hotel.create({ data: { name: exactName, city: 'Essen', address: 'Kennedyplatz 1', hotel_group_id: group.id } }));
+    // The exact phone and email are unique. Earlier local runs of THIS harness
+    // stored them on throwaway test users; free them so the form tests the
+    // product, not a collision with this script's own leftovers.
+    await prisma.user.updateMany({ where: { phone: '+4916090744182' }, data: { phone: null } });
+    await prisma.user.updateMany({
+      where: { email: 'deepak9090122@gmail.com' },
+      data: { email: `retired.${tag}.${Date.now()}@example.test` },
+    });
+    const formAdmin = await prisma.user.create({
+      data: { email: `form.admin.${tag}@example.test`, password_hash: hash, first_name: 'Form', last_name: `Admin${tag}`, role: 'ADMIN' as never, email_verified_at: new Date() } as never,
+    });
     writeFileSync(
       process.env.SERVE_FOR_BROWSER,
-      JSON.stringify({ email: maria.email, password: PASSWORD, hotel: hotel.name, tag })
+      JSON.stringify({ email: maria.email, adminEmail: formAdmin.email, password: PASSWORD, hotel: hotel.name, exactHotel: exactHotel.name, tag })
     );
     console.log(`SERVING on ${base} for the browser spec; credentials in ${process.env.SERVE_FOR_BROWSER}`);
     await new Promise(() => undefined);
@@ -213,6 +230,101 @@ async function main() {
       console.log(`FAIL ${id} -- threw: ${error instanceof Error ? error.stack : String(error)}`);
     }
   };
+
+  // ===========================================================================
+  // VERBATIM=1 -- the owner's seven conversations EXACTLY as typed.
+  //
+  // Asked on 2026-09-15: "have you tried the same prompts from the conversation
+  // i gave you?" The scenarios below adapt several (dates from today, a name
+  // added to "yes create id", "ok make" skipped when a proposal came earlier,
+  // "15 16 17 what dates" / "harvir singh" / "17 add" never sent). This mode
+  // sends every message the owner typed, word for word, in their order, one
+  // conversation per screenshot, pressing Confirm whenever it is offered (the
+  // owner pressed it). It prints every reply in full, then checks the data.
+  // The only message that is not the owner's is a labelled PRECONDITION: the
+  // cancel transcript begins with Parveen already on the calendar for the 16th.
+  // ===========================================================================
+  if (process.env.VERBATIM) {
+    const { isUnbackedActionClaim } = await import('../src/modules/chatbot/orchestrator/templates.js');
+    // Accounts made by anything else in this database (the browser form test
+    // creates a real "Mukesh") must not count against the chat -- the first
+    // verbatim run failed its own check on exactly that.
+    const replayStarted = new Date();
+    const replies: string[] = [];
+    const talk = async (chat: Chat, text: string) => {
+      console.log(`\nYOU:   ${text}`);
+      let t = await chat.say(text);
+      replies.push(t.reply);
+      console.log(`ZELLE [${t.route ?? '?'}${t.toolInvoked ? ` ${t.toolInvoked}` : ''}${t.pendingConfirmation ? ` proposes ${t.pendingConfirmation.toolName}` : ''}]:\n       ${t.reply.replace(/\n/g, '\n       ')}`);
+      if (t.pendingConfirmation) {
+        console.log('YOU:   [presses Confirm]');
+        t = await chat.confirm(t);
+        replies.push(t.reply);
+        console.log(`ZELLE: ${t.reply.replace(/\n/g, '\n       ')}`);
+      }
+      return t;
+    };
+    const conversation = async (title: string, lines: string[]) => {
+      console.log(`\n==================== ${title} ====================`);
+      const chat = await new Chat(managerToken).open();
+      for (const line of lines) await talk(chat, line);
+    };
+
+    await conversation('1. Day task / work list', [
+      'Make day task rooms today we have 90 rooms to clean add that work list and 10 blibe',
+    ]);
+    await conversation('2. Employee ID, then a chat copy', [
+      'I want make id more next employe',
+      'yes create id',
+      'make me that chat copy',
+    ]);
+    await conversation('4. Scheduling Harvir Singh', ['15 16 17 what dates', 'harvir singh', 'manger not worker']);
+
+    console.log('\n(PRECONDITION, not the owner\'s words: the cancel transcript starts with Parveen on the calendar for 16 September)');
+    const pre = await new Chat(managerToken).open();
+    await talk(pre, 'put parveen kumar on 16 September');
+
+    await conversation('5. Cancel Parveen Kumar\'s shift', ['cancel shift for parveen kumar 16 September']);
+    await conversation('6. Previous chats', ['I want previous chats']);
+    await conversation('7. Work data, availability, planning, room count', [
+      'give me record data previews weeks how much work we did',
+      '07.09.2026 data',
+      'make me plans. for parveen 17 18 19 September',
+      'ok make',
+      'add that another dates also',
+      '17 add',
+      'parveen didi today 10 rooms',
+    ]);
+
+    // ---- what actually happened, in the database ----------------------------
+    const checks: Array<[string, boolean, string]> = [];
+    const summary = await prisma.dailyShiftSummary.findFirst({ where: { hotel_id: hotel.id } });
+    checks.push(['day summary is 90 rooms / 10 stay-over', summary?.total_rooms === 90 && summary?.stay_over_rooms === 10, `${summary?.total_rooms}/${summary?.stay_over_rooms}`]);
+    const mukesh = await prisma.user.count({ where: { created_at: { gte: replayStarted }, role: 'WORKER' as never, first_name: { not: 'Parveen' } } });
+    checks.push(['no account was created from the chat', mukesh === 0, `${mukesh}`]);
+    const harvirRows = await prisma.workerAssignment.count({ where: { worker_id: harvir.id } });
+    checks.push(['Harvir Singh (a manager) was never scheduled', harvirRows === 0, `${harvirRows}`]);
+    const sixteenth = await prisma.workerAssignment.findMany({ where: { worker_id: parveen.id, day: new Date('2026-09-16') }, select: { status: true } });
+    checks.push(['Parveen\'s 16 September shift is cancelled', sixteenth.length > 0 && sixteenth.every((r: any) => r.status === 'CANCELLED'), JSON.stringify(sixteenth)]);
+    for (const day of ['2026-09-17', '2026-09-18', '2026-09-19']) {
+      const live = await prisma.workerAssignment.count({ where: { worker_id: parveen.id, day: new Date(day), status: 'CONFIRMED' } });
+      checks.push([`Parveen has exactly one live shift on ${day}`, live === 1, `${live}`]);
+    }
+    const rooms = await prisma.roomsCompletedEntry.findUnique({ where: { assignment_id: finished.id } });
+    checks.push(['10 rooms recorded on Parveen\'s finished shift today', rooms?.rooms_completed === 10, `${rooms?.rooms_completed}`]);
+    const bad = replies.filter((r) => never.test(r));
+    checks.push(['no "did not catch that", budget or false "no access" reply', bad.length === 0, JSON.stringify(bad)]);
+    const claims = replies.filter((r) => isUnbackedActionClaim(r) && !/^(Scheduled|Cancelled|Recorded|Moved|Created|Removed|Done)/.test(r));
+    checks.push(['no reply claims a change the database does not show', claims.length === 0, JSON.stringify(claims)]);
+
+    console.log('\n==================== DATA CHECKS ====================');
+    for (const [label, ok, detail] of checks) console.log(`${ok ? 'PASS' : 'FAIL'} ${label} -- ${detail}`);
+    const passed = checks.filter(([, ok]) => ok).length;
+    console.log(`\n${passed}/${checks.length} data checks passed (tag ${tag})`);
+    server.close();
+    await disconnectDb();
+    process.exit(passed === checks.length ? 0 : 1);
+  }
 
   // ===========================================================================
   // Scenario 21 -- the field report, verbatim where the owner's words allow.
