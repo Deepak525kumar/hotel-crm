@@ -260,6 +260,17 @@ person-naming top-level key must be added to the list in `reference-precheck.ts`
 which is what lets "Anna sick Monday, Tomasz on Monday" succeed in one confirmed call. Reversing
 the order fails on the one-active-assignment-per-day rule.
 
+**The room reads include the previous day, everywhere.** `rooms/service.ts` `dayRangeFrom` spans
+the target day and the one before (night shifts). Any tool that counts or matches rooms must filter
+on the room's own `day` — `reports.work_summary`, `rooms.team_today` and `rooms.fix_my_room` all
+do, and the first of them shipped double-counting until a data-layer run caught it.
+
+**A management read over a route that workers also use needs a management token.**
+`GET /job-requests` and `GET /rooms/for-hotels` declare no token (or one workers hold), so the
+team-view tools declare `staffing:read` as well — otherwise they sit in a worker's manifest beside
+the worker-facing tool with a near-identical description, which costs routing accuracy and
+least privilege at once.
+
 **History does not weaken ADR-074 §5.1.** That control governs what reaches a prompt. A person
 reading their own transcript on their own screen is not a prompt; the one part a tool passes back
 to the model is the person's own opening message.

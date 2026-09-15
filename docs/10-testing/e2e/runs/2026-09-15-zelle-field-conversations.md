@@ -66,3 +66,25 @@ Also closed from "Could not test" above:
   PENDING with skills `[CLEANER]`.
 
 Still open: live-model routing (AWS session expired) and the production `.env` caps.
+
+## Addendum 2 (same day) — the everyday gaps
+
+Chosen by mapping every platform route against the registry and keeping daily tasks with no tool.
+Verified the same way (prerequisites seeded; the absence and the staffing requests created through
+their real tools; confirmation path → executor; rows read back). **7/7 passed.**
+
+| Check | Result | Evidence |
+|---|---|---|
+| `rooms.fix_my_room` change + remove (worker) | PASS | Log went 214/215/216 → 215/241 |
+| fix a room not in the log | PASS | Refused at precheck, before confirmation |
+| `rooms.team_today` (manager) | PASS | Per-worker count for the day only |
+| `calendar.withdraw_worker_absence` | PASS | Absence rows 1 → 0; reply says a cancelled shift is not restored |
+| `job_requests.list_for_my_team` | PASS | Both open requests listed, no ids |
+| `job_requests.cancel_request` | PASS | Two requests on one day and no position → refused at precheck; with position, waiter `CANCELLED`, cleaner still `OPEN` |
+| worker calls the management reads | PASS | Both DENIED |
+
+Defect found by this run and fixed: requests on the same day were not ordered by start time.
+
+**Deliberately not built:** a person changing their own phone number or language. `PUT /auth/profile`
+enforces no permission token and a write tool must declare one; creating that token is a permission
+change reserved for the owner.

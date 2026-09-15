@@ -128,6 +128,7 @@ const ARG_LABELS: Record<string, string> = {
   placements: 'Shifts',
   absences: 'Away',
   new_worker_name: 'Give it to',
+  new_room_number: 'Change it to',
   worker: 'Worker',
 };
 
@@ -163,6 +164,9 @@ const TOOL_ACTIONS: Record<string, string> = {
   'rooms.record_worker_count': "Record a worker's rooms cleaned",
   'assignments.swap_worker': 'Give a shift to someone else',
   'calendar.apply_plan': 'Apply this plan to the calendar',
+  'rooms.fix_my_room': 'Change or remove a room in your log',
+  'calendar.withdraw_worker_absence': "Withdraw a worker's day off",
+  'job_requests.cancel_request': 'Cancel a staffing request',
 };
 
 /**

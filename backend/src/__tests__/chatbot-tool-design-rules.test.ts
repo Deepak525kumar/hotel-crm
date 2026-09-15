@@ -171,6 +171,10 @@ describe('rule: least privilege', () => {
       'users.new_account_link',
       'assignments.swap_worker',
       'calendar.apply_plan',
+      'rooms.team_today',
+      'calendar.withdraw_worker_absence',
+      'job_requests.list_for_my_team',
+      'job_requests.cancel_request',
     ];
     const worker = actorFor('WORKER');
 

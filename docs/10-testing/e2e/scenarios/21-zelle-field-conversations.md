@@ -63,6 +63,10 @@ For every write: **read the row back.** A "Scheduled"/"Cancelled"/"Recorded" rep
 | `Parveen can't come Thursday, give it to Anna` | `assignments.swap_worker` | Confirmation names both people; old assignment `REASSIGNED`, new `CONFIRMED` linked by `previous_assignment_id` |
 | `Anna is off sick Monday, put Tomasz on Monday and Tuesday` | `calendar.apply_plan` | One confirmation listing both; Anna's Monday shift `CANCELLED`, absence row written, Tomasz 2 shifts. Any unknown name → nothing written |
 | `Parveen's phone died, she started at 07:00 today` | `attendance.correct_times` | Check-in on today's attendance row is 07:00 Berlin; reason stored in notes |
+| (worker) `I logged 214 but it was 241` | `rooms.fix_my_room` | Confirmation; the day's entry now 241; an inspected room refused before confirming |
+| `how many rooms has everyone done today` | `rooms.team_today` | Per-worker counts for today only (the underlying read includes yesterday) |
+| `Anna is better, she is not off tomorrow` | `calendar.withdraw_worker_absence` | `CalendarAbsence` row gone; reply warns a cancelled shift is not restored |
+| `which staffing requests are still open` → `cancel the cleaner request for Friday` | `job_requests.list_for_my_team`, `job_requests.cancel_request` | Two requests that day and no position → refused before confirming; otherwise that request `CANCELLED`, others untouched |
 
 ## Knowingly untested here
 

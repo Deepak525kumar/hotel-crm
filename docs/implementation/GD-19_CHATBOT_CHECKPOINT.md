@@ -185,6 +185,18 @@ manager and regional manager). Recorded as `APPROVED_2026_09_15_ROTA`. Again no 
 permission. `attendance.correct_times` kept its scope; only its description now names today as
 well as past days, which is what the tool already did.
 
+**Same day, seventh decision — the everyday gaps.** On "build the tools … to use that are
+needed", after a route-by-route map of the platform against the registry: `rooms.fix_my_room`
+(LOW_RISK_WRITE, confirmed, self-scoped, `rooms:write`), `rooms.team_today` (READ_ONLY,
+`rooms:read` AND `staffing:read`), `calendar.withdraw_worker_absence` (HIGH_RISK_WRITE,
+`calendar:absence:write-team`), `job_requests.list_for_my_team` (READ_ONLY, `staffing:read`) and
+`job_requests.cancel_request` (HIGH_RISK_WRITE, `staffing:write`; cancelling un-books anyone who
+took the request). Recorded as `APPROVED_2026_09_15_EVERYDAY`. No role gained a permission.
+**Not built, pending an owner decision:** changing one's own phone or language — `PUT
+/auth/profile` has no token to declare, so a tool would need a new one. **Noted, not changed:**
+`job_requests.create_broadcast`'s approval note still says "creates a DRAFT only" while the tool
+creates OPEN requests (a stale string in an approved record).
+
 A new registry seam, `ToolRegistration.precheck`, lets a write prove its target exists before a
 confirmation is issued. It is read-only by contract and is not an authorization layer: `invoke`
 repeats every check at execution.

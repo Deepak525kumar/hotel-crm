@@ -153,6 +153,25 @@ export const APPROVED_2026_09_15_ROTA =
   'date, using only permissions its roles already held; a later change to scope, risk ' +
   'tier or permission requires re-approval.';
 
+/**
+ * THE EVERYDAY GAPS, approved 2026-09-15 on a third instruction in the same
+ * session: "build the tools ... to use that are needed". Chosen by mapping
+ * every platform route against the registry and keeping only daily tasks with
+ * no tool: fixing a mis-logged room, the team's rooms today, withdrawing a
+ * worker's absence, and listing and cancelling staffing requests.
+ *
+ * NO ROLE GAINED A PERMISSION. Every token declared was already held by the
+ * roles each tool serves. The one daily gap that WOULD have needed a new token
+ * -- a person changing their own phone or language (`PUT /auth/profile`
+ * enforces none) -- was left unbuilt, because the owner reserved permission
+ * changes for their own decision.
+ */
+export const APPROVED_2026_09_15_EVERYDAY =
+  'APPROVED 2026-09-15 by the commissioning human under ADR-053 item 4, as the everyday ' +
+  'batch (room fixes, team rooms today, withdrawing a worker absence, staffing requests). ' +
+  'Covers this tool as registered on that date, using only permissions its roles already ' +
+  'held; a later change to scope, risk tier or permission requires re-approval.';
+
 export const APPROVED_2026_09_12_SHIFT_SUMMARY =
   'APPROVED 2026-09-12 by the commissioning human under ADR-053 item 4, on the ' +
   'transcripts showing both an admin and a manager refused when asked to record ' +

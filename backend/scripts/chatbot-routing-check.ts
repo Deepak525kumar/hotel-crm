@@ -205,6 +205,18 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
     picks('assignments.place_many')],
   ['manager', "Parveen's phone died, she started at 07:00 today", 'correct_times (today)',
     picks('attendance.correct_times')],
+
+  // Added 2026-09-15 with the everyday tools. Collision probes: fix vs log,
+  // team rooms vs my rooms vs work summary, withdraw worker vs own absence,
+  // team requests vs open shifts.
+  ['worker', 'I logged 214 but it was 241', 'fix_my_room', picks('rooms.fix_my_room')],
+  ['worker', 'Zimmer 118 löschen, das habe ich nicht gemacht', 'fix_my_room (remove, de)', picks('rooms.fix_my_room')],
+  ['worker', 'done with room 305', 'log stays log_cleaned', picks('rooms.log_cleaned')],
+  ['manager', 'how many rooms has everyone done today', 'team_today', picks('rooms.team_today')],
+  ['manager', 'Anna is better, she is not off tomorrow', 'withdraw_worker_absence',
+    picks('calendar.withdraw_worker_absence')],
+  ['manager', 'which staffing requests are still open', 'list_for_my_team', picks('job_requests.list_for_my_team')],
+  ['manager', 'cancel the cleaner request for Friday', 'cancel_request', picks('job_requests.cancel_request')],
   ['manager', 'list my checkers', 'find_team_member (role)', picks('users.find_team_member')],
   ['manager', 'I need 3 cleaners on 2026-09-17 from 08:00 to 16:00', 'create_broadcast', picks('job_requests.create_broadcast')],
   ['manager', 'ich brauche zwei Reinigungskraefte am 2026-09-17 von 08:00 bis 16:00', 'create_broadcast (de)', picks('job_requests.create_broadcast')],
