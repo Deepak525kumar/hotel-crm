@@ -1256,6 +1256,15 @@
     "micDenied": "Der Mikrofonzugriff ist aus. Schalte ihn in den Einstellungen ein, um zu diktieren.",
     "micFailed": "Das Diktat hat nicht funktioniert. Du kannst stattdessen tippen.",
     "enterHint": "Enter zum Senden, Umschalt+Enter für eine neue Zeile",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "history": "Verlauf",
+    "historyTitle": "Frühere Unterhaltungen",
+    "historyEmpty": "Keine Unterhaltungen aus den letzten 30 Tagen.",
+    "historyFailed": "Deine Unterhaltungen konnten nicht geladen werden.",
+    "historyBack": "Zurück zum Chat",
+    "newChat": "Neuer Chat",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "openForm": "Ausgefülltes Formular „Neuer Benutzer“ öffnen"
   }
 }

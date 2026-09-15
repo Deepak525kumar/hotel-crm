@@ -212,6 +212,49 @@ place a worker where nobody asked.
 
 **Verify your base branch is current before concluding anything about the repo.** A stale working branch made `prisma migrate dev` report drift for columns that a migration on `origin/main` already created, which was briefly mistaken for a missing-migration defect. Confirm against `origin/main`, not whatever branch happens to be checked out.
 
+## 6a. The field report of 2026-09-15 — what it taught
+
+The owner tried thirteen real requests; all failed. Scenario
+`docs/10-testing/e2e/scenarios/21-zelle-field-conversations.md` keeps them verbatim. The lessons
+that apply beyond those tools:
+
+**A confirmation precheck must follow the schema's SHAPE, not its top level.**
+`reference-precheck.ts` resolved `worker_name` and `hotel_name` only where they sat at the top of
+the arguments. `assignments.place_many` nests names in `placements[]`, so an unresolvable name went
+straight to "Confirm" → "✓ Confirmed" → "Nothing was scheduled". Any future tool that nests a
+reference needs the precheck extended, and a test in `chatbot-confirm-resolves-references.test.ts`.
+
+**Names are not the only thing that must exist.** "Cancel Parveen's shift on the 16th" names a real
+person and a real day with possibly nothing to cancel. `ToolRegistration.precheck` lets a write
+refuse before its confirmation. It is read-only by contract and never the authorization.
+
+**"Did not catch that" was the reply to requests that WERE caught.** The confirmation gate returned
+`renderUnrecognized()` whenever a write's arguments failed to parse. It now says which argument is
+missing (`renderIncompleteRequest`).
+
+**The daily cap was about seven manager messages.** Measured: ~12,700 prompt tokens per model step
+for a manager (system prompt ~5,600 incl. every tool description; 37 tool schemas ~7,100), and a
+turn takes 2–3 steps. The cap is now 1,000,000 and the day is Berlin's. **Still open:** every tool
+description is sent twice per step — once in the system prompt's tool list and once in the tool
+schemas. Removing the prompt copy would roughly halve per-step cost, but prompt changes have
+measurably cost routing accuracy before, so it was NOT changed without a live
+`chatbot-routing-check.ts` run. Do that measurement before touching it.
+
+**A dataset named "rooms" is not the team's rooms.** `reports.query_team`'s `rooms` dataset reads
+`roomService.listMyRooms` — the caller's own log — so for a manager it is always empty. That is the
+most likely source of "the count is 0". `reports.work_summary` reads the team's logged rooms.
+
+**Manual room counts and logged rooms are summed by analytics.** A tool that writes a
+`RoomsCompletedEntry` over a shift with logged rooms doubles the reported work.
+`rooms.record_worker_count` refuses in that case and reports the logged count.
+
+**`role` cannot be an argument, even when it is the NEW account's role.** `SafeArgs` rejected it at
+compile time; the argument is `staff_type`. The guard is right not to tell the two apart.
+
+**History does not weaken ADR-074 §5.1.** That control governs what reaches a prompt. A person
+reading their own transcript on their own screen is not a prompt; the one part a tool passes back
+to the model is the person's own opening message.
+
 ## 7. Next steps, in order
 
 1. **Close the remaining G2 blockers** (§4). `OD-CHAT-013` is CLOSED (owner assigned 2026-09-04) and

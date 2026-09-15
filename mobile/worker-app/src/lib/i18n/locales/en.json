@@ -1256,6 +1256,15 @@
     "micDenied": "Microphone access is off. Turn it on in Settings to dictate.",
     "micFailed": "Dictation did not work. You can type instead.",
     "enterHint": "Enter to send, Shift+Enter for a new line",
-    "retry": "Try again"
+    "retry": "Try again",
+    "history": "History",
+    "historyTitle": "Earlier conversations",
+    "historyEmpty": "No conversations from the last 30 days.",
+    "historyFailed": "Could not load your conversations.",
+    "historyBack": "Back to chat",
+    "newChat": "New chat",
+    "copy": "Copy",
+    "copied": "Copied",
+    "openForm": "Open the filled-in New user form"
   }
 }

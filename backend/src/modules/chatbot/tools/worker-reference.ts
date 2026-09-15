@@ -36,7 +36,9 @@ export type WorkerReferenceResult =
   | { status: 'RESOLVED'; workerId: string; fullName: string; hotelId: string }
   | { status: 'NO_SCOPE' }
   | { status: 'NOT_FOUND'; query: string }
-  | { status: 'AMBIGUOUS'; query: string; candidates: string[] };
+  | { status: 'AMBIGUOUS'; query: string; candidates: string[] }
+  /** A real colleague in scope who holds a management role, so cannot be staffed. */
+  | { status: 'NOT_STAFFABLE'; query: string; fullName: string; role: string };
 
 /** The hotel an actor is scoped to, or null when they are not hotel-scoped. */
 function hotelIdFromScope(actor: ActorContext): string | null {
@@ -114,7 +116,9 @@ export async function resolveWorkerReference(
   // it also returns managers and admins who hold employment records, and a
   // manager is not someone you put on a cleaning shift.
   const eligibleIds = await listEligibleWorkerIds(hotelId, ['WORKER', 'CHECKER']);
-  if (eligibleIds.length === 0) return { status: 'NOT_FOUND', query };
+  if (eligibleIds.length === 0) {
+    return (await nonStaffableMatch(needle, query, hotelId)) ?? { status: 'NOT_FOUND', query };
+  }
 
   const candidates = await getPrisma().user.findMany({
     where: { id: { in: eligibleIds }, deleted_at: null, is_active: true },
@@ -128,7 +132,9 @@ export async function resolveWorkerReference(
     return full.includes(needle);
   });
 
-  if (matches.length === 0) return { status: 'NOT_FOUND', query };
+  if (matches.length === 0) {
+    return (await nonStaffableMatch(needle, query, hotelId)) ?? { status: 'NOT_FOUND', query };
+  }
 
   // AN EXACT MATCH WINS OUTRIGHT.
   //
@@ -179,11 +185,72 @@ export async function resolveWorkerReference(
   };
 }
 
+/**
+ * A name that matched no worker or checker, checked against the MANAGERS on
+ * the same roster.
+ *
+ * Production, 2026-09-15:
+ *
+ *     Nothing was scheduled. No worker matching "Harvir Singh" is on your team.
+ *     > manger not worker
+ *     I cannot set shifts for a manager role using the provided tools ...
+ *
+ * Harvir Singh was on the team -- as a manager. "Not on your team" was false,
+ * and it sent the manager looking for a typo that did not exist. The rule
+ * itself is right and stays (owner decision, 2026-09-15: managers are not put
+ * on the cleaning calendar, by the assistant or by hand); what was wrong is
+ * that the refusal gave the wrong reason.
+ *
+ * SAME DISCLOSURE BOUNDARY AS THE WORKER SEARCH ABOVE. The candidates come
+ * from `listEligibleWorkerIds` for the same hotel -- the same group-grain
+ * roster of ACTIVE employment records the worker lookup already reads, only
+ * with the management roles named instead. It reveals nothing outside what
+ * the caller's roster already contains, and a manager elsewhere on the
+ * platform still comes back NOT_FOUND, indistinguishable from nobody.
+ *
+ * Only an UNAMBIGUOUS match is reported. Two managers matching "Singh" is not
+ * a scheduling question at all, and naming both would be a lookup the caller
+ * did not ask for.
+ */
+async function nonStaffableMatch(
+  needle: string,
+  query: string,
+  hotelId: string
+): Promise<WorkerReferenceResult | null> {
+  const ids = await listEligibleWorkerIds(hotelId, ['MANAGER', 'REGIONAL_MANAGER']);
+  if (ids.length === 0) return null;
+
+  const people = await getPrisma().user.findMany({
+    where: { id: { in: ids }, deleted_at: null, is_active: true },
+    select: { id: true, first_name: true, last_name: true, role: true },
+  });
+
+  const hits = people.filter((p) => fold(`${p.first_name} ${p.last_name}`).includes(needle));
+  const exact = hits.filter((p) => fold(`${p.first_name} ${p.last_name}`) === needle);
+  const chosen = exact.length === 1 ? exact : hits;
+  if (chosen.length !== 1) return null;
+
+  const only = chosen[0]!;
+  return {
+    status: 'NOT_STAFFABLE',
+    query,
+    fullName: `${only.first_name} ${only.last_name}`,
+    role: String(only.role ?? '').toLowerCase(),
+  };
+}
+
 /** The sentence a person sees when resolution did not produce exactly one worker. */
 export function describeUnresolved(result: WorkerReferenceResult): string {
   switch (result.status) {
     case 'NO_SCOPE':
       return 'This can only be done by a manager assigned to a specific hotel.';
+    case 'NOT_STAFFABLE': {
+      const what = result.role === 'regional_manager' ? 'a regional manager' : 'a manager';
+      return (
+        `${result.fullName} is ${what}, not a worker or checker, so they cannot be ` +
+        'put on the cleaning schedule. Only workers and checkers can be scheduled.'
+      );
+    }
     case 'NOT_FOUND':
       return `No worker matching "${result.query}" is on your team.`;
     case 'AMBIGUOUS':
@@ -337,7 +404,9 @@ export function describeUnresolvedHotel(result: HotelReferenceResult): string {
 export function refuseUnresolved(result: WorkerReferenceResult) {
   const code =
     result.status === 'AMBIGUOUS' ? 'AMBIGUOUS'
-    : result.status === 'NO_SCOPE' ? 'OUT_OF_SCOPE'
+    // NOT_STAFFABLE stops rather than asking: the person exists and the name
+    // was right, so inviting a different spelling would only repeat it.
+    : result.status === 'NO_SCOPE' || result.status === 'NOT_STAFFABLE' ? 'OUT_OF_SCOPE'
     : 'NOT_FOUND';
   return refuse(code, describeUnresolved(result));
 }

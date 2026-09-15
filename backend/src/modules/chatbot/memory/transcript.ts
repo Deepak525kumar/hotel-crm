@@ -179,6 +179,118 @@ export async function replayableHistory(
 }
 
 /**
+ * THE PERSON'S OWN CONVERSATIONS, for the History list and for the assistant
+ * to answer "I want previous chats".
+ *
+ * Reported 2026-09-15: asked for previous chats, the assistant said "Each
+ * conversation is independent" -- while every one of them sat encrypted in
+ * this table for 30 days, readable by the person only through a GDPR export.
+ * The data was already theirs (it is in their personal export by the
+ * 2026-09-08 decision); there was just no ordinary way to see it.
+ *
+ * WHAT THIS DOES NOT CHANGE about ADR-074 §5.1. That control is about what
+ * reaches a PROMPT: assistant text is never replayed into one. Showing a
+ * person their own transcript on their own screen is not a prompt, and the
+ * preview below -- the one part a tool passes back to the model -- is the
+ * person's own FIRST MESSAGE only, never an assistant reply.
+ *
+ * The window matches the retention sweep, so the list never promises a
+ * conversation the sweep has already deleted.
+ */
+const HISTORY_DAYS = 30;
+const PREVIEW_CHARS = 120;
+
+export interface ConversationPreview {
+  id: string;
+  startedAt: Date;
+  status: string;
+  /** The person's own first message, shortened. Never an assistant reply. */
+  opening: string | null;
+  messageCount: number;
+}
+
+export async function listRecentConversations(
+  workerId: string,
+  limit = 20
+): Promise<ConversationPreview[]> {
+  if (!isMemoryEnabled()) return [];
+
+  const k = key();
+  const since = new Date(Date.now() - HISTORY_DAYS * 86_400_000);
+  const rows = await getPrisma().chatbotConversation.findMany({
+    // `worker_id` is the caller's own id, from req.auth, and is the whole
+    // scope: there is no parameter that names anybody else.
+    where: { worker_id: workerId, created_at: { gte: since }, messages: { some: {} } },
+    orderBy: { created_at: 'desc' },
+    take: Math.min(Math.max(limit, 1), 50),
+    select: {
+      id: true,
+      created_at: true,
+      status: true,
+      messages: {
+        where: { role: 'USER' },
+        orderBy: { turn_index: 'asc' },
+        take: 1,
+        select: { content: true },
+      },
+      _count: { select: { messages: true } },
+    },
+  });
+
+  return rows.map((row) => {
+    const first = row.messages[0] ? tryDecryptField(row.messages[0].content, k) : null;
+    const opening =
+      first && first.length > PREVIEW_CHARS ? `${first.slice(0, PREVIEW_CHARS - 1)}…` : first;
+    return {
+      id: row.id,
+      startedAt: row.created_at,
+      status: String(row.status),
+      opening,
+      messageCount: row._count.messages,
+    };
+  });
+}
+
+/**
+ * One of the person's own conversations, both sides, oldest first.
+ *
+ * Null when the conversation does not exist OR belongs to someone else -- the
+ * two are deliberately indistinguishable, so an id cannot be probed for.
+ * Unlike the export below, an unreadable row is skipped rather than raised:
+ * this is a screen, not the answer to a legal right.
+ */
+export async function readOwnTranscript(
+  conversationId: string,
+  workerId: string
+): Promise<StoredMessage[] | null> {
+  const prisma = getPrisma();
+  const conversation = await prisma.chatbotConversation.findUnique({
+    where: { id: conversationId },
+    select: { worker_id: true },
+  });
+  if (!conversation || conversation.worker_id !== workerId) return null;
+  if (!isMemoryEnabled()) return [];
+
+  const k = key();
+  const rows = await prisma.chatbotMessage.findMany({
+    where: { conversation_id: conversationId },
+    orderBy: [{ turn_index: 'asc' }, { created_at: 'asc' }],
+    select: { role: true, content: true, turn_index: true, created_at: true },
+  });
+
+  return rows
+    .flatMap((row) => {
+      const content = tryDecryptField(row.content, k);
+      return content === null
+        ? []
+        : [{ role: row.role as 'USER' | 'ASSISTANT', content, turnIndex: row.turn_index, createdAt: row.created_at }];
+    })
+    // A turn's question before its answer. Both rows of a turn are written in
+    // one createMany and can share a timestamp, so role breaks the tie.
+    .sort((a, b) => a.turnIndex - b.turnIndex || (a.role === b.role ? 0 : a.role === 'USER' ? -1 : 1));
+}
+
+/**
  * The full transcript for a data-subject access request.
  *
  * BOTH ROLES, and unlike the replay path this one does NOT swallow a

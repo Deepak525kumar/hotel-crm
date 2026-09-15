@@ -1903,6 +1903,24 @@ export interface ChatbotConversation {
 }
 
 /**
+ * One of the caller's own earlier conversations, for History (2026-09-15).
+ * `opening` is their own first message, shortened -- never an assistant reply.
+ */
+export interface ChatbotConversationSummary {
+  id: string;
+  started_at: string;
+  status: string;
+  opening: string | null;
+  message_count: number;
+}
+
+/** One of the caller's own conversations, both sides, read back. */
+export interface ChatbotTranscript {
+  id: string;
+  messages: { role: "user" | "assistant"; text: string; at: string }[];
+}
+
+/**
  * The result of one turn.
  *
  * `pending_confirmation` is present when the assistant is proposing a

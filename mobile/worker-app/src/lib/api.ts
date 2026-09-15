@@ -34,6 +34,8 @@ import type {
   CreatePayslipRequestRequest,
   ChatbotCommandDto,
   ChatbotConversationDto,
+  ChatbotConversationSummaryDto,
+  ChatbotTranscriptDto,
   ChatbotTurnDto,
   GeneratedReportDto,
 } from '@/types/api';
@@ -469,6 +471,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({}),
       }),
+
+    /** The caller's OWN conversations from the last 30 days, newest first. */
+    listConversations: () => request<ChatbotConversationSummaryDto[]>('/chatbot/conversations'),
+
+    /** One of the caller's own conversations, both sides, for reading back. */
+    getTranscript: (conversationId: string) =>
+      request<ChatbotTranscriptDto>(`/chatbot/conversations/${conversationId}/messages`),
 
     /**
      * Exactly ONE of text, commandId or confirmToken. The backend rejects any

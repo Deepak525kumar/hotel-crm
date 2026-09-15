@@ -124,6 +124,9 @@ const ARG_LABELS: Record<string, string> = {
   format: 'Format',
   staff_type: 'Staff type',
   count: 'Count',
+  rooms: 'Rooms',
+  placements: 'Shifts',
+  worker: 'Worker',
 };
 
 /**
@@ -153,7 +156,29 @@ const TOOL_ACTIONS: Record<string, string> = {
   'rooms.log_cleaned': 'Log a room as cleaned',
   'hr.request_payslip': 'Request your payslip',
   'notifications.mark_read': 'Mark a message as read',
+  'assignments.cancel_shift': 'Cancel a shift',
+  'assignments.move_shift': 'Move a shift to another day',
+  'rooms.record_worker_count': "Record a worker's rooms cleaned",
 };
+
+/**
+ * A write the model understood but could not fully fill in.
+ *
+ * Kept apart from renderUnrecognized(): "I did not catch that" is true when
+ * nothing was understood, and false -- and costly, because it makes the
+ * person start over -- when the action was clear and one detail was missing.
+ * Only the argument LABELS are named, never a value the model produced.
+ */
+export function renderIncompleteRequest(toolName: string, argKeys: string[]): string {
+  const labels = [...new Set(argKeys.filter(Boolean))].map(
+    (key) => (ARG_LABELS[key] ?? key.replace(/_/g, ' ')).toLowerCase()
+  );
+  const action = describeToolAction(toolName).toLowerCase();
+  if (labels.length === 0) {
+    return `I understood that you want to ${action}, but something in the request did not fit. Could you say it again with the name and the date?`;
+  }
+  return `I understood that you want to ${action}, but I still need: ${labels.join(', ')}. Dates can be written like "16 September" or "tomorrow".`;
+}
 
 /** "assignments.place_worker" -> "Place worker", as a last resort. */
 function describeToolAction(toolName: string): string {

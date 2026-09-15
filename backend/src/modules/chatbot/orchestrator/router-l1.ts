@@ -348,6 +348,18 @@ export function buildSystemPrompt(
         ]
       : []),
     'For a date not listed above, count from today. Never use another year.',
+    // FACTS, not rules -- see the Zelle note above for why that distinction
+    // is measured rather than stylistic.
+    //
+    // Day-first dates. Asked for "07.09.2026 data" on 2026-09-15; in Germany
+    // that is the 7th of September, and a model trained mostly on US text
+    // reads it as July 9th with nothing downstream able to tell.
+    'Dates written with dots, like 07.09.2026 or 7.9., are day first: 07.09.2026 is 2026-09-07.',
+    // What is on the screen around the conversation. Asked "I want previous
+    // chats" and "make me that chat copy" on 2026-09-15, the model answered
+    // that neither was possible -- because nothing had told it the window has
+    // both.
+    'The chat window has a History button that lists this person\'s conversations from the last 30 days, and a Copy button that copies the current conversation.',
     '',
     'Rules:',
     '- Answer only from what a tool returns. If no tool can answer, say so plainly; never guess a shift, a date, a name or a number.',

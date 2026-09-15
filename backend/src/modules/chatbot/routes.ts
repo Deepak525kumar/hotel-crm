@@ -4,6 +4,8 @@ import { chatbotActionRateLimit, chatbotTurnRateLimit } from './guardrails/rate-
 import {
   exchangeMessage,
   getConversation,
+  getConversationMessages,
+  listConversations,
   invokeTool,
   listCommands,
   listTools,
@@ -40,6 +42,13 @@ router.post('/conversations', chatbotActionRateLimit(), startConversation);
 // duplicating them: they bound spend, this bounds rate.
 router.post('/conversations/:id/messages', chatbotTurnRateLimit(), exchangeMessage);
 router.get('/conversations/:id', getConversation);
+
+// History (2026-09-15). The caller's OWN conversations and nobody else's: the
+// service reads only rows whose worker_id is req.auth's own id, and answers
+// "not found" for any other id. No token, for the same reason the routes above
+// carry none -- every role owns its own conversations.
+router.get('/conversations', listConversations);
+router.get('/conversations/:id/messages', getConversationMessages);
 
 // L0 command manifest — the client renders these as quick-reply chips. A
 // tapped chip costs zero tokens.

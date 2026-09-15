@@ -5,7 +5,7 @@ import { logger } from '../../../lib/logger.js';
 import type { ActorContext } from '../tools/actor.js';
 import { executeTool } from '../tools/executor.js';
 import { findPriorCall, recordToolCall } from '../tools/tool-call-log.js';
-import { describeToolError } from '../tools/tool-errors.js';
+import { asRefusal, describeToolError } from '../tools/tool-errors.js';
 import { resolveTool, type CompactResult } from '../tools/registry.js';
 import {
   actorHotelNames,
@@ -31,6 +31,7 @@ import {
   renderBudgetFallback,
   renderConversationClosed,
   renderDenied,
+  renderIncompleteRequest,
   renderProviderUnavailable,
   renderToolResult,
   renderUnrecognized,
@@ -686,8 +687,28 @@ async function executeTurn(params: {
         tool: proposed.name,
         requestId: params.requestId,
       });
+      // SAY WHAT IS MISSING, not "did not catch that".
+      //
+      // Production, 2026-09-15: "cancel shift for parveen kumar 16 September"
+      // came back "Sorry, I did not catch that." The request had been
+      // understood perfectly well -- the model chose a write and filled in
+      // most of it -- and the one thing wrong was an argument. Telling the
+      // person they were not understood makes them rephrase the whole
+      // sentence, when one word would have done. The labels are the same ones
+      // the confirmation screen uses; the model's own values are not echoed.
+      await prisma.chatbotConversation.update({
+        where: { id: params.conversationId },
+        data: {
+          turn_count: { increment: 1 },
+          tokens_input: { increment: completion.usage.promptTokens },
+          tokens_output: { increment: completion.usage.completionTokens },
+        },
+      });
       return {
-        reply: renderUnrecognized(),
+        reply: renderIncompleteRequest(
+          proposed.name,
+          parsedArgs.error.issues.map((issue) => String(issue.path[0] ?? ''))
+        ),
         status: ChatbotConversationStatus.IN_PROGRESS,
         route: 'L1',
       };
@@ -731,6 +752,45 @@ async function executeTurn(params: {
 
     // Canonical names from here on, so what the person reads is what runs.
     const confirmedArgs = references.args;
+
+    // AND THE THING IT ACTS ON MUST EXIST. See `ToolRegistration.precheck`:
+    // a real worker and a real day can still have no shift to cancel, and a
+    // confirmation for that is the same fiction the reference check closed.
+    //
+    // A precheck that THROWS does not block: it is an early warning, and the
+    // tool repeats every check at execution. Failing the turn over it would
+    // trade a slightly later refusal for no answer at all.
+    if (proposed.precheck) {
+      let blocked: ReturnType<typeof asRefusal> = null;
+      try {
+        const reparsed = proposed.args.safeParse(confirmedArgs);
+        if (reparsed.success) {
+          blocked = asRefusal(await proposed.precheck(reparsed.data, params.actor));
+        }
+      } catch (error) {
+        logger.warn('chatbot_tool_precheck_failed', {
+          tool: proposed.name,
+          requestId: params.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      if (blocked) {
+        await prisma.chatbotConversation.update({
+          where: { id: params.conversationId },
+          data: {
+            turn_count: { increment: 1 },
+            tokens_input: { increment: completion.usage.promptTokens },
+            tokens_output: { increment: completion.usage.completionTokens },
+          },
+        });
+        return {
+          reply: blocked.message,
+          status: ChatbotConversationStatus.IN_PROGRESS,
+          route: 'L1',
+        };
+      }
+    }
 
     await writePendingConfirmation(params.conversationId, {
       toolName: proposed.name,

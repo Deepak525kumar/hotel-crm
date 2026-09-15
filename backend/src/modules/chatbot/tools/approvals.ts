@@ -102,6 +102,36 @@ export const APPROVED_2026_09_09_PLANNING =
  * later change to either tool's scope, risk tier or permission needs its own
  * approval rather than this one.
  */
+/**
+ * THE FIELD REPORT OF 2026-09-15, approved on a direct instruction.
+ *
+ * The commissioning human tried the assistant on real work, collected every
+ * conversation that failed, and asked for all of them to work: "if you need to
+ * build more tools build it ... you can build tools yourself though", with one
+ * limit stated in the same sentence -- "ask me first before giving or changing
+ * permissions". That is an explicit approval of the tools built for THOSE
+ * conversations, and of nothing beyond them.
+ *
+ * WHAT IT COVERS. Cancelling a team member's shift, recording the rooms a
+ * worker cleaned on a completed shift, a one-answer team work summary over a
+ * date range, a link to the New user form with a new employee's details
+ * filled in, and listing the caller's own recent conversations.
+ *
+ * WHAT IT DOES NOT: no role gained a permission. Every one of these declares a
+ * token its role already held on 2026-09-15 (`staffing:write`,
+ * `reports:read-team`, `users:write`), or is self-scoped and token-less by the
+ * registry's own narrow rule. Two owner decisions taken alongside it are
+ * recorded where they bind: managers stay off the cleaning calendar
+ * (worker-reference.ts), and accounts are still created on the form because a
+ * profile photo is mandatory (accounts.tools.ts). A later change to any of
+ * these tools' scope, tier or permission needs its own approval.
+ */
+export const APPROVED_2026_09_15_FIELD_REPORT =
+  'APPROVED 2026-09-15 by the commissioning human under ADR-053 item 4, on the ' +
+  'field report of conversations that failed in real use. Covers this tool as ' +
+  'registered on that date, using only permissions its roles already held; a ' +
+  'later change to scope, risk tier or permission requires re-approval.';
+
 export const APPROVED_2026_09_12_SHIFT_SUMMARY =
   'APPROVED 2026-09-12 by the commissioning human under ADR-053 item 4, on the ' +
   'transcripts showing both an admin and a manager refused when asked to record ' +

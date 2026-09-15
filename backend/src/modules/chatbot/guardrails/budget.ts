@@ -1,5 +1,6 @@
 import { getEnv } from '../../../config/env.js';
 import { getPrisma } from '../../../lib/db.js';
+import { CALENDAR_TIMEZONE } from '../../../lib/utils.js';
 
 /**
  * Token budget enforcement — REQ-CHAT-004 (hard monthly cap, config-stored),
@@ -63,7 +64,7 @@ export async function checkBudget(params: {
   // budget and force fallback for everyone else. Summed from the worker's own
   // conversations today rather than a separate counter, so there is one
   // source of truth for spend.
-  const since = startOfUtcDay(params.now ?? new Date());
+  const since = startOfBerlinDay(params.now ?? new Date());
   const todays = await prisma.chatbotConversation.aggregate({
     where: { worker_id: params.workerId, created_at: { gte: since } },
     _sum: { tokens_input: true, tokens_output: true },
@@ -99,6 +100,59 @@ export async function recordSpend(params: {
   });
 }
 
-function startOfUtcDay(now: Date): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+/**
+ * Midnight in Europe/Berlin, as an instant.
+ *
+ * WAS MIDNIGHT UTC, which is 01:00 or 02:00 in Berlin. The daily cap message
+ * promises "Full use comes back tomorrow", and a manager reads "tomorrow" off
+ * a German clock: a cap hit at 23:30 did not reset at their midnight, and one
+ * hit at 00:30 counted against the day before. Every other "day" on this
+ * platform is CALENDAR_TIMEZONE for the same reason.
+ *
+ * The offset is read from Intl rather than hard-coded, and it is read AT
+ * MIDNIGHT, not at `now`. The first version used the offset at `now`, which
+ * is wrong on the two days the clocks change: at noon on 2026-10-25 Berlin is
+ * already on CET (+1), but that day's midnight was still CEST (+2), so the
+ * day started an hour late. `chatbot-budget-berlin-day.test.ts` pins that day.
+ */
+export function startOfBerlinDay(now: Date): Date {
+  const wall = berlinWallClock(now);
+  const midnightAsUtc = Date.UTC(wall.year, wall.month - 1, wall.day);
+
+  // First guess with today's offset, then correct with the offset in force
+  // at that guess -- which is midnight itself, or within an hour of it.
+  const guess = midnightAsUtc - berlinOffsetMs(now);
+  return new Date(midnightAsUtc - berlinOffsetMs(new Date(guess)));
+}
+
+function berlinWallClock(at: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: CALENDAR_TIMEZONE,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+      .formatToParts(at)
+      .map((p) => [p.type, p.value])
+  ) as Record<string, string>;
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
+}
+
+/** Berlin wall-clock time read as if it were UTC, minus the real instant. */
+function berlinOffsetMs(at: Date): number {
+  const w = berlinWallClock(at);
+  const wallAsUtc = Date.UTC(w.year, w.month - 1, w.day, w.hour, w.minute, w.second);
+  return wallAsUtc - Math.floor(at.getTime() / 1000) * 1000;
 }

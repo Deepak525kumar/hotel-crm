@@ -177,6 +177,23 @@ const CASES: Array<[role: string, phrase: string, label: string, check: Check]> 
   ['manager', 'wer ist heute da?', 'team_status (de)', picks('attendance.team_status')],
   ['manager', 'is anyone missing this morning?', 'team_status (missing)', picks('attendance.team_status')],
   ['manager', 'who is on my team?', 'find_team_member', picks('users.find_team_member')],
+
+  // Added 2026-09-15: the field report (E2E scenario 21), VERBATIM. Every one
+  // of these was typed by the owner in real use and failed. The spelling is the
+  // input -- "didi", "blibe", "manger", "previews weeks" -- and correcting it
+  // here would test a tidier product than the one people use.
+  ['manager', 'Make day task rooms today we have 90 rooms to clean add that work list and 10 blibe',
+    'S01 day summary', picks('calendar.set_day_summary')],
+  ['manager', 'yes create id for the next employee', 'S02 new account link', picks('users.new_account_link')],
+  ['manager', 'I want previous chats', 'S08 history', picks('chatbot.recent_conversations')],
+  ['manager', 'cancel shift for parveen kumar 16 September', 'S07 cancel', picks('assignments.cancel_shift')],
+  ['manager', 'give me record data previews weeks how much work we did', 'S09 work summary',
+    picks('reports.work_summary')],
+  ['manager', '07.09.2026 data how much work', 'S09 day-first date',
+    (t, a) => t === 'reports.work_summary' && a?.['from'] === '2026-09-07'],
+  ['manager', 'parveen didi today 10 rooms', 'S13 room count', picks('rooms.record_worker_count')],
+  ['manager', 'make me plans. for parveen 17 18 19 September', 'S10 availability or placement',
+    (t) => t === 'calendar.check_availability' || t === 'assignments.place_many'],
   ['manager', 'list my checkers', 'find_team_member (role)', picks('users.find_team_member')],
   ['manager', 'I need 3 cleaners on 2026-09-17 from 08:00 to 16:00', 'create_broadcast', picks('job_requests.create_broadcast')],
   ['manager', 'ich brauche zwei Reinigungskraefte am 2026-09-17 von 08:00 bis 16:00', 'create_broadcast (de)', picks('job_requests.create_broadcast')],

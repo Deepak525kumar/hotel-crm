@@ -1312,7 +1312,10 @@ export const placeManyOnCalendar = registerTool<PlaceManyArgs>({
       return {
         ...refuse(
           anyAmbiguous ? 'AMBIGUOUS' : 'NOT_FOUND',
-          unresolved.map((r) => describeUnresolvedWorker(r.resolved)).join(' ')
+          // One sentence per distinct problem. Three placements of one
+          // unresolvable person produced the same sentence three times in a
+          // row (production, 2026-09-15), which reads as three problems.
+          [...new Set(unresolved.map((r) => describeUnresolvedWorker(r.resolved)))].join(' ')
         ),
         placed: [] as PlacementOutcome[],
       };

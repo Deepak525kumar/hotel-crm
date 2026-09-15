@@ -1256,6 +1256,15 @@
     "micDenied": "L'accès au microphone est désactivé. Activez-le dans les réglages pour dicter.",
     "micFailed": "La dictée n'a pas fonctionné. Vous pouvez écrire à la place.",
     "enterHint": "Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne",
-    "retry": "Réessayer"
+    "retry": "Réessayer",
+    "history": "Historique",
+    "historyTitle": "Conversations précédentes",
+    "historyEmpty": "Aucune conversation au cours des 30 derniers jours.",
+    "historyFailed": "Impossible de charger vos conversations.",
+    "historyBack": "Retour au chat",
+    "newChat": "Nouvelle conversation",
+    "copy": "Copier",
+    "copied": "Copié",
+    "openForm": "Ouvrir le formulaire Nouvel utilisateur prérempli"
   }
 }

@@ -111,6 +111,60 @@ export async function precheckReferences(
     }
   }
 
+  // NAMES INSIDE A LIST, TOO.
+  //
+  // Production, 2026-09-15. A manager asked to schedule Harvir Singh on the
+  // 15th, 16th and 17th. `assignments.place_many` carries its names inside
+  // `placements[]`, and this precheck only ever looked at a top-level
+  // `worker_name` -- so the batch sailed through to the confirmation screen,
+  // the manager pressed Confirm, the UI showed "✓ Confirmed", and only then
+  // did the tool say:
+  //
+  //     Nothing was scheduled. No worker matching "Harvir Singh" is on your
+  //     team. No worker matching "Harvir Singh" is on your team. No worker
+  //     matching "Harvir Singh" is on your team.
+  //
+  // Exactly the "approving a fiction" defect this file was written to close,
+  // reintroduced by the one tool whose schema nests its references. The rule
+  // is unchanged: a confirmation states what will actually happen.
+  //
+  // Each distinct name is resolved once, and each distinct refusal is said
+  // once -- three identical sentences about one person read as three
+  // problems.
+  if (keys.has('placements') && Array.isArray(out['placements'])) {
+    const seen = new Map<string, Awaited<ReturnType<typeof resolveWorkerReference>>>();
+    const refusals = new Set<string>();
+    const rewritten: unknown[] = [];
+
+    for (const entry of out['placements'] as unknown[]) {
+      if (!entry || typeof entry !== 'object') {
+        rewritten.push(entry);
+        continue;
+      }
+      const row = { ...(entry as Record<string, unknown>) };
+      const raw = typeof row['worker_name'] === 'string' ? (row['worker_name'] as string) : '';
+      if (raw.trim().length > 0) {
+        const cacheKey = raw.trim().toLowerCase();
+        let worker = seen.get(cacheKey);
+        if (!worker) {
+          worker = await resolveWorkerReference(raw, actor, hotelId);
+          seen.set(cacheKey, worker);
+        }
+        if (worker.status === 'RESOLVED') {
+          row['worker_name'] = worker.fullName;
+        } else {
+          refusals.add(describeUnresolved(worker));
+        }
+      }
+      rewritten.push(row);
+    }
+
+    if (refusals.size > 0) {
+      return { status: 'REFUSED', message: [...refusals].join(' ') };
+    }
+    out['placements'] = rewritten;
+  }
+
   return { status: 'RESOLVED', args: out };
 }
 

@@ -27,6 +27,8 @@ import type {
   CalendarAbsence,
   ChatbotCommand,
   ChatbotConversation,
+  ChatbotConversationSummary,
+  ChatbotTranscript,
   ChatbotTurn,
   CalendarEntryDto,
   CheckInInput,
@@ -1013,6 +1015,13 @@ export const chatbotApi = {
 
   startConversation: () =>
     apiFetch<ChatbotConversation>("/chatbot/conversations", { method: "POST", body: {} }),
+
+  /** The caller's OWN conversations from the last 30 days, newest first. */
+  listConversations: () => apiFetch<ChatbotConversationSummary[]>("/chatbot/conversations"),
+
+  /** One of the caller's own conversations, both sides, for reading back. */
+  getTranscript: (conversationId: string) =>
+    apiFetch<ChatbotTranscript>(`/chatbot/conversations/${conversationId}/messages`),
 
   /**
    * One turn. Exactly ONE of `text`, `commandId` or `confirmToken` is sent --
