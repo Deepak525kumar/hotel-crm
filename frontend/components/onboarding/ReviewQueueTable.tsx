@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { employeesApi } from "@/lib/api";
+import { ApiError, employeesApi } from "@/lib/api";
 import {
   Badge,
   Button,
@@ -187,8 +187,19 @@ export function ReviewQueueTable() {
       <Card>
         <CardContent className="p-0">
           {error ? (
+            /* A 403 here is a STATE, not a glitch. getReviewQueue() refuses an
+               unscoped Manager or Regional Manager explicitly, on purpose --
+               the backend added that refusal (2026-09-02) so the person is
+               told why their queue is empty instead of being handed a silent
+               `200 []`. Rendering "please try again" over it threw that away
+               and asked them to repeat something that can never succeed.
+               Reported 2026-09-21 by a newly-created Manager: their own
+               onboarding was not approved yet, so they hold no hotel scope,
+               so the queue 403s -- and the screen told them to try again. */
             <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
-              {t("onboarding.reviewQueueLoadFailed")}
+              {error instanceof ApiError && error.status === 403
+                ? t("onboarding.reviewQueueUnavailable")
+                : t("onboarding.reviewQueueLoadFailed")}
             </div>
           ) : (
             <Table aria-label={t("nav.reviewQueue")}>

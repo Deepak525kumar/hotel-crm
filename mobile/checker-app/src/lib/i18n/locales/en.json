@@ -867,7 +867,8 @@
     "idOrPassport": "ID card or passport",
     "checklistTitle": "Your documents",
     "remainingCount": "{{count}} still needed",
-    "allUploaded": "All documents uploaded"
+    "allUploaded": "All documents uploaded",
+    "reviewQueueUnavailable": "You don't have a review queue yet. It appears once your own onboarding is approved and you are assigned to a hotel."
   },
   "analytics": {
     "myPerformance": "My performance",
@@ -1265,6 +1266,7 @@
     "newChat": "New chat",
     "copy": "Copy",
     "copied": "Copied",
-    "openForm": "Open the filled-in New user form"
+    "openForm": "Open the filled-in New user form",
+    "untitled": "Untitled conversation"
   }
 }

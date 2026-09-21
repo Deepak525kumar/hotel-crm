@@ -103,12 +103,14 @@ export async function runTurn(params: {
   // would file the message under the following turn and break replay order.
   const turnIndex = await currentTurnIndex(params.conversationId);
 
+  const userText = params.text ?? commandLabel(params.commandId);
+
   try {
     const result = await executeTurn(params);
     await recordTurn({
       conversationId: params.conversationId,
       turnIndex,
-      userText: params.text,
+      userText,
       assistantText: result.reply,
     });
     return result;
@@ -116,10 +118,38 @@ export async function runTurn(params: {
     await recordTurn({
       conversationId: params.conversationId,
       turnIndex,
-      userText: params.text,
+      userText,
     });
     throw error;
   }
+}
+
+/**
+ * What the person "said" when they tapped a chip instead of typing.
+ *
+ * A tapped chip sends `command_id` and NEVER the label -- deliberately, so the
+ * label can be translated client-side and the backend still matches on a
+ * stable id. The consequence nobody traced until 2026-09-21: `recordTurn` was
+ * handed `userText: undefined` for every chip turn, so the conversation stored
+ * an assistant reply and no user message at all.
+ *
+ * Verified in production that day: of 20 stored conversations, the one opened
+ * on a chip had `user_msgs = 0, assistant_msgs = 1`, and it rendered in Zelle's
+ * "Earlier conversations" list as a bare ellipsis, because
+ * listRecentConversations() names a conversation after the person's first
+ * message and there was none. (The transcripts themselves were fine -- all six
+ * sampled rows decrypted cleanly, so the key was never the problem.)
+ *
+ * Resolving the label here rather than trusting a client-sent one keeps the
+ * property the chip protocol was built for: the id is the contract, and the
+ * words stored are the ones this server knows that id to mean.
+ *
+ * It also repairs replay. `replayableHistory()` feeds prior USER messages into
+ * the prompt, so a conversation conducted entirely through chips previously
+ * replayed as a series of answers to questions that were not there.
+ */
+function commandLabel(commandId: string | undefined): string | undefined {
+  return commandId ? resolveCommandId(commandId)?.label : undefined;
 }
 
 /** The conversation's current turn count, or 0 if it cannot be read. */

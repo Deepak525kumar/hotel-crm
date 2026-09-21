@@ -107,7 +107,19 @@ export default function RootLayout() {
               <Stack.Screen name="rating/[id]" options={{ headerShown: false }} />
               {/* headerShown false like its siblings: the screen draws its own
                   <ScreenHeader>, and expo-router's bar on top of it is the
-                  double-title this app just removed from the tab layout. */}
+                  double-title this app just removed from the tab layout.
+
+                  Reported 2026-09-21: Zelle showed a second heading with a
+                  back button above its own header, and the worker app did not.
+                  The screens are byte-identical -- the difference is this
+                  navigator. The worker app sets `headerShown: false` once in
+                  `screenOptions`, so an unregistered route inherits it; this
+                  one registers routes individually, so an unregistered route
+                  gets the DEFAULT bar instead. `assistant` was never listed,
+                  and the comment above it had been left behind without the
+                  line it describes. Anything added to src/app/ here needs its
+                  own entry, or it acquires a header nobody asked for. */}
+              <Stack.Screen name="assistant" options={{ headerShown: false }} />
               {/* The inspection entry point since 2026-09-01. select-worker is
                   still registered because it is the fallback for a room the
                   worker never logged, reached from this screen's footer. */}

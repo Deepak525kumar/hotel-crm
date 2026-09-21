@@ -13,6 +13,8 @@ import { api } from '@/lib/api';
 import type { LeaderboardEntry } from '@/types/api';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Spacing } from '@/constants/theme';
 import { ScreenHeader } from '@/components/ui';
 import { NotificationBell } from '@/components/NotificationBell';
 
@@ -44,7 +46,8 @@ export default function LeaderboardScreen() {
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
-    header: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
+    // Same values as every sibling screen's `safeArea` (jobs.tsx, history.tsx).
+    safeArea: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three, paddingBottom: 12 },
     headerSub: { fontSize: 13, color: theme.textSecondary },
     card: {
       flexDirection: 'row',
@@ -116,13 +119,21 @@ export default function LeaderboardScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* Reported 2026-09-21: the title rendered UNDER the status bar, with
+          the clock drawn through the word and the first letter against the
+          screen edge. This screen was the only one in (app)/ laying its
+          header out in a bare View -- every sibling (jobs, history, profile,
+          shifts, calendar, attendance, notifications, index) wraps in
+          SafeAreaView with the same `safeArea` style. `paddingTop: 4` cannot
+          stand in for the inset: it is a fixed number, and the notch it has
+          to clear is not. */}
+      <SafeAreaView style={styles.safeArea}>
         <ScreenHeader
           title={t('nav.leaderboard')}
           subtitle={t('leaderboard.topPerformers')}
           action={<NotificationBell />}
         />
-      </View>
+      </SafeAreaView>
       {error && <Text style={styles.error}>{error}</Text>}
       <FlatList
         data={entries}

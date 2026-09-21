@@ -867,7 +867,8 @@
     "idOrPassport": "Carte d'identité ou passeport",
     "checklistTitle": "Vos documents",
     "remainingCount": "{{count}} encore requis",
-    "allUploaded": "Tous les documents téléversés"
+    "allUploaded": "Tous les documents téléversés",
+    "reviewQueueUnavailable": "Vous n'avez pas encore de file de validation. Elle apparaît une fois votre propre intégration approuvée et votre affectation à un hôtel effectuée."
   },
   "analytics": {
     "myPerformance": "Mes performances",
@@ -1265,6 +1266,7 @@
     "newChat": "Nouvelle conversation",
     "copy": "Copier",
     "copied": "Copié",
-    "openForm": "Ouvrir le formulaire Nouvel utilisateur prérempli"
+    "openForm": "Ouvrir le formulaire Nouvel utilisateur prérempli",
+    "untitled": "Conversation sans titre"
   }
 }

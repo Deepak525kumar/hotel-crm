@@ -51,7 +51,13 @@ changes. They are inert until you complete the Apple-side steps below.
    this declaration App Store Connect asks the export-compliance question on
    every single upload. **Confirm this is still true before each submission** —
    it is a legal declaration, not a build setting.
-4. **`eas.json` → a `channel` on every build profile** (`development`,
+4. **A real icon per app.** Both shipped Expo's template icon, byte for byte
+   identical, so the two were indistinguishable on a phone that had both and
+   Apple would have received Expo's logo as the brand. `worker-app` is now a
+   bed on its existing blue; `checker-app` a check on a distinct teal.
+   Regenerate the whole raster set from source with
+   `node mobile/scripts/generate-app-icons.mjs`.
+5. **`eas.json` → a `channel` on every build profile** (`development`,
    `preview`, `production`), so an update published to a channel reaches only
    the builds made from that profile.
 
