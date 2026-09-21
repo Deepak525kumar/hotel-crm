@@ -20,7 +20,7 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.fhmhotelservices.workerapp",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Zelle uses the microphone so you can speak a message to the assistant instead of typing it.",
         "NSSpeechRecognitionUsageDescription": "Zelle turns what you say into text so you can ask about your shifts without typing.",
