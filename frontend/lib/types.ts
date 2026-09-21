@@ -1988,3 +1988,40 @@ export interface GeneratedReport {
   truncated: boolean;
 }
 
+
+/**
+ * One check this checker recorded, as `GET /quality/my-inspections` returns it.
+ *
+ * Mirrors `OwnInspection` in both mobile clients rather than reusing
+ * `QualityVerification`: this shape is denormalised for a LIST — it carries the
+ * worker, hotel and rework-assignment summaries the row renders, and a
+ * `photo_count` instead of the photos themselves, so a page of twenty costs one
+ * request rather than sixty.
+ */
+export interface OwnInspection {
+  id: string;
+  assignment_id: string;
+  day: string | null;
+  assignment_status: AssignmentStatus | null;
+  room_number: string;
+  score: number;
+  status: VerificationStatus;
+  notes: string | null;
+  criteria_scores: Record<string, number> | null;
+  photo_count: number;
+  rework_required: boolean;
+  rework_notes: string | null;
+  rework_completed_at: string | null;
+  rework_rounds: ReworkRound[];
+  created_at: string;
+  worker: { id: string; first_name: string; last_name: string } | null;
+  hotel: { id: string; name: string; city: string } | null;
+  checked_by: { id: string; first_name: string; last_name: string } | null;
+  /** Present when this check sent work back; drives the worker's "go to rework" button. */
+  rework_assignment: { id: string; status: AssignmentStatus; day: string } | null;
+}
+
+export interface OwnInspectionsPage {
+  checks: OwnInspection[];
+  pagination: { page: number; per_page: number; total: number; total_pages: number };
+}
