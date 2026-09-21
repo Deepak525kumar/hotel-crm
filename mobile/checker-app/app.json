@@ -6,6 +6,10 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "updates": {
+      "url": "https://u.expo.dev/167dffa4-420a-455b-b445-42a46e650bd7",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "checkerapp",
@@ -16,7 +20,8 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Zelle uses the microphone so you can speak a message to the assistant instead of typing it.",
-        "NSSpeechRecognitionUsageDescription": "Zelle turns what you say into text so you can ask about your shifts without typing."
+        "NSSpeechRecognitionUsageDescription": "Zelle turns what you say into text so you can ask about your shifts without typing.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
