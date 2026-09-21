@@ -867,7 +867,8 @@
     "idOrPassport": "Ausweis oder Reisepass",
     "checklistTitle": "Ihre Dokumente",
     "remainingCount": "Noch {{count}} erforderlich",
-    "allUploaded": "Alle Dokumente hochgeladen"
+    "allUploaded": "Alle Dokumente hochgeladen",
+    "reviewQueueUnavailable": "Sie haben noch keine Prüfliste. Sie erscheint, sobald Ihr eigenes Onboarding genehmigt und Sie einem Hotel zugewiesen wurden."
   },
   "analytics": {
     "myPerformance": "Meine Leistung",
@@ -1265,6 +1266,7 @@
     "newChat": "Neuer Chat",
     "copy": "Kopieren",
     "copied": "Kopiert",
-    "openForm": "Ausgefülltes Formular „Neuer Benutzer“ öffnen"
+    "openForm": "Ausgefülltes Formular „Neuer Benutzer“ öffnen",
+    "untitled": "Unbenanntes Gespräch"
   }
 }

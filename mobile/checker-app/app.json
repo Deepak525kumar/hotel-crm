@@ -15,7 +15,7 @@
     "scheme": "checkerapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.fhmhotelservices.checkerapp",
       "buildNumber": "1",
       "infoPlist": {
@@ -29,7 +29,7 @@
       "googleServicesFile": "./google-services.json",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#E3F7F1",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -51,7 +51,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0FA37F",
           "android": {
             "image": "./assets/images/splash-icon.png",
             "imageWidth": 76

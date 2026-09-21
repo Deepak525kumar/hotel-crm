@@ -195,7 +195,22 @@ export default function AssistantScreen() {
                 <ThemedText style={[styles.historyWhen, { color: theme.textSecondary }]}>
                   {when(item.started_at)}
                 </ThemedText>
-                <ThemedText numberOfLines={2}>{item.opening ?? '…'}</ThemedText>
+                {/* Reported 2026-09-21: every earlier conversation listed as
+                    a bare ellipsis. `opening` is the person's own first
+                    message, and a chip turn used to store none -- a tapped
+                    chip sends command_id, never the label, so recordTurn got
+                    userText: undefined. Fixed server-side in runTurn, which
+                    now records the command's own label.
+
+                    This fallback stays for the rows written BEFORE that fix,
+                    which have no user message and never will. Checked against
+                    production first: the transcripts decrypt fine, so this is
+                    not the key-rotation problem it first looked like. The date
+                    above is always present, so a name plus that date still
+                    identifies the row. */}
+                <ThemedText numberOfLines={2}>
+                  {item.opening ?? t('chatbot.untitled', 'Untitled conversation')}
+                </ThemedText>
               </Pressable>
             )}
           />
