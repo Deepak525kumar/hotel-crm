@@ -145,7 +145,19 @@ export default function DashboardPage() {
       {/* GD-06: worker-only, self-scoped equivalent of ManagerOverview above
           — no leaderboard, no other worker's data (see MyStatsCard's own
           comment). Previously only reachable from /profile. */}
-      <RoleGate allow={["worker"]}>
+      {/* `checker` added 2026-09-22. A checker signing in got a BLANK page:
+          the block above is gated to staffing-write roles and this one was
+          gated to `worker`, so a checker matched neither and the dashboard
+          rendered nothing at all.
+
+          These three cards need no checker-specific version, which is why none
+          was written. Each is self-scoped on the server and already serves the
+          role: /assignments narrows to the caller for any self-scoped role and
+          `isSelfScopedRole` counts `checker` (lib/scope.ts), /analytics/my-stats
+          is deliberately ungated ("any authenticated role, no admin/manager
+          permission gate"), and GET /hr/payroll lists `checker` among its
+          allowed roles. The mobile checker home fetches this same trio. */}
+      <RoleGate allow={["worker", "checker"]}>
         {/* Same flaw as the manager row above, not yet reported only because a
             worker's notifications happen to be short. */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6">

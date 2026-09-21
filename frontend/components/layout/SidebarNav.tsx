@@ -102,6 +102,15 @@ export const NAV: NavItem[] = [
   // this app already uses elsewhere).
   { href: "/calendar", label: "Calendar", labelKey: "nav.calendar", icon: CalendarDays },
   { href: "/attendance", label: "Attendance", labelKey: "nav.attendance", icon: Clock },
+  // The checker's own record of what they have checked. `GET
+  // /quality/my-inspections` had no web route at all until 2026-09-22: a
+  // checker could record an inspection from the assignment page and then never
+  // see it again, while both mobile apps have had this list since the Rating
+  // merge. Self-scoped server-side from req.auth, so `admin` sees only the
+  // checks it recorded rather than everyone's -- it is here for the same
+  // reason admin appears on every other quality surface, to support checkers
+  // in the field, not to supervise them.
+  { href: "/inspections", label: "History", labelKey: "nav.history", icon: ClipboardCheck, roles: ["checker", "admin"] },
   // Geo check-ins is no longer a standalone tab: geofence-verification
   // events now render inline on the attendance detail page
   // (GeoVerificationCard, gated by the same GeoCheckinsGate roles).

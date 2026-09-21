@@ -47,6 +47,7 @@ import type {
   HotelAnalyticsSummary,
   LeaderboardEntry,
   QualityLeaderboardEntry,
+  OwnInspectionsPage,
   GeoCheckin,
   Hotel,
   HotelGroup,
@@ -709,6 +710,29 @@ export const qualityApi = {
    * server-side from the caller and cannot be widened by a query param.
    * Mirrors mobile's api.quality.leaderboard() exactly.
    */
+  /**
+   * The checks THIS checker recorded. `GET /quality/my-inspections`.
+   *
+   * Self-scoped on the server from `req.auth` — there is no parameter naming a
+   * checker, and there could not be one. The web had no route to this at all
+   * until 2026-09-22: a checker could record an inspection from the assignment
+   * page but never see one again afterwards, while both mobile apps have shown
+   * this list since the Rating merge.
+   *
+   * `q` is omitted rather than sent empty. The server treats a blank `q` as "no
+   * search", but sending one anyway makes every request look like a query in
+   * the logs and invites a future reader to add a branch that need not exist —
+   * the same reasoning as the mobile clients.
+   */
+  myInspections: (page = 1, perPage = 20, q?: string) =>
+    apiFetch<OwnInspectionsPage>(
+      `/quality/my-inspections${toQuery({
+        page: String(page),
+        per_page: String(perPage),
+        ...(q && q.trim() ? { q: q.trim() } : {}),
+      })}`,
+    ),
+
   leaderboard: () => apiFetch<QualityLeaderboardEntry[]>("/quality/leaderboard"),
 };
 
