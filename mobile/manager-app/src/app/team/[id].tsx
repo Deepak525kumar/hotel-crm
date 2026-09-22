@@ -1,11 +1,12 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import useSWR from 'swr';
 
 import {
   Badge,
+  Button,
   Card,
   EmptyState,
   MaxContentWidth,
@@ -70,6 +71,23 @@ export default function TeamMember() {
                   ) : null}
                 </View>
               </Card>
+
+              <SectionHeader title={t('hr.title')} />
+              <Button
+                label={t('hr.contract')}
+                variant="ghost"
+                onPress={() =>
+                  router.push({
+                    pathname: '/team/contract',
+                    params: { workerId: String(id) },
+                  })
+                }
+              />
+              <Button
+                label={t('nav.docs')}
+                variant="ghost"
+                onPress={() => router.push('/documents')}
+              />
 
               <SectionHeader title={t('nav.onboarding')} />
               {employment.data ? (

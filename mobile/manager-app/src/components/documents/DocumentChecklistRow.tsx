@@ -129,7 +129,7 @@ export function DocumentChecklistRow({
               <ThemedText type="small">{t('documents.choosePhoto')}</ThemedText>
             </Pressable>
             <Pressable onPress={() => void pickFile()} style={styles.action}>
-              <ThemedText type="small">{t('documents.chooseFile')}</ThemedText>
+              <ThemedText type="small">{t('documents.choosePhoto')}</ThemedText>
             </Pressable>
           </View>
 

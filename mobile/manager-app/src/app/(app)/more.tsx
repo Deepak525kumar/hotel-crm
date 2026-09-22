@@ -44,6 +44,9 @@ export default function More() {
           <DataRow title={t('nav.analytics')} onPress={() => router.push('/analytics')} />
           <DataRow title={t('nav.leaderboard')} onPress={() => router.push('/leaderboard')} />
 
+          <SectionHeader title={t('hr.title')} />
+          <DataRow title={t('hr.payslipRequests')} onPress={() => router.push('/payslips')} />
+
           <SectionHeader title={t('nav.hotels')} />
           <DataRow title={t('nav.hotels')} onPress={() => router.push('/hotels')} />
 

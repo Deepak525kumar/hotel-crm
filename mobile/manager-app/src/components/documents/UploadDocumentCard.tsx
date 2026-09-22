@@ -78,7 +78,7 @@ export function UploadDocumentCard({
             <ThemedText type="small" style={styles.pickButtonText}>{t('documents.choosePhoto')}</ThemedText>
           </Pressable>
           <Pressable onPress={pickFile} style={({ pressed }) => [styles.pickButton, styles.flex, { opacity: pressed ? 0.7 : 1 }]}>
-            <ThemedText type="small" style={styles.pickButtonText}>{t('documents.chooseFile')}</ThemedText>
+            <ThemedText type="small" style={styles.pickButtonText}>{t('documents.choosePhoto')}</ThemedText>
           </Pressable>
         </ThemedView>
       ) : (
