@@ -21,6 +21,8 @@ import {
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
+import { HotelPicker } from '@/components/HotelPicker';
+import { hotelFilterFor } from '@/lib/hotel-filter';
 import { Breakdown } from '@/components/Breakdown';
 import { ScopeNote } from '@/components/ScopeNote';
 import { percent, score } from '@/lib/format-metrics';
@@ -38,9 +40,10 @@ export default function Analytics() {
   const user = useAuthStore((s) => s.user);
   const scope = scopeOf(user);
   const [refreshing, setRefreshing] = useState(false);
+  const [hotelId, setHotelId] = useState<string | null>(null);
 
-  const { data, error, isLoading, mutate } = useSWR('analytics/stats', () =>
-    api.analytics.stats()
+  const { data, error, isLoading, mutate } = useSWR(['analytics/stats', hotelId], () =>
+    api.analytics.stats(hotelFilterFor(hotelId))
   );
 
   const onRefresh = useCallback(async () => {
@@ -64,6 +67,7 @@ export default function Analytics() {
           <BackLink />
           <ScreenHeader title={t('nav.analytics')} subtitle={t('analytics.description')} />
           <ScopeNote scope={scope} />
+          <HotelPicker scope={scope} value={hotelId} onChange={setHotelId} />
 
           {isLoading ? (
             <SkeletonList rows={6} />

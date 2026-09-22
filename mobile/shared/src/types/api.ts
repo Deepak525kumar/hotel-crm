@@ -392,6 +392,22 @@ export interface DashboardStats {
 }
 
 /**
+ * A hotel, as GET /crm/hotels returns it.
+ *
+ * Only the fields this client reads. Deliberately narrower than the web's
+ * `Hotel`: a type is a claim about the response, and claiming fields nobody
+ * renders is how `DashboardStats` came to describe an endpoint it had never
+ * seen (SIR-ANLY-016). Add a field here when a screen needs it.
+ */
+export interface Hotel {
+  id: string;
+  name: string;
+  city: string;
+  is_active: boolean;
+  hotel_group_id: string | null;
+}
+
+/**
  * A row of GET /analytics/leaderboard.
  *
  * NOT the same as `LeaderboardEntry`, and the difference is not cosmetic.
