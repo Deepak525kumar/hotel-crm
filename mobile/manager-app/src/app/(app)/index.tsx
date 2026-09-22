@@ -23,6 +23,7 @@ import {
   useAuthStore,
 } from '@hotel-crm/mobile-shared';
 
+import { ChatLauncher } from '@/components/ChatLauncher';
 import { ScopeNote } from '@/components/ScopeNote';
 import { percent } from '@/lib/format-metrics';
 
@@ -151,6 +152,12 @@ export default function Today() {
             </Card>
           )}
         </ScrollView>
+        {/* Zelle. Renders nothing at all unless the backend says the assistant
+            is available: `isAvailable()` swallows its errors on purpose,
+            because a 404 means FEATURE_CHATBOT is off and a 403 means this
+            user may not use it -- and distinguishing them in the UI would
+            leak an unreleased feature. */}
+        <ChatLauncher />
       </SafeAreaView>
     </ThemedView>
   );

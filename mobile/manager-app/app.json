@@ -6,6 +6,13 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "updates": {
+      "url": "https://u.expo.dev/1f4e0ba5-58ed-4293-9b33-165911f58aab",
+      "fallbackToCacheTimeout": 0,
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "managerapp",
@@ -15,7 +22,9 @@
       "bundleIdentifier": "com.fhmhotelservices.managerapp",
       "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "Zelle uses the microphone so you can speak a message to the assistant instead of typing it.",
+        "NSSpeechRecognitionUsageDescription": "Zelle turns what you say into text so you can ask about your team without typing."
       }
     },
     "android": {
@@ -28,7 +37,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": []
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -62,14 +73,19 @@
       ],
       "expo-sharing",
       "./plugins/withDisableUserScriptSandboxing.js",
-      "./plugins/with-metro-port"
+      "./plugins/with-metro-port",
+      "expo-speech-recognition"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
     "extra": {
-      "router": {}
-    }
+      "router": {},
+      "eas": {
+        "projectId": "1f4e0ba5-58ed-4293-9b33-165911f58aab"
+      }
+    },
+    "owner": "mayankk21"
   }
 }

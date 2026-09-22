@@ -53,6 +53,7 @@ export default function More() {
             onPress={() => router.push('/notifications')}
           />
           <DataRow title={t('nav.settings')} onPress={() => router.push('/settings')} />
+          <DataRow title={t('chatbot.title')} onPress={() => router.push('/assistant')} />
 
           {/* Admin-only master data. Absent for a manager or RM rather than
               present-and-refused: ADR-030 D-2/D-3 make these Admin-only, and
