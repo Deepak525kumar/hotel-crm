@@ -12,6 +12,7 @@ import type {
   LeaderboardEntry,
   AnalyticsLeaderboardEntry,
   CalendarEntry,
+  DailyShiftSummary,
   DashboardStats,
   HotelGroup,
   WorkerAvailability,
@@ -1031,6 +1032,33 @@ export const api = {
       }),
 
     availability: () => request<WorkerAvailability[]>('/calendar/availability'),
+
+    /**
+     * A hotel's shift summaries. Scoped by checkHotelAccess() on the route, so
+     * a manager asking about another hotel is refused rather than filtered.
+     */
+    shiftSummaries: (hotelId: string) =>
+      request<DailyShiftSummary[]>(`/calendar/hotels/${hotelId}/shift-summaries`),
+
+    /**
+     * Upsert one day's summary. PUT, not POST: the day is the identity, so
+     * saving twice corrects the row rather than creating a second one.
+     */
+    saveShiftSummary: (
+      hotelId: string,
+      date: string,
+      input: {
+        total_rooms: number;
+        stay_over_rooms: number;
+        checkout_rooms: number;
+        total_people_working: number;
+        notes?: string;
+      }
+    ) =>
+      request<DailyShiftSummary>(`/calendar/hotels/${hotelId}/shift-summaries/${date}`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
   },
   geo: {
     // GD-14: self-checkin, self-scoped to the authenticated worker

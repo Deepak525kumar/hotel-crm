@@ -8,6 +8,13 @@ import {
 } from '@/lib/agenda';
 import type { CalendarAbsence, CalendarEntry } from '@hotel-crm/mobile-shared';
 import { todayInBerlin } from '@/lib/today';
+import {
+  MAX_OCCURRENCES,
+  isCompleteSuccess,
+  summarise,
+  weeklyOccurrences,
+  type OccurrenceOutcome,
+} from '@/lib/recurring';
 
 const entry = (over: Partial<CalendarEntry>): CalendarEntry => ({
   id: 'e1',
@@ -144,5 +151,52 @@ describe('today, as the calendar means it', () => {
 
   it('formats as YYYY-MM-DD, the shape every calendar endpoint speaks', () => {
     expect(todayInBerlin(new Date('2026-01-05T12:00:00Z'))).toBe('2026-01-05');
+  });
+});
+
+describe('recurring placement', () => {
+  it('generates one occurrence per week from the start day', () => {
+    expect(weeklyOccurrences('2026-09-22', 3)).toEqual([
+      '2026-09-22',
+      '2026-09-29',
+      '2026-10-06',
+    ]);
+  });
+
+  // The web caps at 26. A different cap here would make the same form produce
+  // different rotas depending on which client the manager happened to open.
+  it('caps at the web’s 26, and floors at 1', () => {
+    expect(weeklyOccurrences('2026-09-22', 100)).toHaveLength(MAX_OCCURRENCES);
+    expect(weeklyOccurrences('2026-09-22', 0)).toHaveLength(1);
+  });
+
+  /**
+   * The reason the progress sheet exists instead of a toast.
+   *
+   * 19 of 26 succeeding is a PARTIAL result. Reporting it as success has the
+   * manager believe 26 shifts exist when 19 do — found out when nobody turns
+   * up for the other seven.
+   */
+  it('is a success only when every occurrence landed', () => {
+    const all = (state: OccurrenceOutcome['state']) =>
+      ['a', 'b'].map((d) => ({ day: d, state }) as OccurrenceOutcome);
+
+    expect(isCompleteSuccess(all('done'))).toBe(true);
+    expect(isCompleteSuccess([...all('done'), { day: 'c', state: 'failed' }])).toBe(false);
+    expect(isCompleteSuccess([...all('done'), { day: 'c', state: 'pending' }])).toBe(false);
+    expect(isCompleteSuccess([])).toBe(false);
+  });
+
+  // Cancelling mid-run leaves occurrences nobody tried. "Never attempted" and
+  // "refused" are different facts about a rota, and collapsing them into one
+  // number would misreport what happened.
+  it('counts not-attempted separately from failed', () => {
+    const outcomes: OccurrenceOutcome[] = [
+      { day: 'a', state: 'done' },
+      { day: 'b', state: 'failed' },
+      { day: 'c', state: 'pending' },
+      { day: 'd', state: 'pending' },
+    ];
+    expect(summarise(outcomes)).toEqual({ done: 1, failed: 1, notAttempted: 2 });
   });
 });

@@ -7,12 +7,14 @@ import useSWR from 'swr';
 import {
   ApiError,
   BottomTabInset,
+  Button,
   Card,
   EmptyState,
   MaxContentWidth,
   ScreenHeader,
   SectionHeader,
   SkeletonList,
+  ProgressSheet,
   Spacing,
   ThemedText,
   ThemedView,
@@ -23,9 +25,13 @@ import {
   useToast,
 } from '@hotel-crm/mobile-shared';
 
+import { AddPlacementSheet } from '@/components/AddPlacementSheet';
 import { DateStrip, type DayCellLayout } from '@/components/DateStrip';
+import { MarkAbsenceSheet } from '@/components/MarkAbsenceSheet';
+import { ShiftSummarySheet } from '@/components/ShiftSummarySheet';
 import { PlacementRow } from '@/components/PlacementRow';
 import { absencesForDay, addDays, dayStrip, dropTargetAt, groupByHotel, isRealMove } from '@/lib/agenda';
+import { isCompleteSuccess, summarise, weeklyOccurrences, type OccurrenceOutcome } from '@/lib/recurring';
 import { todayInBerlin } from '@/lib/today';
 
 /**
@@ -57,6 +63,12 @@ export default function Calendar() {
   const [day, setDay] = useState(() => todayInBerlin());
   const [refreshing, setRefreshing] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [markingAbsence, setMarkingAbsence] = useState(false);
+  const [summaryFor, setSummaryFor] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [run, setRun] = useState<OccurrenceOutcome[] | null>(null);
+  const cancelled = useRef(false);
 
   // Measured, not assumed: the strip scrolls and the labels are localised, so
   // a hardcoded cell width would drift and drop shifts on the wrong day.
@@ -115,6 +127,92 @@ export default function Calendar() {
     [placements, toast, t]
   );
 
+  /**
+   * Creates one placement per occurrence, reporting each as it lands.
+   *
+   * Sequential, not Promise.all: 26 simultaneous writes on a hotel's
+   * connection is how you get a partially-applied rota with no idea which
+   * half applied. One at a time also makes cancellation meaningful — the
+   * occurrences after the stop are left `pending`, which `summarise()` counts
+   * separately from failures because "never attempted" and "refused" are
+   * different facts about someone's rota.
+   */
+  const createPlacements = useCallback(
+    async (input: { workerId: string; hotelId: string; weeks: number }) => {
+      const days = weeklyOccurrences(day, input.weeks);
+      cancelled.current = false;
+      setAdding(false);
+      setBusy(true);
+      const outcomes: OccurrenceOutcome[] = days.map((d) => ({ day: d, state: 'pending' }));
+      setRun([...outcomes]);
+
+      for (let i = 0; i < days.length; i += 1) {
+        if (cancelled.current) break;
+        outcomes[i] = { day: days[i], state: 'running' };
+        setRun([...outcomes]);
+        try {
+          await api.assignments.createCalendarEntry({
+            worker_id: input.workerId,
+            hotel_id: input.hotelId,
+            day: days[i],
+          });
+          outcomes[i] = { day: days[i], state: 'done' };
+        } catch (e) {
+          // Kept going deliberately: a conflict on one week says nothing about
+          // the others, and abandoning the run would leave the manager with a
+          // partial rota AND no record of which weeks were tried.
+          outcomes[i] = { day: days[i], state: 'failed', detail: translateApiError(e, t) };
+        }
+        setRun([...outcomes]);
+      }
+
+      setBusy(false);
+      await placements.mutate();
+
+      if (isCompleteSuccess(outcomes)) {
+        setRun(null);
+        toast.show(t('fields.updated'), 'success');
+      }
+      // Otherwise the sheet stays open showing exactly which weeks landed.
+      // Closing it with a success toast is the lie this whole flow exists to
+      // avoid.
+    },
+    [day, placements, toast, t]
+  );
+
+  const markAbsence = useCallback(
+    async (input: Parameters<typeof api.calendar.markAbsenceForWorker>[0]) => {
+      setBusy(true);
+      try {
+        await api.calendar.markAbsenceForWorker(input);
+        await absences.mutate();
+        setMarkingAbsence(false);
+        toast.show(t('fields.updated'), 'success');
+      } catch (e) {
+        toast.show(translateApiError(e, t), 'danger');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [absences, toast, t]
+  );
+
+  const saveSummary = useCallback(
+    async (hotelId: string, input: Parameters<typeof api.calendar.saveShiftSummary>[2]) => {
+      setBusy(true);
+      try {
+        await api.calendar.saveShiftSummary(hotelId, day, input);
+        setSummaryFor(null);
+        toast.show(t('fields.updated'), 'success');
+      } catch (e) {
+        toast.show(translateApiError(e, t), 'danger');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [day, toast, t]
+  );
+
   const entriesUnavailable =
     placements.error instanceof ApiError && placements.error.status === 404;
 
@@ -146,6 +244,19 @@ export default function Calendar() {
             />
           </View>
 
+          <View style={styles.actions}>
+            <Button
+              label={t('calendar.placements')}
+              variant="ghost"
+              onPress={() => setAdding(true)}
+            />
+            <Button
+              label={t('calendar.markAbsence')}
+              variant="ghost"
+              onPress={() => setMarkingAbsence(true)}
+            />
+          </View>
+
           {placements.isLoading || absences.isLoading ? (
             <SkeletonList rows={5} />
           ) : entriesUnavailable ? (
@@ -159,7 +270,16 @@ export default function Calendar() {
             <>
               {groups.map((group) => (
                 <View key={group.hotelId} style={styles.group}>
-                  <SectionHeader title={group.hotelId} />
+                  <SectionHeader
+                    title={group.hotelId}
+                    action={
+                      <Button
+                        label={t('calendar.dailySummary')}
+                        variant="ghost"
+                        onPress={() => setSummaryFor(group.hotelId)}
+                      />
+                    }
+                  />
                   {group.entries.map((entry) => (
                     <PlacementRow
                       key={entry.id}
@@ -211,6 +331,45 @@ export default function Calendar() {
             </ThemedText>
           ) : null}
         </ScrollView>
+
+        <AddPlacementSheet
+          visible={adding}
+          day={day}
+          busy={busy}
+          onClose={() => setAdding(false)}
+          onSubmit={(input) => void createPlacements(input)}
+        />
+
+        <MarkAbsenceSheet
+          visible={markingAbsence}
+          day={day}
+          busy={busy}
+          onClose={() => setMarkingAbsence(false)}
+          onSubmit={(input) => void markAbsence(input)}
+        />
+
+        {summaryFor ? (
+          <ShiftSummarySheet
+            visible
+            day={day}
+            busy={busy}
+            onClose={() => setSummaryFor(null)}
+            onSave={(input) => void saveSummary(summaryFor, input)}
+          />
+        ) : null}
+
+        <ProgressSheet
+          visible={run !== null}
+          title={t('calendar.placements')}
+          items={(run ?? []).map((o) => ({
+            key: o.day,
+            label: o.day,
+            state: o.state,
+            detail: o.detail,
+          }))}
+          onCancel={busy ? () => { cancelled.current = true; } : undefined}
+          onClose={() => setRun(null)}
+        />
       </SafeAreaView>
     </ThemedView>
   );
@@ -227,6 +386,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
+  actions: { flexDirection: 'row', gap: Spacing.two },
   group: { gap: Spacing.two },
   absence: { paddingVertical: Spacing.two, gap: 2 },
 });
