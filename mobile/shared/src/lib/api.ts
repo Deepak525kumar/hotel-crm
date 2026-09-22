@@ -12,6 +12,7 @@ import type {
   LeaderboardEntry,
   AnalyticsLeaderboardEntry,
   DashboardStats,
+  Hotel,
   HotelSummary,
   WorkerStats,
   CalendarAbsence,
@@ -621,6 +622,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+  },
+  crm: {
+    /**
+     * The hotels the CALLER can see -- the server filters by their scope, so
+     * a hotel manager gets exactly one row and an RM gets their group's.
+     * There is no "all hotels" request shape here, deliberately: the filter
+     * is the JWT's, never the client's.
+     */
+    hotels: () => request<Hotel[]>('/crm/hotels'),
   },
   analytics: {
     /**
