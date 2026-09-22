@@ -567,6 +567,56 @@ export const api = {
       }),
 
     /**
+     * Raise a work request.
+     *
+     * `status` defaults to DRAFT server-side, so publishing on creation means
+     * sending 'OPEN' explicitly -- the two-step (save draft, then publish) is
+     * the default, not the exception.
+     */
+    create: (input: {
+      hotel_id: string;
+      target_role: 'WORKER' | 'CHECKER';
+      position: string;
+      workers_needed: number;
+      shift_date: string;
+      shift_start_time: string;
+      shift_end_time: string;
+      hourly_rate?: number;
+      currency?: string;
+      description?: string;
+      requirements?: string;
+      status?: 'DRAFT' | 'OPEN';
+    }) =>
+      request<WorkRequest>('/work-requests', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    /**
+     * Raise a broadcast: one shift, several skill x headcount lines.
+     *
+     * `skills` must hold at least one line, and `skill: null` is the
+     * "no specific skill required" slot rather than a missing value -- the
+     * schema makes it nullable on purpose, so sending nothing is a different
+     * (and invalid) request from sending null.
+     */
+    createBroadcast: (input: {
+      hotel_id: string;
+      target_role: 'WORKER' | 'CHECKER';
+      shift_date: string;
+      shift_start_time: string;
+      shift_end_time: string;
+      hourly_rate?: number;
+      currency?: string;
+      description?: string;
+      skills: { skill: string | null; headcount: number }[];
+    }) =>
+      request<WorkRequest>('/work-requests/broadcasts', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    /**
      * Manager writes (2026-09-22). `PATCH /work-requests/:id` carries both
      * publish and cancel -- there is no separate route for either, so the
      * caller sends the status it wants.
@@ -774,6 +824,47 @@ export const api = {
       return request<User[]>(`/users?${qs.toString()}`);
     },
     get: (id: string) => request<User>(`/users/${id}`),
+
+    /**
+     * Create an account. MULTIPART: the route runs `uploadPhoto.single('photo')`,
+     * so the body is FormData and a JSON body would be rejected.
+     *
+     * The request helper duck-types FormData and omits Content-Type so the
+     * runtime can set its own multipart boundary — which is precisely why
+     * this package took worker-app's `request()` and not checker-app's, which
+     * hardcodes application/json (see MIGRATION.md).
+     *
+     * `skills` is a COMMA-SEPARATED STRING, not an array: the schema
+     * preprocesses a string into a list, because multipart cannot carry one.
+     *
+     * Which roles the caller may create is RULE A, enforced server-side by
+     * `canCreateRole`. The client mirrors it only to avoid offering a choice
+     * that will be refused; it is never the gate.
+     */
+    create: (input: {
+      email: string;
+      password: string;
+      first_name: string;
+      last_name: string;
+      phone: string;
+      role: string;
+      hotel_id?: string;
+      hotel_group_id?: string;
+      skills?: string;
+      photo?: { uri: string; name: string; type: string };
+    }) => {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(input)) {
+        if (value === undefined || key === 'photo') continue;
+        form.append(key, String(value));
+      }
+      if (input.photo) {
+        // React Native's FormData takes this shape for a file part; the cast
+        // is unavoidable because the DOM lib types `append` against Blob.
+        form.append('photo', input.photo as unknown as Blob);
+      }
+      return request<User>('/users', { method: 'POST', body: form });
+    },
     /**
      * Profile fields ONLY.
      *

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
@@ -76,10 +76,22 @@ export default function Requests() {
         >
           <BackLink />
           <ScreenHeader title={t('nav.requests')} subtitle={t('requests.pageDescription')} />
-          <FilterBar
-            activeCount={(status ? 1 : 0) + (kind === 'all' ? 0 : 1)}
-            onPress={() => setFiltersOpen(true)}
-          />
+          <View style={styles.bar}>
+            <FilterBar
+              activeCount={(status ? 1 : 0) + (kind === 'all' ? 0 : 1)}
+              onPress={() => setFiltersOpen(true)}
+            />
+            <Button
+              label={t('requests.new')}
+              variant="ghost"
+              onPress={() => router.push('/requests/new')}
+            />
+            <Button
+              label={t('requests.newBroadcast')}
+              variant="ghost"
+              onPress={() => router.push('/requests/new-broadcast')}
+            />
+          </View>
 
           {isLoading ? (
             <SkeletonList rows={6} />
@@ -137,6 +149,7 @@ export default function Requests() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
   content: {
     padding: Spacing.three,
     gap: Spacing.two,

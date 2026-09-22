@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
@@ -21,8 +21,10 @@ import {
   Spacing,
   ThemedView,
   api,
+  useAuthStore,
 } from '@hotel-crm/mobile-shared';
 
+import { creatableRoles } from '@/lib/creatable-roles';
 import { useDebounced } from '@/lib/use-debounced';
 
 const ROLES = ['worker', 'checker', 'manager', 'regional_manager', 'admin'] as const;
@@ -38,6 +40,7 @@ const ROLES = ['worker', 'checker', 'manager', 'regional_manager', 'admin'] as c
  */
 export default function Team() {
   const { t } = useTranslation();
+  const user = useAuthStore((s) => s.user);
   const [refreshing, setRefreshing] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [role, setRole] = useState<string | null>(null);
@@ -71,10 +74,21 @@ export default function Team() {
           }
         >
           <ScreenHeader title={t('nav.users')} />
-          <FilterBar
-            activeCount={(role ? 1 : 0) + (q ? 1 : 0)}
-            onPress={() => setFiltersOpen(true)}
-          />
+          <View style={styles.bar}>
+            <FilterBar
+              activeCount={(role ? 1 : 0) + (q ? 1 : 0)}
+              onPress={() => setFiltersOpen(true)}
+            />
+            {/* Hidden for an actor who may create nobody (RULE A), rather
+                than shown and refused. */}
+            {creatableRoles(user?.role).length > 0 ? (
+              <Button
+                label={t('users.newTitle')}
+                variant="ghost"
+                onPress={() => router.push('/team/new')}
+              />
+            ) : null}
+          </View>
 
           {isLoading ? (
             <SkeletonList rows={8} />
@@ -120,6 +134,7 @@ export default function Team() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
   content: {
     padding: Spacing.three,
     gap: Spacing.two,
