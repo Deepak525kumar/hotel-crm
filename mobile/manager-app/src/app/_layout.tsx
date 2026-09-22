@@ -1,4 +1,5 @@
 import { Stack, DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -85,7 +86,14 @@ export default function RootLayout() {
   }, [isInitialized, themeHydrated]);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    // GestureHandlerRootView, at the ROOT and not inside a screen. Without it
+    // the calendar's pan gesture is silently inert on Android -- the handler
+    // never receives touches, so a long press does nothing at all and looks
+    // like a broken screen rather than a missing provider. react-native-
+    // gesture-handler arrives transitively via expo-router, so nothing warns
+    // that it was never hosted.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <UpdateChecker>
         <AuthGuard>
           {/* PushRegistration is mounted INSIDE ConsentGate, never outside:
@@ -99,6 +107,7 @@ export default function RootLayout() {
           </ConsentGate>
         </AuthGuard>
       </UpdateChecker>
-    </ThemeProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -213,7 +213,8 @@
     "qualityCheck": "Quality Check",
     "rateWorker": "Rate Worker",
     "schedule": "Schedule",
-    "rooms": "Rooms"
+    "rooms": "Rooms",
+    "more": "More"
   },
   "roles": {
     "admin": "Admin",

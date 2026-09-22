@@ -2,6 +2,8 @@ import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { StyleSheet } from 'react-native';
 
+import { useTranslation } from 'react-i18next';
+
 import { useTheme } from '@hotel-crm/mobile-shared';
 import { PushRegistration } from '@/components/PushRegistration';
 
@@ -16,10 +18,11 @@ import { PushRegistration } from '@/components/PushRegistration';
  * scannable at a glance.
  *
  * Tabs land with the PRs that build their screens (MANAGER_APP_PLAN.md §7).
- * Today is the shell's own screen; Rota, Team, Attendance and More follow in
- * PR-4, PR-9, PR-7 and PR-13. A tab is declared here only once the screen
- * behind it does something -- a tab that opens an empty page is worse than no
- * tab, because it reads as a broken app rather than an unfinished one.
+ * Five tabs: Today, Rota, Team, Attendance, More. Everything else on the
+ * web's eighteen-entry sidebar is reachable from More rather than competing
+ * for a slot in a bar that stops being scannable past five. A tab is declared here only once the screen behind it does
+ * something -- a tab that opens an empty page is worse than no tab, because
+ * it reads as a broken app rather than an unfinished one.
  *
  * <PushRegistration /> sits here, inside the consent gate applied at the root
  * layout. In worker-app it was two useEffects on this component, which React
@@ -28,6 +31,7 @@ import { PushRegistration } from '@/components/PushRegistration';
  * retried for the rest of the session.
  */
 export default function AppLayout() {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
@@ -48,9 +52,45 @@ export default function AppLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: 'Today',
+            title: t('common.today'),
             tabBarIcon: ({ color }) => (
               <SymbolView name="square.grid.2x2" tintColor={color} size={24} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="calendar"
+          options={{
+            title: t('nav.calendar'),
+            tabBarIcon: ({ color }) => (
+              <SymbolView name="calendar" tintColor={color} size={24} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="team"
+          options={{
+            title: t('nav.users'),
+            tabBarIcon: ({ color }) => (
+              <SymbolView name="person.2" tintColor={color} size={24} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="attendance"
+          options={{
+            title: t('nav.attendance'),
+            tabBarIcon: ({ color }) => (
+              <SymbolView name="checkmark.circle" tintColor={color} size={24} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="more"
+          options={{
+            title: t('nav.more'),
+            tabBarIcon: ({ color }) => (
+              <SymbolView name="ellipsis.circle" tintColor={color} size={24} />
             ),
           }}
         />

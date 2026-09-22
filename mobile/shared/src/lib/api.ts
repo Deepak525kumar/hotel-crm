@@ -11,7 +11,11 @@ import type {
   Notification,
   LeaderboardEntry,
   AnalyticsLeaderboardEntry,
+  CalendarEntry,
   DashboardStats,
+  HotelGroup,
+  WorkerAvailability,
+  Hotel,
   HotelSummary,
   WorkerStats,
   CalendarAbsence,
@@ -560,6 +564,24 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ skill }),
       }),
+
+    /**
+     * Manager writes (2026-09-22). `PATCH /work-requests/:id` carries both
+     * publish and cancel -- there is no separate route for either, so the
+     * caller sends the status it wants.
+     */
+    update: (id: string, input: Record<string, unknown>) =>
+      request<WorkRequest>(`/work-requests/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+
+    /**
+     * Close a broadcast early. Gated by FEATURE_JOBDISPATCH_PHASE2, and 404s
+     * rather than 403s when it is off.
+     */
+    closeBroadcast: (id: string) =>
+      request<WorkRequest>(`/work-requests/broadcasts/${id}/close`, { method: 'POST' }),
   },
   assignments: {
     list: (params?: { page?: number; limit?: number }) => {
@@ -574,6 +596,76 @@ export const api = {
       request<WorkerAssignment>(`/assignments/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
+      }),
+
+    /**
+     * Placements over a day range.
+     *
+     * `from` and `to` go together or not at all -- the backend refuses a lone
+     * one, because it would silently produce a query unbounded on one side.
+     *
+     * FEATURE_JOBDISPATCH_PHASE2 gates this. With the flag off it 404s rather
+     * than 403ing, so callers must treat "not found" as "unavailable".
+     */
+    calendarEntries: (params: { from: string; to: string; hotelId?: string }) => {
+      const qs = new URLSearchParams({ from: params.from, to: params.to, per_page: '100' });
+      if (params.hotelId) qs.set('hotel_id', params.hotelId);
+      return request<CalendarEntry[]>(`/assignments/calendar-entries?${qs.toString()}`);
+    },
+
+    createCalendarEntry: (input: { worker_id: string; hotel_id: string; day: string }) =>
+      request<CalendarEntry>('/assignments/calendar-entries', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    /**
+     * Day-only move, by product decision (2026-08-05): the hotel and worker on
+     * a placement never change here. Moving someone to a DIFFERENT HOTEL means
+     * cancelling and re-placing -- which is why the agenda's drag targets are
+     * days and never hotel sections.
+     */
+    /**
+     * The manager's assignment list. `per_page`, not `limit` -- the backend
+     * schema names it that, and `limit` is silently ignored (a default page
+     * of 20 that looks like "there are only 20").
+     */
+    listFiltered: (params: {
+      page?: number;
+      perPage?: number;
+      status?: string;
+      q?: string;
+      hotelId?: string;
+    }) => {
+      const qs = new URLSearchParams();
+      qs.set('page', String(params.page ?? 1));
+      qs.set('per_page', String(params.perPage ?? 20));
+      if (params.status) qs.set('status', params.status);
+      if (params.q) qs.set('q', params.q);
+      if (params.hotelId) qs.set('hotel_id', params.hotelId);
+      return request<WorkerAssignment[]>(`/assignments?${qs.toString()}`);
+    },
+
+    reassign: (id: string, workerId: string) =>
+      request<WorkerAssignment>(`/assignments/${id}/reassign`, {
+        method: 'POST',
+        body: JSON.stringify({ worker_id: workerId }),
+      }),
+
+    /**
+     * The aggregate count a manager enters, NOT a room-level log. Workers own
+     * the per-room record and those routes are `requireRole('worker')`.
+     */
+    logRoomsCompleted: (id: string, input: { rooms_completed: number; notes?: string }) =>
+      request<void>(`/assignments/${id}/rooms-completed`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    moveCalendarEntry: (id: string, day: string) =>
+      request<CalendarEntry>(`/assignments/calendar-entries/${id}/move`, {
+        method: 'PATCH',
+        body: JSON.stringify({ day }),
       }),
   },
   attendance: {
@@ -605,9 +697,52 @@ export const api = {
     // Resolve the attendance record for an assignment dynamically. The backend
     // does not embed attendance on AssignmentDto, so the shift screen looks it
     // up by assignment_id to obtain the id needed for check-out.
+    /**
+     * The team's attendance. Scope is the server's: a manager sees their
+     * hotel's rows, an RM their group's.
+     */
+    listTeam: (params: { from?: string; to?: string; status?: string; hotelId?: string }) => {
+      const qs = new URLSearchParams();
+      if (params.from) qs.set('from', params.from);
+      if (params.to) qs.set('to', params.to);
+      if (params.status) qs.set('status', params.status);
+      if (params.hotelId) qs.set('hotel_id', params.hotelId);
+      const q = qs.toString();
+      return request<Attendance[]>(`/attendance${q ? `?${q}` : ''}`);
+    },
+
+    /**
+     * Manager verification and timesheet correction.
+     *
+     * `PATCH /attendance/:id` has NO route-level role gate -- authorization is
+     * entirely service-layer, so this client is a new caller of a route whose
+     * only guard is downstream. It never invents `verified_by`: the server
+     * derives the actor from the token.
+     *
+     * At least one field is required (the schema refuses an empty body), and
+     * latitude/longitude must be sent together or not at all.
+     */
+    updateRecord: (
+      id: string,
+      input: {
+        status?: 'PRESENT' | 'ABSENT' | 'LATE' | 'PARTIAL' | 'EXCUSED';
+        is_verified?: boolean;
+        check_in_at?: string;
+        check_out_at?: string;
+        minutes_late?: number;
+        minutes_worked?: number;
+        notes?: string;
+      }
+    ) =>
+      request<Attendance>(`/attendance/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+
     listByAssignment: (assignmentId: string) =>
       request<Attendance[]>(`/attendance?assignment_id=${encodeURIComponent(assignmentId)}`),
   },
+
   notifications: {
     list: () => request<Notification[]>('/notifications'),
     markRead: (notificationId: string) =>
@@ -621,6 +756,50 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+  },
+  users: {
+    /**
+     * Scoped server-side: a manager receives their hotel's users, an RM their
+     * group's. `limit`, not `per_page` -- this endpoint's schema names it
+     * differently from the assignments one, and the wrong name is silently
+     * ignored rather than rejected.
+     */
+    list: (params?: { page?: number; limit?: number; role?: string; is_active?: boolean }) => {
+      const qs = new URLSearchParams();
+      qs.set('page', String(params?.page ?? 1));
+      qs.set('limit', String(params?.limit ?? 50));
+      if (params?.role) qs.set('role', params.role);
+      if (params?.is_active !== undefined) qs.set('is_active', String(params.is_active));
+      return request<User[]>(`/users?${qs.toString()}`);
+    },
+    get: (id: string) => request<User>(`/users/${id}`),
+    /**
+     * Profile fields ONLY.
+     *
+     * `role` is deliberately absent from this shape and must never be added:
+     * ADR-030 D-4a splits role assignment onto its own Admin-gated route
+     * precisely so `users:write` cannot imply it. A client that sent `role`
+     * here would be testing whether the server's guard holds, which is not
+     * this layer's job.
+     */
+    updateProfile: (
+      id: string,
+      input: { first_name?: string; last_name?: string; phone?: string; is_active?: boolean }
+    ) =>
+      request<User>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  },
+
+  crm: {
+    /**
+     * The hotels the CALLER can see -- the server filters by their scope, so
+     * a hotel manager gets exactly one row and an RM gets their group's.
+     * There is no "all hotels" request shape here, deliberately: the filter
+     * is the JWT's, never the client's.
+     */
+    hotels: () => request<Hotel[]>('/crm/hotels'),
+    hotel: (id: string) => request<Hotel>(`/crm/hotels/${id}`),
+    hotelGroups: () => request<HotelGroup[]>('/crm/hotel-groups'),
+    hotelGroup: (id: string) => request<HotelGroup>(`/crm/hotel-groups/${id}`),
   },
   analytics: {
     /**
@@ -791,6 +970,45 @@ export const api = {
     // refuses a past day.
     deleteAbsence: (absenceId: string) =>
       request<void>(`/calendar/absences/${absenceId}`, { method: 'DELETE' }),
+
+    /**
+     * The team's absences over a range. `from` and `to` are BOTH required by
+     * the backend -- there is no default window, so an agenda always sends
+     * one (ListAbsencesQuerySchema).
+     */
+    teamAbsences: (params: { from: string; to: string; workerId?: string }) => {
+      const qs = new URLSearchParams({ from: params.from, to: params.to });
+      if (params.workerId) qs.set('worker_id', params.workerId);
+      return request<CalendarAbsence[]>(`/calendar/absences?${qs.toString()}`);
+    },
+
+    /**
+     * Mark an absence FOR a worker (manager/RM/admin).
+     *
+     * `reason` is mandatory for VACATION and optional for SICK, enforced by a
+     * zod refine -- omitting it on a vacation is a 422, not a silently empty
+     * field. The same omission already cost this client every vacation
+     * request once (see markAbsence above).
+     */
+    markAbsenceForWorker: (input: {
+      worker_id: string;
+      day: string;
+      kind: CalendarAbsenceKind;
+      reason?: string;
+    }) =>
+      request<CalendarAbsence>('/calendar/absences', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    /** Day-only move. Nothing else about the absence changes. */
+    moveAbsence: (absenceId: string, day: string) =>
+      request<CalendarAbsence>(`/calendar/absences/${absenceId}/move`, {
+        method: 'PATCH',
+        body: JSON.stringify({ day }),
+      }),
+
+    availability: () => request<WorkerAvailability[]>('/calendar/availability'),
   },
   geo: {
     // GD-14: self-checkin, self-scoped to the authenticated worker
@@ -890,6 +1108,59 @@ export const api = {
   },
   employee: {
     /**
+     * The reviewer's queue, filtered to their own SCOPE server-side -- not
+     * merely gated by role. An empty queue therefore proves nothing about
+     * whether the filter works; it may simply be empty.
+     */
+    reviewQueue: () => request<EmploymentRecordDto[]>('/employees/review-queue'),
+
+    /**
+     * The six lifecycle transitions, each a named workflow action rather than
+     * a field edit.
+     *
+     * ADR-030 D-4b is explicit that manager authority over an employment
+     * record is expressed ONLY as discrete transitions -- there is no
+     * manager-editable field set, and none may be introduced by inference
+     * from `employees:write`. That is why this is a fixed verb list and not a
+     * generic PATCH.
+     *
+     * Approving a MANAGER or REGIONAL_MANAGER is TWO calls, approve then
+     * assign (ADR-065). A caller that stops after the first leaves the record
+     * approved and unassigned, and the hotel without a manager.
+     */
+    transition: (
+      employeeId: string,
+      action:
+        | 'submit-for-review'
+        | 'approve'
+        | 'reject'
+        | 'deactivate'
+        | 'reactivate'
+        | 'rehire'
+        | 'trigger-reonboarding',
+      body?: Record<string, unknown>
+    ) =>
+      request<EmploymentRecordDto>(`/employees/${employeeId}/${action}`, {
+        method: 'POST',
+        body: JSON.stringify(body ?? {}),
+      }),
+
+    assign: (employeeId: string, input: { hotel_group_id: string; primary_hotel_id?: string }) =>
+      request<EmploymentRecordDto>(`/employees/${employeeId}/assign`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    blocklist: (hotelId: string) =>
+      request<{ worker_id: string; reason?: string | null }[]>(
+        `/employees/hotels/${hotelId}/blocklist`
+      ),
+
+    /** RM and admin only -- `org_chart:read` is the one token RM has and Manager does not. */
+    orgChart: (hotelGroupId: string) =>
+      request<Record<string, unknown>>(`/employees/hotel-groups/${hotelGroupId}/org-chart`),
+
+    /**
      * Resolves this user's EmploymentRecord, or null when none exists yet
      * (null, not a 404). Workers hold `employees:read` and the service scopes
      * visibility to self, so a worker may call this for their own account.
@@ -956,6 +1227,16 @@ export const api = {
 
     listPayroll: () =>
       request<PayslipRequestDto[]>('/hr/payroll'),
+
+    /** Contracts the caller may see; scoped server-side. */
+    listContracts: () => request<ContractDto[]>('/hr/contracts'),
+
+    /** Manager fulfils a payslip request. Cross-group is refused server-side. */
+    fulfilPayslip: (requestId: string) =>
+      request<PayslipRequestDto>(`/hr/payroll/${requestId}/fulfil`, { method: 'POST' }),
+
+    confirmContract: (workerId: string) =>
+      request<ContractDto>(`/hr/workers/${workerId}/contract-confirm`, { method: 'POST' }),
 
     requestPayslip: (input: CreatePayslipRequestRequest) =>
       request<PayslipRequestDto>('/hr/payslip-requests', {

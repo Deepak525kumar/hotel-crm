@@ -20,6 +20,8 @@ import {
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
+import { HotelPicker } from '@/components/HotelPicker';
+import { hotelFilterFor } from '@/lib/hotel-filter';
 import { ScopeNote } from '@/components/ScopeNote';
 import { score } from '@/lib/format-metrics';
 
@@ -41,9 +43,10 @@ export default function Leaderboard() {
   const user = useAuthStore((s) => s.user);
   const scope = scopeOf(user);
   const [refreshing, setRefreshing] = useState(false);
+  const [hotelId, setHotelId] = useState<string | null>(null);
 
-  const { data, error, isLoading, mutate } = useSWR('analytics/leaderboard', () =>
-    api.analytics.leaderboard()
+  const { data, error, isLoading, mutate } = useSWR(['analytics/leaderboard', hotelId], () =>
+    api.analytics.leaderboard(hotelFilterFor(hotelId))
   );
 
   const onRefresh = useCallback(async () => {
@@ -72,6 +75,7 @@ export default function Leaderboard() {
             subtitle={t('leaderboard.topPerformers')}
           />
           <ScopeNote scope={scope} />
+          <HotelPicker scope={scope} value={hotelId} onChange={setHotelId} />
 
           {isLoading ? (
             <SkeletonList rows={8} />

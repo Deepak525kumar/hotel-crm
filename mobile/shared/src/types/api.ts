@@ -176,8 +176,37 @@ export interface Attendance {
   check_in_at?: string | null;
   check_out_at?: string | null;
   status: AttendanceStatus;
-  notes?: string;
+  notes?: string | null;
   created_at: string;
+
+  /**
+   * Manager-facing fields (2026-09-22). Present on the wire all along; this
+   * type was a narrow subset written for the worker app, which needs none of
+   * them.
+   *
+   * `is_verified` is the one that matters most: it is the whole point of the
+   * manager's attendance queue, and without it the client cannot tell a
+   * checked record from an unchecked one.
+   */
+  hotel_id?: string;
+  expected_start?: string | null;
+  expected_end?: string | null;
+  minutes_late?: number | null;
+  minutes_worked?: number | null;
+  is_verified?: boolean;
+  verified_by_id?: string | null;
+  verified_at?: string | null;
+  verified_by_name?: string | null;
+  /**
+   * Resolved names, on the READ paths only (list/getById). Nested by the
+   * backend precisely because a checker cannot call /users/:id or
+   * /crm/hotels/:id -- both are scoped against them -- so without these a
+   * verification screen showed the last six characters of a cuid and no
+   * hotel at all.
+   */
+  worker?: { id: string; first_name: string; last_name: string } | null;
+  hotel?: { id: string; name: string } | null;
+  updated_at?: string;
 }
 
 export interface Notification {
@@ -328,6 +357,21 @@ export interface EmploymentRecordDto {
   start_date: string;
   status: string;
   submitted_for_review_at?: string | null;
+  /**
+   * The applicant, nested by the review-queue read path (`include: { user }`).
+   *
+   * Present on that path and not on every employment-record response, so a
+   * screen outside the queue must not assume it. Without it the queue would
+   * render a cuid, which is exactly what the attendance DTO had to fix for
+   * the same reason.
+   */
+  user?: {
+    id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    role: UserRole;
+  } | null;
 }
 
 /**
@@ -389,6 +433,37 @@ export interface DashboardStats {
     total: number;
     entries: number;
   };
+}
+
+/**
+ * A hotel, as GET /crm/hotels returns it.
+ *
+ * Only the fields this client reads. Deliberately narrower than the web's
+ * `Hotel`: a type is a claim about the response, and claiming fields nobody
+ * renders is how `DashboardStats` came to describe an endpoint it had never
+ * seen (SIR-ANLY-016). Add a field here when a screen needs it.
+ */
+export interface Hotel {
+  id: string;
+  name: string;
+  city: string;
+  is_active: boolean;
+  hotel_group_id: string | null;
+}
+
+/**
+ * A hotel group, as GET /crm/hotel-groups returns it.
+ *
+ * Only the fields this client reads. `regional_manager_user_id` is nullable
+ * by design (2026-08-06 vacancy model): a group may be temporarily
+ * unassigned, and rendering that as "no group" rather than "no RM" would
+ * misreport a vacancy as a missing entity.
+ */
+export interface HotelGroup {
+  id: string;
+  name: string;
+  regional_manager_user_id: string | null;
+  is_active: boolean;
 }
 
 /**
@@ -464,8 +539,57 @@ export interface CalendarAbsence {
   worker_id: string;
   day: string; // YYYY-MM-DD
   kind: CalendarAbsenceKind;
+  /** Required by the backend for VACATION, optional for SICK. */
+  reason?: string | null;
+  /**
+   * Who marked it -- the worker themself, or a manager acting for them. Null
+   * on pre-migration rows.
+   */
+  marked_by_id?: string | null;
+  /**
+   * Display names, populated ONLY by the list paths that load the relations
+   * (backend `CalendarAbsenceDto`). Null elsewhere, so a detail view must not
+   * depend on them.
+   */
+  worker_name?: string | null;
+  marked_by_name?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * A placement on the calendar -- GET/POST /assignments/calendar-entries.
+ *
+ * Carries ids and no names, so any screen showing a person or a property
+ * resolves them itself.
+ *
+ * EVERY route behind this type is gated by FEATURE_JOBDISPATCH_PHASE2, which
+ * defaults to OFF. With the flag off they do not 403 -- they fall through to
+ * the 404 handler, so a client cannot tell "not permitted" from "not built"
+ * without knowing this. Screens must degrade to "unavailable", not to an
+ * error.
+ */
+export interface CalendarEntry {
+  id: string;
+  assignment_id: string;
+  worker_id: string;
+  hotel_id: string;
+  day: string; // YYYY-MM-DD
+  /**
+   * Present on LIST responses only, so a cancelled placement renders
+   * distinctly instead of silently vanishing from the grid (2026-08-13).
+   */
+  assignment_status?: AssignmentStatus;
+  placed_by_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** GET /calendar/availability — today-only, one row per worker. */
+export interface WorkerAvailability {
+  worker_id: string;
+  day: string;
+  available: boolean;
 }
 
 // GD-14 (SPEC-GEO-001 TREQ-GEO-001/003/004) — matches backend GeoCheckinDto

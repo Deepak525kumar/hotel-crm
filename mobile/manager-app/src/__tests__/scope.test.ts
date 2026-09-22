@@ -4,6 +4,8 @@
 // reason locales.test.ts imports its module directly.
 import { scopeOf } from '@hotel-crm/mobile-shared/src/lib/scope';
 import { percent, score } from '@/lib/format-metrics';
+import { ALL_HOTELS, canChooseHotel, hotelFilterFor } from '@/lib/hotel-filter';
+import { needsAssignAfterApproval } from '@/lib/review-queue';
 
 /**
  * Scope derivation, and the reason it is a function rather than an inline
@@ -89,5 +91,57 @@ describe('metric formatting', () => {
 
   it('scales a 0-1 fraction, since the API mixes both conventions', () => {
     expect(percent(0.5)).toBe('50%');
+  });
+});
+
+describe('hotel filtering', () => {
+  // A picker offering one option is a control that cannot change anything --
+  // worse than no picker, because it implies a choice exists.
+  it('offers no choice to a hotel manager, whose scope is already one hotel', () => {
+    expect(canChooseHotel({ kind: 'hotel', hotelId: 'h1' })).toBe(false);
+  });
+
+  it('offers a choice to a regional manager and to an admin', () => {
+    expect(canChooseHotel({ kind: 'group', hotelGroupId: 'g1' })).toBe(true);
+    expect(canChooseHotel({ kind: 'global' })).toBe(true);
+  });
+
+  it('offers no choice on a null scope, which the server denies outright', () => {
+    expect(canChooseHotel({ kind: 'none' })).toBe(false);
+  });
+
+  // The sentinel must never reach a URL: '/analytics/stats?hotel_id=__all__'
+  // is a 403 for a scoped caller and a 404-shaped nothing for an admin.
+  it('maps the all-hotels sentinel back to no filter, never to an id', () => {
+    expect(hotelFilterFor(ALL_HOTELS)).toBeUndefined();
+    expect(hotelFilterFor(null)).toBeUndefined();
+    expect(hotelFilterFor('h1')).toBe('h1');
+  });
+});
+
+describe('approval chain', () => {
+  /**
+   * ADR-065 makes Manager and Regional Manager a TWO-STEP approval: approve,
+   * then assign. Worker and Checker are one step.
+   *
+   * The failure mode is silent in exactly the way this repository keeps
+   * getting caught by. The approve returns 200, the record reads APPROVED,
+   * and the hotel simply has no manager -- scenario 02 records the mirror
+   * image of it ("`assign` returned 200 but the hotel had no manager"), which
+   * is why it is worth pinning from this side too.
+   */
+  it('requires a second assign call for a manager and a regional manager', () => {
+    expect(needsAssignAfterApproval('manager')).toBe(true);
+    expect(needsAssignAfterApproval('regional_manager')).toBe(true);
+  });
+
+  it('does not for a worker or a checker', () => {
+    expect(needsAssignAfterApproval('worker')).toBe(false);
+    expect(needsAssignAfterApproval('checker')).toBe(false);
+  });
+
+  it('does not for an absent role rather than guessing', () => {
+    expect(needsAssignAfterApproval(null)).toBe(false);
+    expect(needsAssignAfterApproval(undefined)).toBe(false);
   });
 });
