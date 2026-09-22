@@ -11,7 +11,9 @@ import type {
   Notification,
   LeaderboardEntry,
   AnalyticsLeaderboardEntry,
+  CalendarEntry,
   DashboardStats,
+  WorkerAvailability,
   Hotel,
   HotelSummary,
   WorkerStats,
@@ -576,6 +578,39 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       }),
+
+    /**
+     * Placements over a day range.
+     *
+     * `from` and `to` go together or not at all -- the backend refuses a lone
+     * one, because it would silently produce a query unbounded on one side.
+     *
+     * FEATURE_JOBDISPATCH_PHASE2 gates this. With the flag off it 404s rather
+     * than 403ing, so callers must treat "not found" as "unavailable".
+     */
+    calendarEntries: (params: { from: string; to: string; hotelId?: string }) => {
+      const qs = new URLSearchParams({ from: params.from, to: params.to, per_page: '100' });
+      if (params.hotelId) qs.set('hotel_id', params.hotelId);
+      return request<CalendarEntry[]>(`/assignments/calendar-entries?${qs.toString()}`);
+    },
+
+    createCalendarEntry: (input: { worker_id: string; hotel_id: string; day: string }) =>
+      request<CalendarEntry>('/assignments/calendar-entries', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    /**
+     * Day-only move, by product decision (2026-08-05): the hotel and worker on
+     * a placement never change here. Moving someone to a DIFFERENT HOTEL means
+     * cancelling and re-placing -- which is why the agenda's drag targets are
+     * days and never hotel sections.
+     */
+    moveCalendarEntry: (id: string, day: string) =>
+      request<CalendarEntry>(`/assignments/calendar-entries/${id}/move`, {
+        method: 'PATCH',
+        body: JSON.stringify({ day }),
+      }),
   },
   attendance: {
     // GD-14: when coordinates are available they're sent with the check-in
@@ -801,6 +836,45 @@ export const api = {
     // refuses a past day.
     deleteAbsence: (absenceId: string) =>
       request<void>(`/calendar/absences/${absenceId}`, { method: 'DELETE' }),
+
+    /**
+     * The team's absences over a range. `from` and `to` are BOTH required by
+     * the backend -- there is no default window, so an agenda always sends
+     * one (ListAbsencesQuerySchema).
+     */
+    teamAbsences: (params: { from: string; to: string; workerId?: string }) => {
+      const qs = new URLSearchParams({ from: params.from, to: params.to });
+      if (params.workerId) qs.set('worker_id', params.workerId);
+      return request<CalendarAbsence[]>(`/calendar/absences?${qs.toString()}`);
+    },
+
+    /**
+     * Mark an absence FOR a worker (manager/RM/admin).
+     *
+     * `reason` is mandatory for VACATION and optional for SICK, enforced by a
+     * zod refine -- omitting it on a vacation is a 422, not a silently empty
+     * field. The same omission already cost this client every vacation
+     * request once (see markAbsence above).
+     */
+    markAbsenceForWorker: (input: {
+      worker_id: string;
+      day: string;
+      kind: CalendarAbsenceKind;
+      reason?: string;
+    }) =>
+      request<CalendarAbsence>('/calendar/absences', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    /** Day-only move. Nothing else about the absence changes. */
+    moveAbsence: (absenceId: string, day: string) =>
+      request<CalendarAbsence>(`/calendar/absences/${absenceId}/move`, {
+        method: 'PATCH',
+        body: JSON.stringify({ day }),
+      }),
+
+    availability: () => request<WorkerAvailability[]>('/calendar/availability'),
   },
   geo: {
     // GD-14: self-checkin, self-scoped to the authenticated worker

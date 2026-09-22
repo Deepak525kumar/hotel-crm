@@ -480,8 +480,57 @@ export interface CalendarAbsence {
   worker_id: string;
   day: string; // YYYY-MM-DD
   kind: CalendarAbsenceKind;
+  /** Required by the backend for VACATION, optional for SICK. */
+  reason?: string | null;
+  /**
+   * Who marked it -- the worker themself, or a manager acting for them. Null
+   * on pre-migration rows.
+   */
+  marked_by_id?: string | null;
+  /**
+   * Display names, populated ONLY by the list paths that load the relations
+   * (backend `CalendarAbsenceDto`). Null elsewhere, so a detail view must not
+   * depend on them.
+   */
+  worker_name?: string | null;
+  marked_by_name?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * A placement on the calendar -- GET/POST /assignments/calendar-entries.
+ *
+ * Carries ids and no names, so any screen showing a person or a property
+ * resolves them itself.
+ *
+ * EVERY route behind this type is gated by FEATURE_JOBDISPATCH_PHASE2, which
+ * defaults to OFF. With the flag off they do not 403 -- they fall through to
+ * the 404 handler, so a client cannot tell "not permitted" from "not built"
+ * without knowing this. Screens must degrade to "unavailable", not to an
+ * error.
+ */
+export interface CalendarEntry {
+  id: string;
+  assignment_id: string;
+  worker_id: string;
+  hotel_id: string;
+  day: string; // YYYY-MM-DD
+  /**
+   * Present on LIST responses only, so a cancelled placement renders
+   * distinctly instead of silently vanishing from the grid (2026-08-13).
+   */
+  assignment_status?: AssignmentStatus;
+  placed_by_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** GET /calendar/availability — today-only, one row per worker. */
+export interface WorkerAvailability {
+  worker_id: string;
+  day: string;
+  available: boolean;
 }
 
 // GD-14 (SPEC-GEO-001 TREQ-GEO-001/003/004) — matches backend GeoCheckinDto
