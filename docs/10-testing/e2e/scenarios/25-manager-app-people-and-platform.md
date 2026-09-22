@@ -149,6 +149,50 @@ queue.
 - The token registers **before** consent is accepted → 403 `CONSENT_REQUIRED`,
   and the token is then absent for the whole session
 
+## Step 11 — The lifecycle transitions, and the two that are not interchangeable
+
+From a team member's screen, run the transitions the record's status offers.
+
+**PASS:** each writes **exactly one** `EmploymentStatusHistory` row, and the
+`employment_cycle` counter is correct. A verb the server refuses from that
+state surfaces its own message, not a generic failure — the client narrows
+the list as a convenience and `applyTransition()` owns the real state machine.
+
+**The pair worth its own check:** from `DEACTIVATED`, both `reactivate` and
+`trigger-reonboarding` are offered. They are **not** alternatives —
+`reactivate` returns someone whose contract is still valid,
+`trigger-reonboarding` restarts the gate for someone whose contract expired,
+and the server enforces which applies (scenario 15). Verify the wrong one is
+refused rather than quietly doing the other.
+
+**FAIL conditions:**
+- Two history rows for one tap
+- `delete` or `restore` offered to a manager — both are admin-only and cross
+  the account boundary (`deleted_at`/`is_active`/`token_generation`)
+- Any employment-record FIELD editable anywhere on the screen (ADR-030 D-4b)
+
+## Step 12 — Blocking someone from a hotel
+
+Add a blocklist entry from a hotel's screen, with and without a reason.
+
+**PASS:** the reason is required (`SetBlocklistSchema` min(1)) and the entry
+is readable back from `EmployeeBlocklistEntry`. This bars a named person from
+a named property; the reason is the only record of why.
+
+## Step 13 — Exports reach the share sheet
+
+Export the team report and the own-data report from Settings.
+
+**PASS:** the file downloads and the system share sheet opens. A report with
+**zero rows** reports "no rows" rather than sharing an empty file.
+
+**FAIL conditions (both real traps):**
+- Nothing happens and no error appears → `FileSystem.downloadAsync` was used.
+  It is still exported in SDK 57 as a stub that unconditionally THROWS;
+  `File.downloadFileAsync` is the working call
+- The whole Settings screen fails to render → a native module was imported at
+  the top level. Its absence takes down every importer, not just the button
+
 ## Pass criteria summary
 
 - [ ] Review queue scoped, proven with **two** groups
@@ -161,6 +205,10 @@ queue.
 - [ ] 375pt with the width **measured**
 - [ ] Airplane mode readable; writes fail visibly
 - [ ] `PushToken.app = 'MANAGER'`; real provider send observed
+- [ ] Each lifecycle transition writes exactly one history row
+- [ ] `reactivate` vs `trigger-reonboarding` enforced by the server
+- [ ] Blocklist refuses a missing reason; entry readable at the data layer
+- [ ] Both exports open the share sheet; an empty report says so
 
 ## Knowingly untested here
 

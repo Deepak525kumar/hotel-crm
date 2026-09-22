@@ -13,11 +13,13 @@ import {
   ThemePicker,
   ThemedText,
   ThemedView,
+  api,
   scopeOf,
   useAuthStore,
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
+import { ExportRow } from '@/components/ExportRow';
 
 export default function Settings() {
   const { t } = useTranslation();
@@ -52,6 +54,16 @@ export default function Settings() {
 
           <SectionHeader title={t('settings.language.title')} />
           <LanguagePicker />
+
+          <SectionHeader title={t('settings.exportData')} />
+          {/* Export only, no on-screen table (owner decision 2026-09-22): a
+              phone is a poor place to read a report and a good place to send
+              one. Both of these end at the share sheet. */}
+          <ExportRow
+            label={t('settings.exportDataAction')}
+            run={() => api.reports.exportTeam({ dataset: 'attendance' })}
+          />
+          <ExportRow label={t('settings.exportDataShort')} run={() => api.reports.exportMine()} />
 
           <Button label={t('nav.logout')} variant="danger" onPress={() => void logout()} />
         </ScrollView>

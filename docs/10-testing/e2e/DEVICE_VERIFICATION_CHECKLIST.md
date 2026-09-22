@@ -70,6 +70,15 @@ took worker-app's `request()`.
       returned a bare 413 for months — see the 2026-09-21 run log.
 - [ ] **Upload over a slow connection** does not appear to hang silently.
 
+## 3b. Export and share sheet
+
+- [ ] **Team report export** and **own-data export** (Settings) download and
+      open the system share sheet, with a real file attached.
+- [ ] A report with **zero rows** says so rather than sharing an empty file.
+- [ ] **On a build made before `expo-sharing` was added**, the download still
+      succeeds and only the sharing step is skipped — the modules are required
+      lazily precisely so a missing native half does not take down the screen.
+
 ## 4. Push notifications
 
 **Blocked** until `com.fhmhotelservices.managerapp` is registered in Apple
@@ -84,7 +93,12 @@ Developer with push enabled, `APNS_BUNDLE_ID_MANAGER` is set in the EC2
       evidence** — scenario 16's rule applies verbatim.
 - [ ] No `DeviceTokenNotForTopic`: that means the manager token was sent to
       another app's topic, the exact outage `PushApp` exists to prevent.
-- [ ] Tapping a notification deep-links to the right screen.
+- [ ] **Tapping a notification deep-links to the right screen, for each
+      manager type.** This file arrived as a copy of worker-app's and pointed
+      at `/offer/:id`, `/rework/:id` and `/shift/:id` — none of which exist
+      here, so every tap went nowhere. `push-routes.test.ts` now pins the
+      destinations, but only a device proves the payload carries the ids the
+      routes need.
 - [ ] Token ownership reassigns when a second user signs in on one device.
 
 ## 5. Permissions

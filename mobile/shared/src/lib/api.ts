@@ -416,6 +416,19 @@ export const api = {
    * real state and callers must render it as such, never as a dead link.
    */
   reports: {
+    /**
+     * The team report, as a file.
+     *
+     * Export only, no on-screen table (owner decision, 2026-09-22): a phone
+     * is a poor place to read a report and a good place to send one. The
+     * response is a download the caller shares or opens elsewhere.
+     */
+    exportTeam: (input: { dataset: string; from?: string; to?: string }) =>
+      request<GeneratedReportDto>('/reports/export', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
     exportMine: (range?: { from: string; to: string }) =>
       request<GeneratedReportDto>('/reports/export/mine', {
         method: 'POST',
@@ -1293,9 +1306,20 @@ export const api = {
       }),
 
     blocklist: (hotelId: string) =>
-      request<{ worker_id: string; reason?: string | null }[]>(
+      request<{ employee_id: string; reason?: string | null }[]>(
         `/employees/hotels/${hotelId}/blocklist`
       ),
+
+    /**
+     * Block an employee from a hotel. A REASON IS REQUIRED by the schema
+     * (`SetBlocklistSchema`, min(1)) -- this bars a named person from a named
+     * property, and the reason is the record of why.
+     */
+    addToBlocklist: (hotelId: string, input: { employee_id: string; reason: string }) =>
+      request<void>(`/employees/hotels/${hotelId}/blocklist`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
 
     /** RM and admin only -- `org_chart:read` is the one token RM has and Manager does not. */
     orgChart: (hotelGroupId: string) =>

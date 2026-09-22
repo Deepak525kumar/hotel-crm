@@ -3,11 +3,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router, useLocalSearchParams } from 'expo-router';
 import useSWR from 'swr';
+import { useCallback, useState } from 'react';
 
 import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
   EmptyState,
   MaxContentWidth,
   ScreenHeader,
@@ -17,9 +19,12 @@ import {
   ThemedText,
   ThemedView,
   api,
+  translateApiError,
+  useToast,
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
+import { actionsFor, needsReason, type LifecycleAction } from '@/lib/lifecycle';
 
 /**
  * One team member.
@@ -37,11 +42,44 @@ import { BackLink } from '@/components/BackLink';
  */
 export default function TeamMember() {
   const { t } = useTranslation();
+  const toast = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [pending, setPending] = useState<LifecycleAction | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const user = useSWR(id ? ['user', id] : null, () => api.users.get(String(id)));
   const employment = useSWR(id ? ['employment', id] : null, () =>
     api.employee.getByUserId(String(id))
+  );
+
+  /**
+   * Runs one named transition.
+   *
+   * No generic PATCH exists here on purpose (ADR-030 D-4b): manager authority
+   * over an employment record is a fixed verb list, and every field --
+   * identity, legal, payroll, tax, compensation, employment terms -- is
+   * Admin-owned.
+   */
+  const runTransition = useCallback(
+    async (action: LifecycleAction, reason?: string) => {
+      const record = employment.data;
+      if (!record || busy) return;
+      setBusy(true);
+      try {
+        await api.employee.transition(record.id, action, reason ? { reason } : undefined);
+        await employment.mutate();
+        toast.show(t('fields.updated'), 'success');
+      } catch (e) {
+        // The server owns the real state machine; a refusal here means this
+        // transition is not valid from this state, which is information the
+        // manager needs verbatim rather than flattened into "failed".
+        toast.show(translateApiError(e, t), 'danger');
+      } finally {
+        setBusy(false);
+        setPending(null);
+      }
+    },
+    [employment, busy, toast, t]
   );
 
   return (
@@ -100,9 +138,38 @@ export default function TeamMember() {
               ) : (
                 <EmptyState title={t('onboarding.noRecordFound')} />
               )}
+
+              {employment.data ? (
+                <>
+                  <SectionHeader title={t('common.actions')} />
+                  {/* A fixed verb list, narrowed by status. There is no
+                      employment-record form anywhere on this screen. */}
+                  {actionsFor(employment.data.status).map((action) => (
+                    <Button
+                      key={action}
+                      label={action}
+                      variant={action === 'reject' || action === 'deactivate' ? 'danger' : 'ghost'}
+                      loading={busy}
+                      onPress={() =>
+                        needsReason(action) ? setPending(action) : void runTransition(action)
+                      }
+                    />
+                  ))}
+                </>
+              ) : null}
             </>
           )}
         </ScrollView>
+
+        <ConfirmDialog
+          visible={pending !== null}
+          title={pending ?? ''}
+          destructive
+          requireReason
+          busy={busy}
+          onCancel={() => setPending(null)}
+          onConfirm={(reason) => pending && void runTransition(pending, reason)}
+        />
       </SafeAreaView>
     </ThemedView>
   );
