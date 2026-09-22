@@ -26,12 +26,17 @@ import {
 } from '@hotel-crm/mobile-shared';
 
 import { AddPlacementSheet } from '@/components/AddPlacementSheet';
+import { CoverageGrid, type DayCoverage } from '@/components/CoverageGrid';
 import { DateStrip, type DayCellLayout } from '@/components/DateStrip';
+import { PeriodNav } from '@/components/PeriodNav';
+import { ViewSwitcher } from '@/components/ViewSwitcher';
 import { MarkAbsenceSheet } from '@/components/MarkAbsenceSheet';
 import { ShiftSummarySheet } from '@/components/ShiftSummarySheet';
 import { PlacementRow } from '@/components/PlacementRow';
 import { absencesForDay, addDays, dayStrip, dropTargetAt, groupByHotel, isRealMove } from '@/lib/agenda';
 import { isCompleteSuccess, summarise, weeklyOccurrences, type OccurrenceOutcome } from '@/lib/recurring';
+import { isSameMonth, monthGrid, step, weekDays, type CalendarView } from '@/lib/calendar-views';
+import { useDirectory } from '@/hooks/useDirectory';
 import { todayInBerlin } from '@/lib/today';
 
 /**
@@ -61,6 +66,10 @@ export default function Calendar() {
   const scope = scopeOf(user);
 
   const [day, setDay] = useState(() => todayInBerlin());
+  const [view, setView] = useState<CalendarView>('day');
+  const today = useMemo(() => todayInBerlin(), []);
+  // Names for the ids the calendar DTO carries. See useDirectory.
+  const { workerName, hotelName } = useDirectory();
   const [refreshing, setRefreshing] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -75,7 +84,19 @@ export default function Calendar() {
   const cells = useRef(new Map<string, DayCellLayout>());
   const stripOriginX = useRef(0);
 
-  const days = useMemo(() => dayStrip(day), [day]);
+  /**
+   * The days the current view needs.
+   *
+   * The fetch range follows the VIEW, not a fixed strip: a month grid that
+   * only loaded a week would render empty cells that look like quiet days
+   * rather than unloaded ones, which is worse than a spinner.
+   */
+  const days = useMemo(() => {
+    if (view === 'week') return weekDays(day);
+    if (view === 'month') return monthGrid(day);
+    return dayStrip(day);
+  }, [view, day]);
+
   const range = useMemo(() => ({ from: days[0], to: days[days.length - 1] }), [days]);
 
   const placements = useSWR(['calendar-entries', range.from, range.to], () =>
@@ -216,6 +237,23 @@ export default function Calendar() {
   const entriesUnavailable =
     placements.error instanceof ApiError && placements.error.status === 404;
 
+  const coverage: DayCoverage[] = useMemo(() => {
+    const entries = placements.data ?? [];
+    const offs = absences.data ?? [];
+    return days.map((d) => ({
+      day: d,
+      placements: entries.filter((e) => e.day === d).length,
+      absences: offs.filter((a) => a.day === d).length,
+      inPeriod: view === 'month' ? isSameMonth(d, day) : true,
+    }));
+  }, [days, placements.data, absences.data, view, day]);
+
+  const periodLabel = useMemo(() => {
+    if (view === 'day') return day;
+    if (view === 'week') return `${days[0]} – ${days[days.length - 1]}`;
+    return day.slice(0, 7);
+  }, [view, day, days]);
+
   const groups = groupByHotel(placements.data ?? [], day);
   const dayAbsences = absencesForDay(absences.data ?? [], day);
 
@@ -228,21 +266,57 @@ export default function Calendar() {
             <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
           }
         >
-          <ScreenHeader title={t('nav.calendar')} subtitle={t('calendar.dragToMoveHint')} />
+          <ScreenHeader title={t('nav.calendar')} />
 
-          <View
-            onLayout={(e) => {
-              stripOriginX.current = e.nativeEvent.layout.x;
-            }}
-          >
-            <DateStrip
-              days={days}
+          <ViewSwitcher
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'day', label: t('calendar.viewDay') },
+              { value: 'week', label: t('calendar.viewWeek') },
+              { value: 'month', label: t('calendar.viewMonth') },
+            ]}
+          />
+
+          <PeriodNav
+            label={periodLabel}
+            atToday={day === today}
+            todayLabel={t('common.today')}
+            onToday={() => setDay(today)}
+            onPrev={() => setDay(step(view, day, -1))}
+            onNext={() => setDay(step(view, day, 1))}
+          />
+
+          {view === 'day' ? (
+            // The strip stays in day view only: it is the drag target, and a
+            // drag needs day-sized drop zones. In week and month the grid
+            // itself is the navigation.
+            <View
+              onLayout={(e) => {
+                stripOriginX.current = e.nativeEvent.layout.x;
+              }}
+            >
+              <DateStrip
+                days={days}
+                selected={day}
+                highlight={hovered}
+                onSelect={setDay}
+                onCellLayout={(layout) => cells.current.set(layout.day, layout)}
+              />
+            </View>
+          ) : (
+            <CoverageGrid
+              days={coverage}
               selected={day}
-              highlight={hovered}
-              onSelect={setDay}
-              onCellLayout={(layout) => cells.current.set(layout.day, layout)}
+              today={today}
+              onSelect={(next) => {
+                setDay(next);
+                // Drop into the day, because that is where the names and the
+                // actions are — a count is a reason to look, not an answer.
+                setView('day');
+              }}
             />
-          </View>
+          )}
 
           <View style={styles.actions}>
             <Button
@@ -271,7 +345,7 @@ export default function Calendar() {
               {groups.map((group) => (
                 <View key={group.hotelId} style={styles.group}>
                   <SectionHeader
-                    title={group.hotelId}
+                    title={hotelName(group.hotelId)}
                     action={
                       <Button
                         label={t('calendar.dailySummary')}
@@ -283,7 +357,7 @@ export default function Calendar() {
                   {group.entries.map((entry) => (
                     <PlacementRow
                       key={entry.id}
-                      title={entry.worker_id}
+                      title={workerName(entry.worker_id)}
                       subtitle={entry.day}
                       status={entry.assignment_status}
                       onDragStart={() => setHovered(entry.day)}
@@ -311,7 +385,7 @@ export default function Calendar() {
                     {dayAbsences.map((absence) => (
                       <View key={absence.id} style={styles.absence}>
                         <ThemedText type="smallBold" numberOfLines={1}>
-                          {absence.worker_name ?? absence.worker_id}
+                          {absence.worker_name ?? workerName(absence.worker_id)}
                         </ThemedText>
                         <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
                           {absence.kind}

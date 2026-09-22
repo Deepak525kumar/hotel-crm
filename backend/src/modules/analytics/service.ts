@@ -32,10 +32,44 @@ export class AnalyticsService extends BaseService {
   // `hotelGroupId` (ADR-030 PR-4, D-7) lets a scoped manager/regional_manager's
   // own group filter directly, without resolving through a specific hotel.
   async getLeaderboard(hotelId?: string, hotelGroupId?: string): Promise<LeaderboardEntry[]> {
-    let where: Record<string, unknown> = {};
+    /**
+     * A deleted person leaves the leaderboard. (2026-09-23)
+     *
+     * Reported by the project owner: "a user gets removed, but his data in the
+     * leaderboard is staying". Two separate holes produced it, and the second
+     * is the worse one:
+     *
+     * 1. The scoped branches below filter `employment_record.status = ACTIVE`,
+     *    which is about EMPLOYMENT, not about the account. `deleteUser()` sets
+     *    `User.deleted_at` and `is_active = false`; it does not by itself make
+     *    an employment record non-ACTIVE, so a deleted account whose record
+     *    still read ACTIVE kept ranking.
+     *
+     * 2. With NEITHER hotel nor group — which is every admin call, since an
+     *    admin has global scope and sends no filter — `where` was `{}`. No
+     *    filter of any kind. Every WorkerOverallRating row ever written was
+     *    returned, deleted users included.
+     *
+     * The name is the part that matters: this endpoint returns
+     * `first_name`/`last_name`, so a removed person's NAME kept appearing to
+     * everyone who could see the board. It is a privacy problem, not only a
+     * tidiness one.
+     *
+     * `deleted_at: null` is now applied unconditionally and merged INTO the
+     * scope filter rather than replacing it, so narrowing and exclusion
+     * compose. `User.deleted_at` is indexed, so this costs nothing.
+     *
+     * Deliberately NOT filtering on `is_active`: deactivation is reversible
+     * and a temporarily inactive worker's history is still theirs. Deletion is
+     * the line this draws.
+     */
+    const notDeleted = { deleted_at: null };
+
+    let where: Record<string, unknown> = { worker: notDeleted };
     if (hotelGroupId) {
       where = {
         worker: {
+          ...notDeleted,
           employment_record: { hotel_group_id: hotelGroupId, status: 'ACTIVE' },
         },
       };
@@ -46,6 +80,7 @@ export class AnalyticsService extends BaseService {
       });
       where = {
         worker: {
+          ...notDeleted,
           employment_record: { hotel_group_id: hotel?.hotel_group_id ?? '__none__', status: 'ACTIVE' },
         },
       };
