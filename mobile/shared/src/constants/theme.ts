@@ -3,6 +3,10 @@
  * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
  */
 
+/// <reference path="../types/css.d.ts" />
+// The reference above is load-bearing, not decoration. Without it this import
+// only typechecks where Expo's generated `expo-env.d.ts` happens to exist --
+// which is every developer's machine and no CI runner (it is gitignored).
 import '../global.css';
 
 import { Platform } from 'react-native';
