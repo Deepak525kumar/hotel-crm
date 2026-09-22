@@ -1,0 +1,16 @@
+{
+  "name": "@hotel-crm/mobile-shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "expo-secure-store": "*",
+    "react": "*",
+    "react-native": "*",
+    "zustand": "*"
+  }
+}

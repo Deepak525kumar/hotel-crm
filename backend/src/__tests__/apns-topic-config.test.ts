@@ -38,7 +38,7 @@ import path from 'node:path';
 describe('APNs topic configuration', () => {
   const repoRoot = path.resolve(process.cwd(), '..');
 
-  const bundleIdOf = (app: 'worker-app' | 'checker-app'): string => {
+  const bundleIdOf = (app: 'worker-app' | 'checker-app' | 'manager-app'): string => {
     const appJson = JSON.parse(
       readFileSync(path.join(repoRoot, 'mobile', app, 'app.json'), 'utf8')
     );
@@ -63,12 +63,22 @@ describe('APNs topic configuration', () => {
     expect(envExample().get('APNS_BUNDLE_ID_CHECKER')).toBe(bundleIdOf('checker-app'));
   });
 
-  it('the two apps have distinct bundle identifiers', () => {
+  // Added 2026-09-22 with mobile/manager-app. The manager topic shipped in
+  // .env.example one commit before the app existed, which is exactly the
+  // window in which an unpinned placeholder gets copied into a deployed .env
+  // and causes a silent 100% push outage -- the defect this whole file exists
+  // to prevent. Closed as soon as there was an app.json to assert against.
+  it('.env.example documents the manager app’s real bundle identifier', () => {
+    expect(envExample().get('APNS_BUNDLE_ID_MANAGER')).toBe(bundleIdOf('manager-app'));
+  });
+
+  it('the apps have distinct bundle identifiers', () => {
     // A copy-paste between the two app.json files would make both topics
     // identical, and the resulting failure is asymmetric and confusing: one
     // app keeps working while the other gets DeviceTokenNotForTopic on every
     // send. PushApp exists precisely to keep these two apart (PR 7.8).
-    expect(bundleIdOf('worker-app')).not.toBe(bundleIdOf('checker-app'));
+    const ids = [bundleIdOf('worker-app'), bundleIdOf('checker-app'), bundleIdOf('manager-app')];
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('does not carry the placeholder values that caused the outage', () => {

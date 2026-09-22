@@ -35,6 +35,14 @@ const GLYPHS = {
     <rect x="170" y="470" width="684" height="140" rx="60" fill="${fill}"/>
     <rect x="196" y="606" width="60" height="96" rx="30" fill="${fill}"/>
     <rect x="768" y="606" width="60" height="96" rx="30" fill="${fill}"/>`,
+  // Clipboard with two ruled lines: the rota a manager works from. Same
+  // weight and geometry as the other two so the three read as one family.
+  clipboard: (fill) => `
+    <rect x="232" y="232" width="560" height="640" rx="72"
+          fill="none" stroke="${fill}" stroke-width="72"/>
+    <rect x="400" y="150" width="224" height="150" rx="64" fill="${fill}"/>
+    <rect x="356" y="500" width="312" height="60" rx="30" fill="${fill}"/>
+    <rect x="356" y="644" width="216" height="60" rx="30" fill="${fill}"/>`,
   // Check inside a rounded square: inspected and signed off.
   check: (fill) => `
     <rect x="200" y="200" width="624" height="624" rx="160"
@@ -59,6 +67,16 @@ const BRANDS = {
     from: '#14B58C',
     to: '#0A7A5E',
     adaptiveBackground: '#E3F7F1',
+  },
+  'manager-app': {
+    glyph: 'clipboard',
+    // Indigo: the third distinct hue, and the one furthest from both the
+    // worker blue and the checker green at a glance. An admin may have all
+    // three installed, so the trio has to separate on a home screen, not just
+    // in a side-by-side comparison.
+    from: '#5A6BB5',
+    to: '#2E3A6B',
+    adaptiveBackground: '#E8EAF5',
   },
 };
 

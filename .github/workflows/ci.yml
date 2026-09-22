@@ -388,3 +388,42 @@ jobs:
       - name: Unit tests
         run: npm test -- --ci
         working-directory: mobile/${{ matrix.app }}
+
+  # manager-app is NOT in the matrix above, and cannot be: that job runs
+  # `npm ci` inside each app against the app's own package-lock.json, and
+  # manager-app depends on `@hotel-crm/mobile-shared`, a workspace package
+  # that exists only in this repository. A standalone install would try to
+  # fetch it from the registry and fail.
+  #
+  # So this job installs from the repository root, where the workspace links
+  # mobile/shared into place, and runs the same three gates. Lint is included
+  # here deliberately: it is the gate that gets skipped and the one that fails
+  # CI (see CLAUDE.md).
+  mobile-manager:
+    name: Mobile · manager-app
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install workspace deps
+        run: npm ci
+
+      - name: Typecheck (shared)
+        run: npm run typecheck --workspace @hotel-crm/mobile-shared
+
+      - name: Typecheck
+        run: npm run typecheck --workspace manager-app
+
+      - name: Lint
+        run: npx expo lint
+        working-directory: mobile/manager-app
+
+      - name: Unit tests
+        run: npm test --workspace manager-app -- --ci

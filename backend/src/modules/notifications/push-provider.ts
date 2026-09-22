@@ -229,7 +229,7 @@ export class ApnsProviderClient implements PushProviderClient {
           if (reason === 'BadTopic' || reason === 'TopicDisallowed' || reason === 'DeviceTokenNotForTopic') {
             reject(
               new PushConfigurationError(
-                `APNs rejected the topic: ${status} ${reason}. apns-topic must equal the app's iOS bundle identifier (expo.ios.bundleIdentifier in mobile/<app>/app.json); check APNS_BUNDLE_ID_WORKER / APNS_BUNDLE_ID_CHECKER.`,
+                `APNs rejected the topic: ${status} ${reason}. apns-topic must equal the app's iOS bundle identifier (expo.ios.bundleIdentifier in mobile/<app>/app.json); check APNS_BUNDLE_ID_WORKER / APNS_BUNDLE_ID_CHECKER / APNS_BUNDLE_ID_MANAGER.`,
                 input.topic
               )
             );

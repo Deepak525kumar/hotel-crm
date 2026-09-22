@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "version": ">= 20.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "channel": "development",
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "channel": "preview",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.deepcleaninghub.de/api/v1",
+        "EXPO_PUBLIC_DAIWI_URL": "https://api.deepcleaninghub.de"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.deepcleaninghub.de/api/v1",
+        "EXPO_PUBLIC_DAIWI_URL": "https://api.deepcleaninghub.de"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
