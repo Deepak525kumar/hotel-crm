@@ -1,8 +1,59 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
-} from 'expo-speech-recognition';
+
+/**
+ * THE NATIVE MODULE IS REQUIRED LAZILY, AND THE WHOLE APP DEPENDED ON IT.
+ *
+ * This file used to open with a top-level
+ * `import { ... } from 'expo-speech-recognition'`. A top-level import of an
+ * Expo module whose NATIVE half is absent from the running binary throws
+ * `Cannot find native module 'ExpoSpeechRecognition'` during module
+ * evaluation — which takes down every importer, not just the microphone
+ * button. expo-router reports it as the thoroughly misleading
+ * "Route is missing the required default export", and with `assistant.tsx`
+ * failing to evaluate the app could not be navigated at all: reported
+ * 2026-09-22 as "I am not able to log into the app".
+ *
+ * That is not a new lesson here. `lib/contract-download.ts` records the same
+ * shape taking out `shift/[id].tsx` via `expo-location`, and says so at
+ * length. This file was copied from worker-app — where the native module IS
+ * in the build — without the lesson being applied.
+ *
+ * `expo-speech-recognition` is a RECENT addition to this app, so any
+ * development build made before it was added does not contain it until the
+ * app is rebuilt. Requiring it lazily means such a build loses dictation and
+ * nothing else.
+ */
+type SpeechModule = {
+  ExpoSpeechRecognitionModule: {
+    stop: () => void;
+    abort: () => void;
+    requestPermissionsAsync: () => Promise<{ granted: boolean }>;
+    start: (options: Record<string, unknown>) => void;
+  };
+  // Typed loosely on purpose: the real types live in the module that may not
+  // be present, and importing them for typing alone would reintroduce the
+  // top-level dependency this indirection exists to remove.
+  useSpeechRecognitionEvent: (
+    event: 'result',
+    handler: (payload: { results?: { transcript?: string }[] }) => void
+  ) => void;
+};
+
+type SpeechEventModule = SpeechModule & {
+  useSpeechRecognitionEvent: (
+    event: 'result' | 'error' | 'end',
+    handler: (payload: { results?: { transcript?: string }[]; error?: string }) => void
+  ) => void;
+};
+
+const speech: SpeechEventModule | null = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-speech-recognition') as SpeechEventModule;
+  } catch {
+    return null;
+  }
+})();
 
 /**
  * Dictation for the assistant composer.
@@ -33,10 +84,37 @@ const RECOGNITION_LOCALE: Record<string, string> = {
 
 export type SpeechError = 'denied' | 'failed' | null;
 
-export function useSpeechInput(options: {
-  language: string;
-  onTranscript: (text: string) => void;
-}) {
+type SpeechInput = {
+  listening: boolean;
+  error: SpeechError;
+  /** False when the native module is absent — hide the microphone entirely. */
+  available: boolean;
+  start: () => void | Promise<void>;
+  stop: () => void;
+};
+
+type SpeechInputOptions = { language: string; onTranscript: (text: string) => void };
+
+/**
+ * The no-native-module case.
+ *
+ * Calls no hooks from the missing module, so hook order stays stable — the
+ * choice between the two implementations is made ONCE at module load, never
+ * per render.
+ */
+function useSpeechInputUnavailable(_options: SpeechInputOptions): SpeechInput {
+  void _options;
+  return {
+    listening: false,
+    error: null,
+    available: false,
+    start: () => {},
+    stop: () => {},
+  };
+}
+
+function useSpeechInputNative(options: SpeechInputOptions): SpeechInput {
+  const { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } = speech!;
   const { language, onTranscript } = options;
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<SpeechError>(null);
@@ -120,5 +198,11 @@ export function useSpeechInput(options: {
     };
   }, []);
 
-  return { listening, error, start, stop };
+  return { listening, error, available: true, start, stop };
 }
+
+/**
+ * Picked once, at module load. Both implementations have a fixed hook shape,
+ * so this cannot violate the rules of hooks.
+ */
+export const useSpeechInput = speech ? useSpeechInputNative : useSpeechInputUnavailable;

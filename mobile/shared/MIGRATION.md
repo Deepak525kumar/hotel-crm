@@ -43,10 +43,16 @@ migration does not "fix" it back:
    upload in the manager app depends on the latter. checker-app's copy is the
    one that is wrong, and fixing it is its own change.
 
-2. **`ScreenHeader` renders title-then-subtitle.** The two apps disagree
-   (worker renders subtitle first, checker title first) and a single shared
-   copy can only have one. Title first, because the subtitle is context for
-   the title rather than the other way round.
+2. **`ScreenHeader` renders title-then-subtitle, at `h1` not `title`.** The
+   two shipped apps disagree (worker renders subtitle first, checker title
+   first) and a single shared copy can only have one. Title first, because the
+   subtitle is context for the title rather than the other way round.
+
+   **Corrected 2026-09-23.** This entry described the intended decision, but
+   the code still rendered subtitle-first at 48pt until the project owner
+   reported it on two screens. A documented decision that was never applied is
+   worse than an undocumented one: it makes the next reader trust the file
+   instead of the component.
 
 3. **`themed-text` adds `h1` (28/34/700) and `h2` (20/26/600).** An addition,
    never a change to `title`/`subtitle` — those still render at 48pt and 32pt

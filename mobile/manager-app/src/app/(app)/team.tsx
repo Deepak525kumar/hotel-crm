@@ -24,6 +24,7 @@ import {
   useAuthStore,
 } from '@hotel-crm/mobile-shared';
 
+import { PersonRow } from '@/components/PersonRow';
 import { creatableRoles } from '@/lib/creatable-roles';
 import { useDebounced } from '@/lib/use-debounced';
 
@@ -73,7 +74,10 @@ export default function Team() {
             <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
           }
         >
-          <ScreenHeader title={t('nav.users')} />
+          <ScreenHeader
+            title={t('nav.users')}
+            subtitle={rows.length > 0 ? `${rows.length}` : undefined}
+          />
           <View style={styles.bar}>
             <FilterBar
               activeCount={(role ? 1 : 0) + (q ? 1 : 0)}
@@ -98,11 +102,14 @@ export default function Team() {
             <EmptyState title={t('users.noneFound')} />
           ) : (
             rows.map((u) => (
-              <DataRow
+              <PersonRow
                 key={u.id}
-                title={`${u.first_name} ${u.last_name}`.trim() || u.email}
-                subtitle={u.email}
-                trailing={<Badge label={u.role} tone="neutral" />}
+                id={u.id}
+                name={`${u.first_name} ${u.last_name}`.trim() || u.email}
+                email={u.email}
+                role={u.role}
+                status={u.employment_status}
+                hasPhoto={u.has_profile_photo}
                 onPress={() => router.push(`/team/${u.id}`)}
               />
             ))

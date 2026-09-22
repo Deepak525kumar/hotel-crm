@@ -52,7 +52,7 @@ export default function AppLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: t('common.today'),
+            title: t('nav.home'),
             tabBarIcon: ({ color }) => (
               <SymbolView name="square.grid.2x2" tintColor={color} size={24} />
             ),
@@ -76,15 +76,13 @@ export default function AppLayout() {
             ),
           }}
         />
-        <Tabs.Screen
-          name="attendance"
-          options={{
-            title: t('nav.attendance'),
-            tabBarIcon: ({ color }) => (
-              <SymbolView name="checkmark.circle" tintColor={color} size={24} />
-            ),
-          }}
-        />
+        {/* ATTENDANCE IS HIDDEN, NOT DELETED (2026-09-23, project owner).
+            `href: null` keeps the route navigable while removing its tab —
+            the WORKER_NO_SHOW push deep-links to `/attendance/:id`, and
+            deleting the screens would create exactly the dead link this app
+            has already shipped three times. Hidden for all three roles, so
+            nothing here branches on who is looking. */}
+        <Tabs.Screen name="attendance" options={{ href: null }} />
         <Tabs.Screen
           name="more"
           options={{

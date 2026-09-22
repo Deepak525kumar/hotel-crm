@@ -122,16 +122,32 @@ export function Button({
  * spacing and alignment, which is what made the app feel assembled rather
  * than designed.
  */
+/**
+ * A screen's heading.
+ *
+ * TITLE FIRST, then the subtitle. It rendered the other way round until
+ * 2026-09-23, which reads as a stray line of grey text floating above the
+ * page name — reported by the project owner on two screens before anyone
+ * looked at the component. MIGRATION.md had claimed this was already resolved
+ * in favour of title-first; it documented a decision that was never actually
+ * applied to the code.
+ *
+ * `h1` (28pt), not `title` (48pt). `title` is worker-app's home-screen hero,
+ * where one greeting owns the fold. A manager screen is dense and data-led,
+ * and a 48pt heading above a twelve-row list spends the whole fold on the
+ * word "Attendance" — which is exactly why h1/h2 were added to the type scale
+ * in the first place and then not used here.
+ */
 export function ScreenHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
     <View style={styles.screenHeader}>
       <View style={styles.sectionText}>
+        <ThemedText type="h1">{title}</ThemedText>
         {subtitle ? (
           <ThemedText type="small" themeColor="textSecondary">
             {subtitle}
           </ThemedText>
         ) : null}
-        <ThemedText type="title">{title}</ThemedText>
       </View>
       {action}
     </View>

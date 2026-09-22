@@ -7,7 +7,6 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 
 import { Badge, Radius, Spacing, ThemedText, useTheme } from '@hotel-crm/mobile-shared';
 
@@ -56,8 +55,24 @@ export function PlacementRow({
   const lifted = useSharedValue(0);
 
   const haptic = useCallback(() => {
-    // Fire-and-forget: a device without a taptic engine must not fail a drag.
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    // Required LAZILY, and fire-and-forget.
+    //
+    // expo-haptics was added to this app on 2026-09-22, so any development
+    // build cut before that does not contain its native half. A top-level
+    // import would throw during module evaluation and take down the whole
+    // Rota screen — the same failure that `assistant.tsx` hit via
+    // expo-speech-recognition, reported as "I am not able to log into the
+    // app". A drag without a buzz is a far better outcome than no screen.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Haptics = require('expo-haptics') as {
+        impactAsync: (style: unknown) => Promise<void>;
+        ImpactFeedbackStyle: { Medium: unknown };
+      };
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    } catch {
+      // No haptics in this build, or no taptic engine. Neither is a failure.
+    }
   }, []);
 
   const pan = Gesture.Pan()

@@ -82,10 +82,25 @@ describe('Analytics getLeaderboard — hotel_id filter', () => {
     mockWorkerOverallRating.findMany.mockResolvedValue([]);
   });
 
-  it('applies no filter when hotelId is undefined', async () => {
+  /**
+   * CORRECTED 2026-09-23. This case previously asserted `where` was `{}` and
+   * was named "applies no filter when hotelId is undefined" — it pinned the
+   * defect as intended behaviour.
+   *
+   * No filter means every WorkerOverallRating row ever written, deleted users
+   * included, and this endpoint returns first and last name. So a removed
+   * person's NAME kept appearing to everyone who could see the board, and
+   * this is every admin's call, since an admin has global scope and sends no
+   * hotel filter. Reported by the project owner as "a user gets removed, but
+   * his data in the leaderboard is staying".
+   *
+   * A test that encodes a bug is worse than a missing test: it makes the next
+   * person fixing it believe they are breaking something.
+   */
+  it('always excludes deleted users, even with no hotel filter', async () => {
     await service.getLeaderboard(undefined);
     const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
-    expect(where).toEqual({});
+    expect(where).toEqual({ worker: { deleted_at: null } });
   });
 
   it('filters via the employment_record relation at the resolved hotel group', async () => {
@@ -93,7 +108,10 @@ describe('Analytics getLeaderboard — hotel_id filter', () => {
     await service.getLeaderboard('h1');
     const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
     expect(where).toEqual({
-      worker: { employment_record: { hotel_group_id: 'g1', status: 'ACTIVE' } },
+      worker: {
+        deleted_at: null,
+        employment_record: { hotel_group_id: 'g1', status: 'ACTIVE' },
+      },
     });
   });
 
@@ -102,8 +120,33 @@ describe('Analytics getLeaderboard — hotel_id filter', () => {
     await service.getLeaderboard('h1');
     const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
     expect(where).toEqual({
-      worker: { employment_record: { hotel_group_id: '__none__', status: 'ACTIVE' } },
+      worker: {
+        deleted_at: null,
+        employment_record: { hotel_group_id: '__none__', status: 'ACTIVE' },
+      },
     });
+  });
+
+  it('excludes deleted users at group scope too', async () => {
+    await service.getLeaderboard(undefined, 'g1');
+    const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+    expect(where).toEqual({
+      worker: {
+        deleted_at: null,
+        employment_record: { hotel_group_id: 'g1', status: 'ACTIVE' },
+      },
+    });
+  });
+
+  /**
+   * Deactivation is NOT deletion, and the distinction is deliberate: a
+   * deactivation is reversible and a temporarily inactive worker's history is
+   * still theirs. Only `deleted_at` removes someone from the board.
+   */
+  it('does not filter on is_active', async () => {
+    await service.getLeaderboard(undefined);
+    const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+    expect(JSON.stringify(where)).not.toContain('is_active');
   });
 });
 

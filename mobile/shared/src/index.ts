@@ -20,6 +20,7 @@ export * from './constants/polling';
 export { ThemedText, type ThemedTextProps } from './components/themed-text';
 export { ThemedView, type ThemedViewProps } from './components/themed-view';
 export { RatingTierBadge } from './components/RatingTierBadge';
+export { UserAvatar } from './components/UserAvatar';
 export { LanguagePicker } from './components/LanguagePicker';
 export { ThemePicker } from './components/ThemePicker';
 

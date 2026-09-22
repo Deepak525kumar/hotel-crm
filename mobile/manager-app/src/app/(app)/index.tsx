@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -11,11 +11,11 @@ import {
   Card,
   EmptyState,
   MaxContentWidth,
+  RatingTierBadge,
   ScreenHeader,
   SectionHeader,
   SkeletonList,
   Spacing,
-  StatTile,
   ThemedText,
   ThemedView,
   api,
@@ -23,42 +23,63 @@ import {
   useAuthStore,
 } from '@hotel-crm/mobile-shared';
 
+import { ActionCard } from '@/components/ActionCard';
 import { ChatLauncher } from '@/components/ChatLauncher';
+import { DayShape } from '@/components/DayShape';
 import { ScopeNote } from '@/components/ScopeNote';
-import { percent } from '@/lib/format-metrics';
+import { TrendBar, TrendCard } from '@/components/TrendBar';
+import { percent, score } from '@/lib/format-metrics';
+import { todayInBerlin } from '@/lib/today';
 
 /**
- * Today.
+ * Home.
  *
- * Four numbers, chosen because they are the ones a supervisor acts on before
- * lunch: work waiting to be filled, whether people arrived on time, whether
- * the rooms passed, and who did not turn up. Everything else is a tap away on
- * Analytics rather than competing for the fold.
+ * Renamed from "Today" 2026-09-23 and restructured, because the first
+ * version was a grid of KPI tiles — which answers "how are we doing" when the
+ * question a supervisor opens the app with, mid-shift, is "what needs me".
  *
- * Pull-to-refresh is deliberately decoupled from SWR's `isValidating`: tying
- * the spinner to revalidation leaves it turning on every focus and poll, so
- * it stops meaning "your pull is being handled".
+ * Three bands, in the order a shift is actually managed:
+ *
+ *   1. THE DAY'S SHAPE — is today covered, who is missing, what is unfilled.
+ *   2. WHAT NEEDS ME  — only non-zero items, each a tap into the work.
+ *   3. HOW WE ARE DOING — rates and the leaderboard, for when there is time.
+ *
+ * Band 2 renders nothing when nothing is waiting. A dashboard full of zeroes
+ * teaches people to stop reading it.
  */
-export default function Today() {
+export default function Home() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const scope = scopeOf(user);
   const [refreshing, setRefreshing] = useState(false);
+  const today = useMemo(() => todayInBerlin(), []);
 
   const stats = useSWR('analytics/stats', () => api.analytics.stats());
   const board = useSWR('analytics/leaderboard', () => api.analytics.leaderboard());
+  const queue = useSWR('review-queue', () => api.employee.reviewQueue());
+  const attendanceToday = useSWR(['attendance', today], () =>
+    api.attendance.listTeam({ from: today, to: today })
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([stats.mutate(), board.mutate()]);
+      await Promise.all([stats.mutate(), board.mutate(), queue.mutate(), attendanceToday.mutate()]);
     } finally {
       setRefreshing(false);
     }
-  }, [stats, board]);
+  }, [stats, board, queue, attendanceToday]);
 
   const d = stats.data;
+  const rows = attendanceToday.data ?? [];
+  const present = rows.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length;
+  const absent = rows.filter((r) => r.status === 'ABSENT').length;
+  const unverified = rows.filter((r) => !r.is_verified).length;
+  const pendingReviews = (queue.data ?? []).length;
   const topFive = (board.data ?? []).slice(0, 5);
+
+  const loading = stats.isLoading || attendanceToday.isLoading;
+  const nothingWaiting = unverified === 0 && pendingReviews === 0 && (d?.work_requests.open ?? 0) === 0;
 
   return (
     <ThemedView style={styles.root}>
@@ -69,98 +90,132 @@ export default function Today() {
             <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
           }
         >
-          <ScreenHeader title={t('common.today')} subtitle={t('analytics.description')} />
+          <ScreenHeader title={t('nav.home')} />
           <ScopeNote scope={scope} />
 
-          {stats.isLoading ? (
-            <SkeletonList rows={3} />
+          {loading ? (
+            <SkeletonList rows={5} />
           ) : stats.error ? (
-            // A readable failure, never a blank screen or a spinner that never
-            // ends: hotel connectivity drops constantly, and "nothing
-            // rendered" is indistinguishable from "there is nothing to show".
             <EmptyState title={t('analytics.loadFailed')} />
           ) : (
-            <Card>
-              <View style={styles.tiles}>
-                <StatTile
-                  label={t('analytics.openRequests')}
-                  value={String(d?.work_requests.open ?? 0)}
-                />
-                <StatTile
-                  label={t('analytics.onTimeRate')}
-                  value={percent(d?.attendance.on_time_rate)}
-                />
-              </View>
-              <View style={styles.tiles}>
-                <StatTile
-                  label={t('analytics.qualityPassRate')}
-                  value={percent(d?.quality.pass_rate)}
-                />
-                <StatTile
-                  label={t('analytics.noShows')}
-                  value={String(d?.assignments.no_show ?? 0)}
-                />
-              </View>
-              <Button
-                label={t('analytics.viewAnalytics')}
-                variant="ghost"
-                onPress={() => router.push('/analytics')}
+            <>
+              {/* 1 — the day's shape */}
+              <DayShape
+                present={present}
+                expected={rows.length}
+                absent={absent}
+                unfilled={d?.work_requests.open ?? 0}
               />
-              <Button
-                label={t('nav.assignments')}
-                variant="ghost"
-                onPress={() => router.push('/assignments')}
-              />
-              <Button
-                label={t('nav.requests')}
-                variant="ghost"
-                onPress={() => router.push('/requests')}
-              />
-            </Card>
-          )}
 
-          <SectionHeader title={t('nav.leaderboard')} />
-          {board.isLoading ? (
-            <SkeletonList rows={3} />
-          ) : board.error ? (
-            <EmptyState title={t('analytics.leaderboardLoadFailed')} />
-          ) : topFive.length === 0 ? (
-            <EmptyState
-              title={t('analytics.noRankedWorkers')}
-              body={t('analytics.noRankedWorkersDescription')}
-            />
-          ) : (
-            <Card>
-              {topFive.map((row) => (
-                <View key={row.worker_id} style={styles.boardRow}>
-                  <ThemedText type="smallBold" style={styles.position}>
-                    {row.position}
-                  </ThemedText>
-                  <ThemedText style={styles.boardName} numberOfLines={1}>
-                    {row.name}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {row.completed_tasks}/{row.total_tasks}
-                  </ThemedText>
-                </View>
-              ))}
-              <Button
-                label={t('leaderboard.view')}
-                variant="ghost"
-                onPress={() => router.push('/leaderboard')}
+              {/* 2 — what needs me, non-zero only */}
+              <SectionHeader title={t('common.actions')} />
+              {nothingWaiting ? (
+                <EmptyState title={t('notifications.allCaughtUp')} />
+              ) : (
+                <>
+                  <ActionCard
+                    label={t('attendance.statusPRESENT')}
+                    count={unverified}
+                    urgent
+                    onPress={() => router.push('/(app)/attendance')}
+                  />
+                  <ActionCard
+                    label={t('nav.reviewQueue')}
+                    count={pendingReviews}
+                    urgent
+                    onPress={() => router.push('/review-queue')}
+                  />
+                  <ActionCard
+                    label={t('analytics.openRequests')}
+                    count={d?.work_requests.open ?? 0}
+                    onPress={() => router.push('/requests')}
+                  />
+                  <ActionCard
+                    label={t('analytics.noShows')}
+                    count={d?.assignments.no_show ?? 0}
+                    onPress={() => router.push('/(app)/attendance')}
+                  />
+                </>
+              )}
+
+              {/* 3 — how we are doing */}
+              <SectionHeader
+                title={t('nav.analytics')}
+                action={
+                  <Button
+                    label={t('analytics.viewAnalytics')}
+                    variant="ghost"
+                    onPress={() => router.push('/analytics')}
+                  />
+                }
               />
-            </Card>
+              <TrendCard>
+                <TrendBar
+                  label={t('analytics.onTimeRate')}
+                  value={rate(d?.attendance.on_time_rate)}
+                  display={percent(d?.attendance.on_time_rate)}
+                  tone="success"
+                />
+                <TrendBar
+                  label={t('analytics.qualityPassRate')}
+                  value={rate(d?.quality.pass_rate)}
+                  display={percent(d?.quality.pass_rate)}
+                />
+                <TrendBar
+                  label={t('analytics.averageRating')}
+                  // Ratings are 0-100 on this platform (ADR-026), so the bar
+                  // shares the same scale as the rates above.
+                  value={rate(d?.ratings.average_score)}
+                  display={score(d?.ratings.average_score)}
+                  tone="warning"
+                />
+              </TrendCard>
+
+              <SectionHeader
+                title={t('nav.leaderboard')}
+                action={
+                  <Button
+                    label={t('leaderboard.view')}
+                    variant="ghost"
+                    onPress={() => router.push('/leaderboard')}
+                  />
+                }
+              />
+              {topFive.length === 0 ? (
+                <EmptyState title={t('analytics.noRankedWorkers')} />
+              ) : (
+                <Card>
+                  {topFive.map((row) => (
+                    <View key={row.worker_id} style={styles.boardRow}>
+                      <ThemedText type="smallBold" style={styles.position}>
+                        {row.position}
+                      </ThemedText>
+                      <ThemedText style={styles.boardName} numberOfLines={1}>
+                        {row.name}
+                      </ThemedText>
+                      {row.rating_tier ? <RatingTierBadge tier={row.rating_tier} /> : null}
+                    </View>
+                  ))}
+                </Card>
+              )}
+            </>
           )}
         </ScrollView>
-        {/* Zelle. Renders nothing at all unless the backend says the assistant
-            is available: `isAvailable()` swallows its errors on purpose,
-            because a 404 means FEATURE_CHATBOT is off and a 403 means this
-            user may not use it -- and distinguishing them in the UI would
-            leak an unreleased feature. */}
         <ChatLauncher />
       </SafeAreaView>
     </ThemedView>
   );
+}
+
+/**
+ * A 0-100 API value as a 0..1 fraction, or null when never measured.
+ *
+ * Null stays null rather than becoming 0: an unmeasured rate and a rate of
+ * zero look identical on a bar, and only one of them is bad news.
+ */
+function rate(value: number | null | undefined): number | null {
+  if (value === null || value === undefined || Number.isNaN(value)) return null;
+  return Math.max(0, Math.min(1, value > 1 ? value / 100 : value));
 }
 
 const styles = StyleSheet.create({
@@ -174,15 +229,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
-  tiles: { flexDirection: 'row', gap: Spacing.three },
-  boardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
+  boardRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, paddingVertical: Spacing.two },
   position: { width: 24 },
-  // flexShrink + min-width 0, or a long name widens the row past the viewport
-  // instead of ellipsising (the lesson frontend/CLAUDE.md records for the web).
   boardName: { flex: 1, flexShrink: 1, minWidth: 0 },
 });

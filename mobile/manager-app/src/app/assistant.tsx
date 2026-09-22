@@ -308,7 +308,13 @@ export default function AssistantScreen() {
 
               {/* Dictation. A microphone glyph rather than an icon component:
                   these apps ship no vector library, and one drawn shape is not
-                  worth a native dependency. */}
+                  worth a native dependency.
+
+                  HIDDEN ENTIRELY when the native speech module is absent from
+                  the running binary — a development build made before
+                  expo-speech-recognition was added has no dictation, and a
+                  button that silently does nothing is worse than no button. */}
+              {speech.available ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ selected: speech.listening }}
@@ -330,6 +336,7 @@ export default function AssistantScreen() {
                   {speech.listening ? '■' : '🎤'}
                 </ThemedText>
               </Pressable>
+              ) : null}
 
               <Pressable
                 accessibilityRole="button"
