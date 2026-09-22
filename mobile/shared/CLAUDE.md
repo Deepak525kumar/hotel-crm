@@ -9,11 +9,8 @@ file lists exactly which.
 
 ## Gates
 
-```bash
-npm run typecheck
-```
-
-There is no jest project in this package. Its behaviour is covered by
+`mobile/CLAUDE.md` has the standard set. This package runs `npm run typecheck`
+only — there is no jest project in it. Its behaviour is covered by
 `manager-app`'s suite, which imports these modules directly — including the
 locale lockstep, which deep-equals these catalogues against the frontend's.
 That is deliberate: a second jest/babel/jest-expo setup for a library with no
@@ -21,9 +18,6 @@ screens would be configuration to maintain for no additional coverage.
 
 ## The things that will cost you time
 
-- **Locale keys are all-or-nothing.** Four catalogues (frontend, worker,
-  checker, here) are pinned to each other. Adding a key to one fails CI in
-  packages your branch never opened. Never add a dead key just to pass.
 - **No screen may hardcode a colour.** `theme.ts` says this at length and it
   is the rule with the most expensive failure mode: an inline `#FFFFFF` looks
   correct in light mode and renders white-on-white in dark, invisible to

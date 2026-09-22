@@ -35,6 +35,7 @@ Two mandatory entry points are declared there and are easy to miss:
 | `mobile/manager-app/` | Expo app for manager, regional manager and admin. |
 | `mobile/shared/` | Design system, API client and stores; consumed by `manager-app` only. |
 | `daiwi/` | App-distribution portal on :3002. Uploading never publishes. |
+| `chatbot-prototype/` | **Not integrated.** A standalone runnable prototype outside the workspaces. The real module is `backend/src/modules/chatbot/` — check which one you are in before editing. |
 | `docs/` | Specifications, ADRs, E2E scenarios, implementation handoffs. |
 | `.claude/` | Reusable engineering framework. `knowledge/` inside it holds repo facts. |
 
