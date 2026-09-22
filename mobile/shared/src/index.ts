@@ -20,6 +20,8 @@ export * from './constants/polling';
 export { ThemedText, type ThemedTextProps } from './components/themed-text';
 export { ThemedView, type ThemedViewProps } from './components/themed-view';
 export { RatingTierBadge } from './components/RatingTierBadge';
+export { LanguagePicker } from './components/LanguagePicker';
+export { ThemePicker } from './components/ThemePicker';
 
 // Primitives that predate this package (copied verbatim from worker-app)
 export * from './components/ui';

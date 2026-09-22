@@ -214,7 +214,8 @@
     "qualityCheck": "فحص الجودة",
     "rateWorker": "تقييم العامل",
     "schedule": "الجدول",
-    "rooms": "الغرف"
+    "rooms": "الغرف",
+    "more": "المزيد"
   },
   "roles": {
     "admin": "مدير النظام",

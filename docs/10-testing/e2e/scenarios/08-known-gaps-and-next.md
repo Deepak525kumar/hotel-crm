@@ -46,6 +46,31 @@ explicit yes/no:
 3. **`consent` read asymmetry** — Admin reads any worker; Manager/RM read none, not even their
    own group. Explicitly ratified in `ADR-037`/`SIR-CONSENT-011`.
 
+
+### Mobile apps — updated 2026-09-22
+
+`mobile/manager-app` now has numbered coverage: scenarios **23** (auth and
+capability gating), **24** (rota, dispatch, attendance) and **25** (people,
+i18n, connectivity, push). They consolidate the thirteen files
+`MANAGER_APP_PLAN.md` §8.3 anticipated — fewer, fuller files rather than
+thirteen thin ones, since several of the planned splits shared every
+precondition and would have repeated the same setup three times.
+
+What that does **not** change:
+
+- **`worker-app` and `checker-app` still have no numbered scenario of their
+  own.** Their evidence remains the 2026-08-25→09-21 run logs. Scenarios
+  23–25 cover the manager app only.
+- **Push in the manager app is unrunnable** until APNs/FCM credentials exist
+  for `com.fhmhotelservices.managerapp`. Scenario 25 Step 10 must be recorded
+  as Not Run, never as a pass.
+- **Placements are unrunnable with `FEATURE_JOBDISPATCH_PHASE2` off**, and the
+  routes 404 rather than 403 — so a tester who reads 404 as "broken" will file
+  a bug against a deliberate configuration. Scenario 24 says to record the
+  flag state first.
+- **The drag gesture has no automated test.** Gesture behaviour needs a
+  device; 82 green unit tests in that package prove nothing about it.
+
 ## 3. Never tested by anyone
 
 - ~~**`retention/sweep-job.ts`**~~ — **Scenario 09 added**. The multi-module hard-delete fan-out is now covered by an explicit scenario covering atomicity, large batched deletions, overlapping executions, and audit row creation without personal data.

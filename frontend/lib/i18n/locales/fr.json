@@ -213,7 +213,8 @@
     "qualityCheck": "Contrôle qualité",
     "rateWorker": "Évaluer l'employé",
     "schedule": "Planning",
-    "rooms": "Chambres"
+    "rooms": "Chambres",
+    "more": "Plus"
   },
   "roles": {
     "admin": "Administrateur",

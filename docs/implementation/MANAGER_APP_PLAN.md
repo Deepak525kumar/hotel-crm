@@ -523,6 +523,13 @@ Device steps are explicit about which are *not* HTTP — the mobile run logs
 (`2026-08-25-mobile-app-flow-verification.md`) found 8 defects, 5 of them in `.tsx`
 files that passed typecheck. A curl-only pass would have found none of them.
 
+> **Delivered 2026-09-22 as three files, not thirteen.** Scenarios 23, 24 and
+> 25 consolidate the table below: several planned splits shared every
+> precondition (the same seeded users, the same two groups, the same device)
+> and would have repeated that setup three times over. The mapping is 23 ←
+> {23, 24, 35}, 24 ← {25, 26, 27}, 25 ← {28, 29, 30, 31, 32, 33, 34}. Fewer,
+> fuller files; the same assertions.
+
 | # | File | Covers |
 |---|---|---|
 | 23 | `23-manager-app-auth-and-role-admission.md` | Login as manager / RM / admin on a device; token persistence across restart; 401 transparent refresh with concurrent requests (shared in-flight promise); `TOKEN_REVOKED` is non-refreshable and logs out; 429 honours `Retry-After` in both forms; a `worker` and a `checker` are refused with the wrong-app screen, not an empty dashboard; scope claims resolved at login (`scope_hotel_id` for a manager, `scope_hotel_group_id` for an RM, both null for admin); **a deactivated or archived hotel confers no scope on fresh login or stale token** (scenario 20's rule). |

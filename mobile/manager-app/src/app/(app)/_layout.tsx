@@ -18,8 +18,9 @@ import { PushRegistration } from '@/components/PushRegistration';
  * scannable at a glance.
  *
  * Tabs land with the PRs that build their screens (MANAGER_APP_PLAN.md §7).
- * Today, Rota and Attendance exist; Team and More follow with their own
- * screens. A tab is declared here only once the screen behind it does
+ * Five tabs: Today, Rota, Team, Attendance, More. Everything else on the
+ * web's eighteen-entry sidebar is reachable from More rather than competing
+ * for a slot in a bar that stops being scannable past five. A tab is declared here only once the screen behind it does
  * something -- a tab that opens an empty page is worse than no tab, because
  * it reads as a broken app rather than an unfinished one.
  *
@@ -81,6 +82,15 @@ export default function AppLayout() {
             title: t('nav.attendance'),
             tabBarIcon: ({ color }) => (
               <SymbolView name="checkmark.circle" tintColor={color} size={24} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="more"
+          options={{
+            title: t('nav.more'),
+            tabBarIcon: ({ color }) => (
+              <SymbolView name="ellipsis.circle" tintColor={color} size={24} />
             ),
           }}
         />
