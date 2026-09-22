@@ -176,7 +176,8 @@
     "jobTitlePlaceholder": "e.g. Housekeeper",
     "targetRole": "Shift for",
     "targetRoleWorker": "Worker",
-    "targetRoleChecker": "Checker"
+    "targetRoleChecker": "Checker",
+    "peopleWorking": "People working"
   },
   "nav": {
     "history": "History",
@@ -253,7 +254,12 @@
     "alreadyFilled": "Already filled",
     "inProgress": "In progress",
     "present": "Present",
-    "late": "Late"
+    "late": "Late",
+    "noShow": "No-show",
+    "reassigned": "Reassigned",
+    "partial": "Partial",
+    "excused": "Excused",
+    "expected": "Expected"
   },
   "assignments": {
     "shiftDetails": "Shift details",

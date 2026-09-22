@@ -153,7 +153,7 @@ export default function BroadcastDetailPage() {
               value={
                 <div className="flex flex-col gap-1">
                   <TextLink href={`/hotels/${request.hotel_id}`}>
-                    {hotel?.name ?? "View hotel"}
+                    {hotel?.name ?? request.hotel?.name ?? t("fields.hotel")}
                   </TextLink>
                   {hotel && (
                     <div className="flex items-start justify-between gap-4">

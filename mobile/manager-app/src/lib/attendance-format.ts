@@ -31,3 +31,34 @@ export function attendanceTone(status: string): BadgeTone {
       return 'neutral';
   }
 }
+
+/**
+ * Localised label for an attendance status.
+ *
+ * Same defect as the assignment statuses: the raw enum ("NO_SHOW", "PARTIAL")
+ * was rendered straight to screen -- a database value, in English, in an app
+ * shipped in six languages. `status.partial`, `status.excused` and
+ * `status.expected` were added across all four catalogues for this
+ * (2026-09-23); present/absent/late already existed.
+ *
+ * Unknown values fall through to the raw string: an untranslated enum still
+ * identifies the row, a blank does not.
+ */
+export function attendanceStatusLabel(status: string, t: (key: string) => string): string {
+  switch (status) {
+    case 'EXPECTED':
+      return t('status.expected');
+    case 'PRESENT':
+      return t('status.present');
+    case 'ABSENT':
+      return t('status.absent');
+    case 'LATE':
+      return t('status.late');
+    case 'PARTIAL':
+      return t('status.partial');
+    case 'EXCUSED':
+      return t('status.excused');
+    default:
+      return status;
+  }
+}

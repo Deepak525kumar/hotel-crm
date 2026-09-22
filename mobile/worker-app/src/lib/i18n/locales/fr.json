@@ -176,7 +176,8 @@
     "jobTitlePlaceholder": "p. ex. Femme de chambre",
     "targetRole": "Poste pour",
     "targetRoleWorker": "Employé",
-    "targetRoleChecker": "Contrôleur"
+    "targetRoleChecker": "Contrôleur",
+    "peopleWorking": "Personnes au travail"
   },
   "nav": {
     "history": "Historique",
@@ -253,7 +254,12 @@
     "alreadyFilled": "Déjà pourvu",
     "inProgress": "En cours",
     "present": "Présent",
-    "late": "En retard"
+    "late": "En retard",
+    "noShow": "Non présenté",
+    "reassigned": "Réattribué",
+    "partial": "Partiel",
+    "excused": "Excusé",
+    "expected": "Attendu"
   },
   "assignments": {
     "shiftDetails": "Détails du service",

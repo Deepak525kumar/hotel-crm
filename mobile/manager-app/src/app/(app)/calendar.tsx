@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { CalendarProvider, ExpandableCalendar } from 'react-native-calendars';
@@ -28,6 +28,7 @@ import {
 } from '@hotel-crm/mobile-shared';
 
 import { AddPlacementSheet } from '@/components/AddPlacementSheet';
+import { assignmentStatusLabel, assignmentTone } from '@/lib/assignment-format';
 import { MarkAbsenceSheet } from '@/components/MarkAbsenceSheet';
 import { NotificationBell } from '@/components/NotificationBell';
 import { ShiftSheet } from '@/components/ShiftSheet';
@@ -72,6 +73,21 @@ export default function Calendar() {
   const [adding, setAdding] = useState(false);
   const [markingAbsence, setMarkingAbsence] = useState(false);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
+
+  /**
+   * The day's STORED summary, loaded before the editor opens.
+   *
+   * saveShiftSummary is a PUT upsert keyed by (hotel, day). The editor used to
+   * open blank over an existing row, so saving replaced all four numbers with
+   * whatever was typed -- silently, with a success toast, and with no way to
+   * get the old figures back. The sheet is not rendered until this settles;
+   * an empty form shown for half a second is exactly the window in which a
+   * manager types over yesterday's count.
+   */
+  const summaries = useSWR(
+    summaryFor ? ['shift-summaries', summaryFor] : null,
+    () => api.calendar.shiftSummaries(String(summaryFor))
+  );
   const [openShift, setOpenShift] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<OccurrenceOutcome[] | null>(null);
@@ -215,7 +231,7 @@ export default function Calendar() {
                 {groups.map((group) => (
                   <View key={group.hotelId} style={styles.group}>
                     <SectionHeader
-                      title={hotelName(group.hotelId)}
+                      title={group.hotelName ?? hotelName(group.hotelId)}
                       action={
                         <Button
                           label={t('calendar.dailySummary')}
@@ -225,28 +241,42 @@ export default function Calendar() {
                       }
                     />
                     <Card>
+                      {/*
+                        The WHOLE ROW opens the shift, not a "Day" button at
+                        the end of it (2026-09-23). The button was labelled
+                        `calendar.viewDay` -- "Day" -- which says nothing about
+                        what it opens, and it made the row itself dead: tapping
+                        a worker's name, the obvious target, did nothing.
+                      */}
                       {group.entries.map((entry) => (
-                        <View key={entry.id} style={styles.shiftRow}>
+                        <Pressable
+                          key={entry.id}
+                          style={styles.shiftRow}
+                          onPress={() => setOpenShift(entry.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={
+                            entry.worker
+                              ? `${entry.worker.first_name} ${entry.worker.last_name}`.trim()
+                              : workerName(entry.worker_id)
+                          }
+                        >
                           <View style={styles.shiftText}>
                             <ThemedText type="smallBold" numberOfLines={1}>
-                              {workerName(entry.worker_id)}
+                              {entry.worker
+                                ? `${entry.worker.first_name} ${entry.worker.last_name}`.trim()
+                                : workerName(entry.worker_id)}
                             </ThemedText>
                             <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                              {hotelName(entry.hotel_id)}
+                              {entry.hotel?.name ?? hotelName(entry.hotel_id)}
                             </ThemedText>
                           </View>
                           {entry.assignment_status ? (
                             <Badge
-                              label={entry.assignment_status}
-                              tone={entry.assignment_status === 'CANCELLED' ? 'danger' : 'neutral'}
+                              label={assignmentStatusLabel(entry.assignment_status, t)}
+                              tone={assignmentTone(entry.assignment_status)}
                             />
                           ) : null}
-                          <Button
-                            label={t('calendar.viewDay')}
-                            variant="ghost"
-                            onPress={() => setOpenShift(entry.id)}
-                          />
-                        </View>
+                        </Pressable>
                       ))}
                     </Card>
                   </View>
@@ -313,10 +343,11 @@ export default function Calendar() {
           }}
         />
 
-        {summaryFor ? (
+        {summaryFor && !summaries.isLoading ? (
           <ShiftSummarySheet
             visible
             day={day}
+            initial={summaries.data?.find((row) => row.date === day)}
             busy={busy}
             onClose={() => setSummaryFor(null)}
             onSave={(input) => {
@@ -324,6 +355,7 @@ export default function Calendar() {
               void api.calendar
                 .saveShiftSummary(summaryFor, day, input)
                 .then(() => {
+                  void summaries.mutate();
                   setSummaryFor(null);
                   toast.show(t('fields.updated'), 'success');
                 })

@@ -177,7 +177,8 @@
     "jobTitlePlaceholder": "مثال: عاملة تنظيف غرف",
     "targetRole": "الوردية لـ",
     "targetRoleWorker": "عامل",
-    "targetRoleChecker": "مُدقِّق"
+    "targetRoleChecker": "مُدقِّق",
+    "peopleWorking": "عدد العاملين"
   },
   "nav": {
     "history": "السجل",
@@ -254,7 +255,12 @@
     "alreadyFilled": "مكتمل بالفعل",
     "inProgress": "قيد التنفيذ",
     "present": "حاضر",
-    "late": "متأخر"
+    "late": "متأخر",
+    "noShow": "لم يحضر",
+    "reassigned": "أُعيد تعيينه",
+    "partial": "جزئي",
+    "excused": "بعذر",
+    "expected": "متوقع"
   },
   "assignments": {
     "shiftDetails": "تفاصيل الوردية",

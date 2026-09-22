@@ -176,7 +176,8 @@
     "jobTitlePlaceholder": "напр. Покоївка",
     "targetRole": "Зміна для",
     "targetRoleWorker": "Працівник",
-    "targetRoleChecker": "Перевіряючий"
+    "targetRoleChecker": "Перевіряючий",
+    "peopleWorking": "Працівників"
   },
   "nav": {
     "history": "Історія",
@@ -253,7 +254,12 @@
     "alreadyFilled": "Уже заповнено",
     "inProgress": "У процесі",
     "present": "Присутній",
-    "late": "Запізнився"
+    "late": "Запізнився",
+    "noShow": "Не з’явився",
+    "reassigned": "Перепризначено",
+    "partial": "Частково",
+    "excused": "Виправдано",
+    "expected": "Очікується"
   },
   "assignments": {
     "shiftDetails": "Деталі зміни",

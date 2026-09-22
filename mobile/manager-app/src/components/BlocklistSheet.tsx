@@ -36,14 +36,46 @@ export function BlocklistSheet({
   onSubmit: (input: { employee_id: string; reason: string }) => void;
 }) {
   const { t } = useTranslation();
-  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [resolving, setResolving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const people = useSWR(visible ? ['users', 'blocklist'] : null, () =>
     api.users.list({ limit: 100 })
   );
 
-  const ready = employeeId !== null && reason.trim().length > 0;
+  const ready = userId !== null && reason.trim().length > 0;
+
+  /**
+   * The picker lists USERS; the blocklist route is keyed by the
+   * employee-management-owned `employee_id` ("EMP-W-001"). Sending the user
+   * cuid here 404'd on EVERY add (2026-09-23) -- `findRecordOrThrow` looks up
+   * `employmentRecord.employee_id`, which a cuid never matches.
+   *
+   * Resolved through the real lookup rather than by widening the user DTO:
+   * /employees/by-user is the same call the web client makes, and it returns
+   * null (not 404) for someone never onboarded -- which is exactly the case
+   * worth telling the manager about, since such a person has no employment
+   * record to bar.
+   */
+  const submit = async () => {
+    if (!userId) return;
+    setResolving(true);
+    setError(null);
+    try {
+      const record = await api.employee.getByUserId(userId);
+      if (!record?.employee_id) {
+        setError(t('employees.noRecordFound'));
+        return;
+      }
+      onSubmit({ employee_id: record.employee_id, reason: reason.trim() });
+    } catch {
+      setError(t('errors.generic'));
+    } finally {
+      setResolving(false);
+    }
+  };
 
   return (
     <BottomSheet
@@ -57,9 +89,9 @@ export function BlocklistSheet({
             label={t('common.add')}
             variant="danger"
             disabled={!ready}
-            loading={busy}
+            loading={busy || resolving}
             style={styles.action}
-            onPress={() => employeeId && onSubmit({ employee_id: employeeId, reason: reason.trim() })}
+            onPress={submit}
           />
         </View>
       }
@@ -70,12 +102,12 @@ export function BlocklistSheet({
 
       <SelectSheet
         label={t('fields.worker')}
-        value={employeeId}
+        value={userId}
         options={(people.data ?? []).map((u) => ({
           value: u.id,
           label: `${u.first_name} ${u.last_name}`.trim() || u.email,
         }))}
-        onChange={setEmployeeId}
+        onChange={setUserId}
       />
 
       <Input
@@ -87,6 +119,12 @@ export function BlocklistSheet({
         autoCorrect
         error={reason.trim().length === 0 ? t('common.required') : undefined}
       />
+
+      {error ? (
+        <ThemedText type="small" themeColor="danger">
+          {error}
+        </ThemedText>
+      ) : null}
     </BottomSheet>
   );
 }

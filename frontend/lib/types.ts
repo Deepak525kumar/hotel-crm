@@ -618,6 +618,13 @@ export type WorkRequestStatus =
 export interface WorkRequest {
   id: string;
   hotel_id: string;
+  /**
+   * Nested by the server (2026-09-23) so a list row does not fetch its own
+   * hotel. Every broadcast row used to call useHotel(hotel_id) per row and
+   * show "—" for the name whenever that N+1 fetch failed or was still in
+   * flight. Optional: only the read paths join it.
+   */
+  hotel?: { id: string; name: string; city: string } | null;
   created_by_id: string;
   /** Which account role this request/broadcast is for. Defaults to WORKER server-side. */
   target_role: "WORKER" | "CHECKER";

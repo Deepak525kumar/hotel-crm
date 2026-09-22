@@ -25,6 +25,7 @@ import {
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
+import { formatDateTime } from '@/lib/assignment-format';
 import { attendanceTone, personName } from '@/lib/attendance-format';
 
 const STATUSES = ['PRESENT', 'LATE', 'ABSENT', 'PARTIAL', 'EXCUSED'] as const;
@@ -107,8 +108,14 @@ export default function AttendanceDetail() {
               </Card>
 
               <Card>
-                <SectionHeader title={t('attendance.checkedInAt')} />
-                <ThemedText type="small">{data.check_in_at ?? '—'}</ThemedText>
+                {/* `attendance.checkedInAt` is "Checked in: {{time}}" -- a
+                    SENTENCE with an interpolation, not a label. Used as a
+                    heading it rendered the literal "{{time}}" on screen
+                    (2026-09-23). `assignments.checkInLabel` is the label. */}
+                <SectionHeader title={t('assignments.checkInLabel')} />
+                <ThemedText type="small">
+                  {data.check_in_at ? formatDateTime(data.check_in_at) : '—'}
+                </ThemedText>
                 <SectionHeader title={t('attendance.expectedStart')} />
                 <ThemedText type="small">{data.expected_start ?? '—'}</ThemedText>
                 <SectionHeader title={t('attendance.minutesLate')} />

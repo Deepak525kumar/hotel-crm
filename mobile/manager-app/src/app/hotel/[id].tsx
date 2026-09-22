@@ -146,8 +146,8 @@ export default function HotelDetail() {
               ) : (
                 (blocklist.data ?? []).map((entry) => (
                   <DataRow
-                    key={entry.employee_id}
-                    title={entry.employee_id}
+                    key={entry.id}
+                    title={entry.worker_name ?? entry.employee_id ?? entry.employment_record_id}
                     subtitle={entry.reason ?? undefined}
                   />
                 ))

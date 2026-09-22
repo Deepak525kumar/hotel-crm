@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  DataRow,
   EmptyState,
   Input,
   MaxContentWidth,
@@ -26,7 +27,11 @@ import {
 
 import { BackLink } from '@/components/BackLink';
 import { ReassignSheet } from '@/components/ReassignSheet';
-import { assignmentTone } from '@/lib/assignment-format';
+import {
+  assignmentStatusLabel,
+  assignmentTone,
+  formatDateTime,
+} from '@/lib/assignment-format';
 
 /**
  * One assignment.
@@ -94,11 +99,83 @@ export default function AssignmentDetail() {
                   {data.shift_start_time ? `· ${data.shift_start_time}` : ''}
                 </ThemedText>
                 <View style={styles.badges}>
-                  <Badge label={data.status} tone={assignmentTone(data.status)} />
+                  <Badge
+                    label={assignmentStatusLabel(data.status, t)}
+                    tone={assignmentTone(data.status)}
+                  />
                   {data.rework_of_assignment_id ? (
                     <Badge label={t('quality.goToRework')} tone="warning" />
                   ) : null}
                 </View>
+              </Card>
+
+              {/*
+                The facts this screen used to leave out.
+
+                It rendered hotel, day, status and a rooms input -- about four
+                of the ~20 fields the DTO carries -- and the owner reported the
+                assignment detail as "empty". Every row below is a field the
+                API was already sending. Rows are omitted when the value is
+                null rather than shown blank: "not recorded" and "empty" look
+                identical, and only one of them is a bug worth chasing.
+              */}
+              <Card>
+                <SectionHeader title={t('assignments.placementDetails')} />
+                {data.worker_name ? (
+                  <DataRow title={t('fields.worker')} meta={data.worker_name} />
+                ) : null}
+                {data.shift_start_time ? (
+                  <DataRow
+                    title={t('fields.time')}
+                    meta={`${data.shift_start_time}${
+                      data.shift_end_time ? `\u2013${data.shift_end_time}` : ''
+                    }`}
+                  />
+                ) : null}
+                {data.hotel?.address ? (
+                  <DataRow
+                    title={t('fields.hotel')}
+                    meta={[data.hotel.address, data.hotel.city].filter(Boolean).join(', ')}
+                  />
+                ) : null}
+                {data.assigned_by_name ? (
+                  <DataRow title={t('assignments.assignedBy')} meta={data.assigned_by_name} />
+                ) : null}
+                {data.started_at ? (
+                  <DataRow title={t('assignments.started')} meta={formatDateTime(data.started_at)} />
+                ) : null}
+                {data.completed_at ? (
+                  <DataRow
+                    title={t('status.completed')}
+                    meta={formatDateTime(data.completed_at)}
+                  />
+                ) : null}
+                {data.cancelled_at ? (
+                  <DataRow
+                    title={t('status.cancelled')}
+                    meta={formatDateTime(data.cancelled_at)}
+                  />
+                ) : null}
+                {/* The reason a manager typed. It was collected, made
+                    mandatory, and then discarded before the request -- so it
+                    could never appear here until now. */}
+                {data.cancellation_reason ? (
+                  <DataRow title={t('fields.reason')} meta={data.cancellation_reason} />
+                ) : null}
+                {data.rooms_completed ? (
+                  <DataRow
+                    title={t('assignments.roomsCompleted')}
+                    meta={String(data.rooms_completed.rooms_completed)}
+                    subtitle={
+                      data.rooms_completed.entered_by_name
+                        ? `${t('assignments.loggedBy')}: ${data.rooms_completed.entered_by_name}`
+                        : undefined
+                    }
+                  />
+                ) : null}
+                {data.rooms_completed?.notes ? (
+                  <DataRow title={t('fields.notes')} meta={data.rooms_completed.notes} />
+                ) : null}
               </Card>
 
               <Card>
@@ -186,14 +263,14 @@ export default function AssignmentDetail() {
           onCancel={() => setCancelOpen(false)}
           onConfirm={(reason) => {
             setCancelOpen(false);
+            // The reason goes WITH the status change. `void reason` stood
+            // here until 2026-09-23, so a mandatory field the manager filled
+            // in never left the device, and UpdateAssignmentSchema had
+            // accepted `cancellation_reason` the whole time.
             void run(
-              () => api.assignments.updateStatus(String(id), 'CANCELLED'),
+              () => api.assignments.updateStatus(String(id), 'CANCELLED', reason),
               'fields.updated'
             );
-            // The reason is collected and sent with the status change where
-            // the endpoint accepts one; recorded here so it is not silently
-            // dropped if the API gains the field.
-            void reason;
           }}
         />
       </SafeAreaView>

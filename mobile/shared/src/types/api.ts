@@ -139,9 +139,38 @@ export interface AssignmentHotel {
   contact_email: string | null;
 }
 
+/**
+ * The rooms count a manager logged after a shift.
+ *
+ * Null on the assignment until POST /:id/rooms-completed is called -- never
+ * fabricated as 0, because "not yet entered" and "zero rooms" are different
+ * facts and a manager acts differently on each.
+ */
+export interface RoomsCompletedEntry {
+  id: string;
+  assignment_id: string;
+  hotel_id: string;
+  worker_id: string;
+  entered_by_id: string;
+  /** Null when the entering user has since been deleted; the id still resolves historically. */
+  entered_by_name?: string | null;
+  rooms_completed: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkerAssignment {
   id: string;
-  work_request_id: string;
+  /**
+   * NULLABLE (2026-09-23). This was declared `string`, and it is null for
+   * every calendar-placed assignment -- which is most of them. The detail
+   * screen read it as present and tsc agreed, because the type described a
+   * response nobody had read back. Same defect class as DashboardStats.
+   */
+  work_request_id: string | null;
+  /** The FK populated for broadcast-accept and calendar rows instead. */
+  job_request_id?: string | null;
   // ADR-069: set when this assignment is corrective rework for another one.
   // Both request FKs are null on a rework row, so without this the shift list
   // renders it as a generic "Shift" -- indistinguishable from real work, with
@@ -167,6 +196,26 @@ export interface WorkerAssignment {
   shift_start_time?: string | null; // HH:mm
   shift_end_time?: string | null; // HH:mm
   assigned_by_name?: string | null;
+  /**
+   * The assigned worker's display name, nested by the server since 2026-09-09.
+   * The assignment detail screen resolved it client-side or showed a cuid.
+   */
+  worker_name?: string | null;
+  /**
+   * The lifecycle timestamps and the cancellation reason.
+   *
+   * The detail screen rendered about four of the ~20 fields this DTO carries
+   * (2026-09-23) -- reported by the owner as an assignment detail that is
+   * "empty". The reason in particular was COLLECTED from the manager and then
+   * discarded client-side, while the endpoint had accepted it all along.
+   */
+  confirmed_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
+  updated_at?: string;
+  rooms_completed?: RoomsCompletedEntry | null;
 }
 
 export interface Attendance {
@@ -580,6 +629,16 @@ export interface CalendarEntry {
    * distinctly instead of silently vanishing from the grid (2026-08-13).
    */
   assignment_status?: AssignmentStatus;
+  /**
+   * Nested on LIST responses (2026-09-23). The rota rendered raw cuids where
+   * a person and a property belong -- reported as "instead of seeing the name
+   * for the worker assigned to a shift, I am seeing his ID". The client-side
+   * workaround (useDirectory) resolved them from /users, which capped at 100
+   * and 400'd above it; the names now travel with the row that was already
+   * scoped to produce them, same as AttendanceDto does.
+   */
+  worker?: { id: string; first_name: string; last_name: string } | null;
+  hotel?: { id: string; name: string; city: string } | null;
   placed_by_id: string;
   created_at: string;
   updated_at: string;

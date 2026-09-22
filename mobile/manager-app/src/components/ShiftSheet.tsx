@@ -13,7 +13,8 @@ import {
   api,
 } from '@hotel-crm/mobile-shared';
 
-import { assignmentTone } from '@/lib/assignment-format';
+import { assignmentTone, formatDateTime } from '@/lib/assignment-format';
+import { attendanceStatusLabel } from '@/lib/attendance-format';
 
 /**
  * Everything about one placement, and what can be done to it.
@@ -128,13 +129,22 @@ export function ShiftSheet({
           record yet, never "absent" — not checked in and did not turn up are
           different facts and only one is a problem. */}
       <SectionHeader title={t('nav.attendance')} />
+      {/* `attendance.checkedInAt` is "Checked in: {{time}}" -- a sentence,
+          not a label; as a label it printed the literal "{{time}}". */}
       <Row
-        label={t('attendance.checkedInAt')}
-        value={a?.attendance?.check_in_at ?? '—'}
+        label={t('assignments.checkInLabel')}
+        value={a?.attendance?.check_in_at ? formatDateTime(a.attendance.check_in_at) : '—'}
       />
-      <Row label={t('fields.status')} value={a?.attendance?.status ?? '—'} />
+      <Row
+        label={t('fields.status')}
+        value={
+          a?.attendance?.status ? attendanceStatusLabel(a.attendance.status, t) : '—'
+        }
+      />
 
-      <Button label={t('calendar.dragToMoveHint')} variant="ghost" onPress={onMove} />
+      {/* `calendar.dragToMoveHint` is a HINT ("drag a shift to move it"),
+          which read as a button caption. The button moves the shift; say so. */}
+      <Button label={t('common.reassign')} variant="ghost" onPress={onMove} />
     </BottomSheet>
   );
 }

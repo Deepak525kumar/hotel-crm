@@ -690,7 +690,46 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
       expect(result.data[0].assignment_status).toBe('CANCELLED');
       expect(mockCalendarEntry.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          include: { assignment: { select: { status: true } } },
+          // objectContaining on the include too: this asserts the assignment
+          // join, and the worker/hotel joins that put NAMES on the wire (the
+          // rota was rendering raw cuids) are not this test's business.
+          include: expect.objectContaining({ assignment: { select: { status: true } } }),
+        })
+      );
+    });
+
+    /**
+     * The rota rendered raw cuids where a person and a property belong --
+     * reported by the owner as "instead of seeing the name for the worker
+     * assigned to a shift, I am seeing his ID". The client worked around it
+     * by fetching /users and matching ids, which caps at 100 and 400s above
+     * it, so on any real estate the workaround failed and every name fell
+     * back to the cuid. AttendanceDto has nested its person since 2026-08;
+     * this is the same fix, in the same shape.
+     */
+    it('nests the worker and the hotel so a client renders names, not cuids', async () => {
+      mockCalendarEntry.findMany.mockResolvedValue([
+        {
+          ...makeCalendarEntryRow(),
+          worker: { id: 'w1', first_name: 'Ada', last_name: 'Lovelace' },
+          hotel: { id: 'h1', name: 'Hotel Adlon', city: 'Berlin' },
+        },
+      ]);
+      mockCalendarEntry.count.mockResolvedValue(1);
+
+      const result = await service.listCalendarEntries({ page: 1, per_page: 20 } as any, {
+        userId: 'admin1',
+        role: 'admin',
+      });
+
+      expect(result.data[0].worker).toEqual({ id: 'w1', first_name: 'Ada', last_name: 'Lovelace' });
+      expect(result.data[0].hotel).toEqual({ id: 'h1', name: 'Hotel Adlon', city: 'Berlin' });
+      // Identity fields only. A calendar row is not a licence to read a
+      // person's contact details or a hotel's commercial terms.
+      expect(mockCalendarEntry.findMany.mock.calls[0][0].include).toEqual(
+        expect.objectContaining({
+          worker: { select: { id: true, first_name: true, last_name: true } },
+          hotel: { select: { id: true, name: true, city: true } },
         })
       );
     });

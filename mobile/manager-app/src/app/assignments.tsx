@@ -23,10 +23,13 @@ import {
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
-import { assignmentTone } from '@/lib/assignment-format';
+import {
+  ASSIGNMENT_STATUSES,
+  assignmentStatusLabel,
+  assignmentTone,
+} from '@/lib/assignment-format';
 import { useDebounced } from '@/lib/use-debounced';
 
-const STATUSES = ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const;
 
 export default function Assignments() {
   const { t } = useTranslation();
@@ -86,7 +89,12 @@ export default function Assignments() {
                     ? `${row.shift_start_time}–${row.shift_end_time ?? ''}`
                     : undefined
                 }
-                trailing={<Badge label={row.status} tone={assignmentTone(row.status)} />}
+                trailing={
+                  <Badge
+                    label={assignmentStatusLabel(row.status, t)}
+                    tone={assignmentTone(row.status)}
+                  />
+                }
                 onPress={() => router.push(`/assignment/${row.id}`)}
               />
             ))
@@ -105,7 +113,7 @@ export default function Assignments() {
             value={status}
             options={[
               { value: '__any__', label: t('common.all') },
-              ...STATUSES.map((s) => ({ value: s, label: s })),
+              ...ASSIGNMENT_STATUSES.map((s) => ({ value: s, label: assignmentStatusLabel(s, t) })),
             ]}
             onChange={(next) => setStatus(next === '__any__' ? null : next)}
           />

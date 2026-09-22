@@ -1078,6 +1078,33 @@ describe('AssignmentService', () => {
       expect(dto.id).toBe('a1');
     });
 
+    /**
+     * `worker_name` was DECLARED on the enrichment result and never assigned
+     * (2026-09-23): enrichContext() resolved the hotel, the shift times and
+     * the assigner's name, and left the assigned person's name undefined. The
+     * manager app's assignment detail therefore showed a hotel and a status
+     * and no person at all -- reported as the detail screen being "empty".
+     *
+     * `assigned_by_name` asserted alongside it on purpose: it was correct,
+     * and it is the reason nobody noticed. A screen with three of four names
+     * filled in looks like a rendering bug, not a missing query.
+     */
+    it('resolves the assigned worker\'s name, not just the assigner\'s', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
+      mockPrisma.user.findUnique.mockImplementation((args: any) =>
+        Promise.resolve(
+          args.where.id === 'w1'
+            ? { first_name: 'Ada', last_name: 'Lovelace' }
+            : { first_name: 'Grace', last_name: 'Hopper' }
+        )
+      );
+
+      const dto = await service.getById('a1', { userId: 'w1', role: 'worker' });
+
+      expect(dto.worker_name).toBe('Ada Lovelace');
+      expect(dto.assigned_by_name).toBe('Grace Hopper');
+    });
+
     // IDOR fix (2026-08-08): hotel eligibility answers "could this worker be
     // assigned here", never "is this worker's assignment" -- so ownership,
     // not eligibility, is the gate.
