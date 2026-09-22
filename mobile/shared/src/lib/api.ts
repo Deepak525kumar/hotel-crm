@@ -10,7 +10,9 @@ import type {
   Attendance,
   Notification,
   LeaderboardEntry,
+  AnalyticsLeaderboardEntry,
   DashboardStats,
+  HotelSummary,
   WorkerStats,
   CalendarAbsence,
   CalendarAbsenceKind,
@@ -621,9 +623,34 @@ export const api = {
       }),
   },
   analytics: {
-    stats: () => request<DashboardStats>('/analytics/stats'),
+    /**
+     * `hotelId` is a REQUEST, not a grant. For any non-admin the server
+     * ignores an out-of-scope value and answers 403 rather than filtering to
+     * it (analytics/controller.ts `resolveScopedFilter`), and omitting it
+     * does not widen a manager to every hotel -- their JWT scope claim is the
+     * only filter that counts. So this parameter exists to narrow an admin,
+     * or to pick one hotel inside an RM's own group; it can never broaden
+     * anyone.
+     */
+    stats: (hotelId?: string) =>
+      request<DashboardStats>(
+        hotelId ? `/analytics/stats?hotel_id=${encodeURIComponent(hotelId)}` : '/analytics/stats'
+      ),
     // GD-06: resolves the previously-silent 403 — /stats is admin/manager-only.
     myStats: () => request<WorkerStats>('/analytics/my-stats'),
+    /**
+     * The manager-facing leaderboard, behind `analytics:read`. Distinct from
+     * `quality.leaderboard()` in both route and response shape -- see
+     * AnalyticsLeaderboardEntry.
+     */
+    leaderboard: (hotelId?: string) =>
+      request<AnalyticsLeaderboardEntry[]>(
+        hotelId
+          ? `/analytics/leaderboard/by-hotel/${encodeURIComponent(hotelId)}`
+          : '/analytics/leaderboard'
+      ),
+    hotelSummary: (hotelId: string) =>
+      request<HotelSummary>(`/analytics/hotel-summary/${encodeURIComponent(hotelId)}`),
   },
   /**
    * The worker's own room log (2026-09-01) -- the rooms they cleaned on a

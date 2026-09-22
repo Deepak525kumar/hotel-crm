@@ -576,23 +576,25 @@ files that passed typecheck. A curl-only pass would have found none of them.
 Per `.claude/CLAUDE.md`'s repository rules, synchronized as an exit condition rather
 than left to be rediscovered.
 
-1. **`ADR-075` — "A single role-gated manager app".** `ADR-074` is the current
-   highest; confirm `075` is free with `ls` before claiming it (duplicate ADR numbers
-   are a **blocking** Repository Integrity finding). From
-   `.claude/templates/DECISION_RECORD_TEMPLATE.md`. Records D-1, D-2, D-3, the
+1. **[`ADR-075` — One role-gated manager app, on a shared mobile package](../14-governance/architecture-decisions/ADR-075-one-role-gated-manager-app.md).**
+   **Written 2026-09-22, status `PROPOSED`.** Records D-1, D-2, D-3, the
    agenda-first calendar (§5.1), the `h1`/`h2` type-scale addition, and the
-   `PushApp.MANAGER` extension. **Status `PROPOSED` until the owner ratifies** —
-   G2 and decision ratification are reserved human authority.
+   `PushApp.MANAGER` extension. **Flipping it to `ACCEPTED` is reserved human
+   authority** (Constitution §12/§20) — the implementing session may not ratify
+   its own record.
 2. **Specification Issues Register** (`.claude/governance/SPECIFICATION_ISSUES_REGISTER.md`)
    — append, never delete; merge by canonical source within a section; update the
    section's `**Section last verified:**` marker; never invent an owner:
-   - `SIR-CRM-NNN` — `crm/routes.ts:42,44` admits `['admin','manager']` under
+   **Recorded 2026-09-22:**
+   - `SIR-CRM-020` — `crm/routes.ts:42,44` admits `['admin','manager']` under
      `FEATURE_GD02_MATRIX`-off, omitting `regional_manager` and contradicting
-     `ADR-030` D-5. *security, Medium, OPEN, authority: human/architecture.*
-   - `SIR-GLOB-NNN` — three mobile code sources after D-2; migration of worker-app
+     `ADR-030` D-5. *security, decision-required, Medium, OPEN.*
+   - `SIR-GLOB-028` — three mobile code sources after D-2; migration of worker-app
      and checker-app onto `mobile/shared` outstanding. *consistency, Low, OPEN.*
-   - `SIR-NOTIF-NNN` — `PushApp` extended to a third app; Daiwi `APPS` and APNs
-     bundle-id env vars follow. *migration-gap, Medium.*
+   - `SIR-ANLY-016` — the mobile `DashboardStats` described a response the endpoint
+     has never returned; corrected in `mobile/shared` and pinned by a compile-time
+     contract test. The two shipped apps still carry the wrong copy.
+     *consistency, Medium, OPEN (residual).*
    - `SIR-GLOB-022` (existing) — re-verify: transport-layer error strings English in
      every locale. `mobile/shared` is the natural place to close it.
 3. **`ADR-030` amendment remains owed** for RULE A / RULE B (§3). This plan does not

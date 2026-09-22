@@ -19,6 +19,7 @@ export * from './constants/theme';
 export * from './constants/polling';
 export { ThemedText, type ThemedTextProps } from './components/themed-text';
 export { ThemedView, type ThemedViewProps } from './components/themed-view';
+export { RatingTierBadge } from './components/RatingTierBadge';
 
 // Primitives that predate this package (copied verbatim from worker-app)
 export * from './components/ui';
@@ -45,6 +46,7 @@ export { useColorScheme } from './hooks/use-color-scheme';
 export * from './lib/api';
 export * from './lib/api-error-i18n';
 export * from './lib/locales';
+export * from './lib/scope';
 export * from './lib/persistent-storage';
 
 // Stores
