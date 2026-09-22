@@ -25,6 +25,7 @@ import {
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
+import { ReassignSheet } from '@/components/ReassignSheet';
 import { assignmentTone } from '@/lib/assignment-format';
 
 /**
@@ -53,6 +54,7 @@ export default function AssignmentDetail() {
 
   const [rooms, setRooms] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [reassignOpen, setReassignOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const run = useCallback(
@@ -147,6 +149,11 @@ export default function AssignmentDetail() {
               )}
 
               <Button
+                label={t('assignments.reassignTitle')}
+                variant="ghost"
+                onPress={() => setReassignOpen(true)}
+              />
+              <Button
                 label={t('assignments.cancelTitle')}
                 variant="danger"
                 onPress={() => setCancelOpen(true)}
@@ -154,6 +161,19 @@ export default function AssignmentDetail() {
             </>
           )}
         </ScrollView>
+
+        <ReassignSheet
+          visible={reassignOpen}
+          busy={busy}
+          onClose={() => setReassignOpen(false)}
+          onSubmit={(workerId) => {
+            setReassignOpen(false);
+            void run(
+              () => api.assignments.reassign(String(id), workerId),
+              'fields.updated'
+            );
+          }}
+        />
 
         <ConfirmDialog
           visible={cancelOpen}

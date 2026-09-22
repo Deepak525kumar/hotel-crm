@@ -4,6 +4,26 @@ import type { useRouter } from 'expo-router';
 import { api , useNotificationStore } from '@hotel-crm/mobile-shared';
 import { PUSH_APP } from '@/constants/app-config';
 
+/**
+ * Resolves the in-app route a tapped push notification should open, from
+ * its `data` payload — `type` is always present (composed by
+ * PushTransportHandler.deliver() in
+ * backend/src/modules/notifications/outbox-transport.ts, alongside
+ * whatever Notification.data itself carries, e.g. work_request_id for a
+ * JOB_REQUEST_BROADCAST). Extracted as a pure function so the routing
+ * decision is independently testable without mocking expo-notifications'
+ * listener plumbing.
+ *
+ * Falls back to the Alerts tab for any notification type this function
+ * doesn't recognize (including a payload with no `type` at all, or a
+ * `type` this app version predates) — the safe default this app already
+ * had for every notification before per-type routing existed.
+ */
+// Re-exported so every existing caller and the public surface are unchanged;
+// the implementation moved to keep it testable (see push-routes.ts). Imported
+// as well, because this module calls it itself when a notification is tapped.
+import { resolvePushTapRoute } from './push-routes';
+
 type Router = ReturnType<typeof useRouter>;
 
 /**
@@ -71,47 +91,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
   }
 }
 
-/**
- * Resolves the in-app route a tapped push notification should open, from
- * its `data` payload — `type` is always present (composed by
- * PushTransportHandler.deliver() in
- * backend/src/modules/notifications/outbox-transport.ts, alongside
- * whatever Notification.data itself carries, e.g. work_request_id for a
- * JOB_REQUEST_BROADCAST). Extracted as a pure function so the routing
- * decision is independently testable without mocking expo-notifications'
- * listener plumbing.
- *
- * Falls back to the Alerts tab for any notification type this function
- * doesn't recognize (including a payload with no `type` at all, or a
- * `type` this app version predates) — the safe default this app already
- * had for every notification before per-type routing existed.
- */
-export function resolvePushTapRoute(data: Record<string, unknown> | undefined | null): string {
-  if (data?.type === 'JOB_REQUEST_BROADCAST' && typeof data.work_request_id === 'string') {
-    return `/offer/${data.work_request_id}`;
-  }
-  // CRR §14: tapping the rework push opens the screen where the worker
-  // uploads evidence and marks it done. The checker's note rides along in the
-  // query string so the instruction is on screen without a second fetch --
-  // the worker is standing in the room and the note IS the task.
-  if (data?.type === 'REWORK_REQUIRED' && typeof data.rework_assignment_id === 'string') {
-    const notes = typeof data.notes === 'string' ? data.notes : '';
-    return `/rework/${data.rework_assignment_id}?notes=${encodeURIComponent(notes)}`;
-  }
-  // The end-of-shift digest (2026-08-30) summarizes a whole shift, so it opens
-  // that shift -- where the per-room checks are listed and searchable. It
-  // carries assignment_id rather than verification_id precisely because it is
-  // about many checks, not one.
-  //
-  // Note this type is ALSO used by the per-check inbox notification, which
-  // carries the same field. That one is deliberately not pushed (transports:
-  // []), so it never reaches this function; if that ever changes, this route
-  // is still the right destination for it.
-  if (data?.type === 'QUALITY_VERIFICATION_SUBMITTED' && typeof data.assignment_id === 'string') {
-    return `/shift/${data.assignment_id}`;
-  }
-  return '/notifications';
-}
+export { resolvePushTapRoute };
 
 /**
  * Foreground display + tap-through routing for incoming push notifications.
