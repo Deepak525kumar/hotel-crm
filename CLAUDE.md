@@ -29,8 +29,11 @@ Two mandatory entry points are declared there and are easy to miss:
 | --- | --- |
 | `backend/` | Express + TypeScript modular monolith, Prisma/Postgres. The only thing that touches the database. |
 | `frontend/` | Next.js web app — admin, manager and regional-manager surfaces. |
+| `mobile/` | Three Expo apps + `shared/`. See `mobile/CLAUDE.md` for what is true across all four. |
 | `mobile/worker-app/` | Expo app for housekeepers. |
 | `mobile/checker-app/` | Expo app for quality checkers. |
+| `mobile/manager-app/` | Expo app for manager, regional manager and admin. |
+| `mobile/shared/` | Design system, API client and stores; consumed by `manager-app` only. |
 | `daiwi/` | App-distribution portal on :3002. Uploading never publishes. |
 | `docs/` | Specifications, ADRs, E2E scenarios, implementation handoffs. |
 | `.claude/` | Reusable engineering framework. `knowledge/` inside it holds repo facts. |
@@ -47,16 +50,18 @@ cd backend   && npx tsc --noEmit && npm run lint && npx jest --runInBand --force
 cd frontend  && npx tsc --noEmit && npm run lint && npx jest --ci && npx next build
 cd mobile/worker-app  && npm run typecheck && npx expo lint && npx jest --forceExit
 cd mobile/checker-app && npm run typecheck && npx expo lint && npx jest --forceExit
+cd mobile/manager-app && npm run typecheck && npx expo lint && npx jest --forceExit
 ```
 
 **Lint is the one that gets skipped and the one that fails CI.** `tsc` and
 `jest` passing is not evidence the build is green; that mistake has been made
 here more than once.
 
-**The two mobile apps are kept in lockstep by a test.** `locales.test.ts`
-asserts each app's catalogue deep-equals the frontend's, so a string added to
-one app alone fails CI in a branch that never touched mobile. Add a key to all
-three, or to none.
+**Four packages are kept in lockstep by a test.** `locales.test.ts` asserts
+each mobile catalogue deep-equals the frontend's, so a string added to one
+alone fails CI in a branch that never touched it. Add a key to all four
+(frontend, worker, checker, shared), or to none — and never a dead key to
+satisfy the test.
 
 ## Working agreements
 

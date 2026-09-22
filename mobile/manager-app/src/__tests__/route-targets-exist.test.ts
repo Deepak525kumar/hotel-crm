@@ -1,8 +1,11 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 
+import { ONBOARDING_ROUTE } from '@/lib/onboarding-gate-decision';
+
 /**
- * Every router.push() target must resolve to a real route file.
+ * Every router.push()/replace() target must resolve to a real route file,
+ * including the ones held in constants.
  *
  * Carried from checker-app, where three dead links shipped in one change:
  * screens ported from worker-app kept pushing to `/shift/[id]` and
@@ -53,16 +56,28 @@ const routes = new Set(
  */
 function targetsIn(source: string): string[] {
   const out: string[] = [];
-  const re = /router\.push\(\s*[`'"]([^`'"]+)[`'"]/g;
+  // push AND replace. AuthGuard redirects with replace(), and the onboarding
+  // route it points at did not exist -- caught only by a STALE local typed-
+  // route manifest, which is luck rather than a gate: `.expo/` is gitignored,
+  // so CI never has that manifest and expo-router's typed routes protect
+  // nothing there. This test is the protection.
+  const re = /router\.(?:push|replace)\(\s*[`'"]([^`'"]+)[`'"]/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(source))) out.push(m[1]);
-  const tpl = /router\.push\(\s*`([^`]*)`/g;
+  const tpl = /router\.(?:push|replace)\(\s*`([^`]*)`/g;
   while ((m = tpl.exec(source))) out.push(m[1]);
   // pathname: '/a/[id]' anywhere inside a push's object argument. Matched on
   // the property rather than on the whole call so it survives the multi-line
   // formatting prettier gives these.
-  const obj = /router\.push\(\s*\{[\s\S]*?pathname:\s*[`'"]([^`'"]+)[`'"]/g;
+  const obj = /router\.(?:push|replace)\(\s*\{[\s\S]*?pathname:\s*[`'"]([^`'"]+)[`'"]/g;
   while ((m = obj.exec(source))) out.push(m[1]);
+  // Routes held in a constant. AuthGuard redirects through ONBOARDING_ROUTE,
+  // so a call-site-only scan never sees the target at all -- which is how a
+  // dead redirect survived: a gated manager would have been sent to a route
+  // that did not exist, and the only thing that noticed was a stale local
+  // typed-route manifest.
+  const konst = /[A-Z_]*ROUTE[A-Z_]*\s*(?::\s*[^=]+)?=\s*[`'"](\/[^`'"]*)[`'"]/g;
+  while ((m = konst.exec(source))) out.push(m[1]);
   return out;
 }
 
@@ -80,7 +95,8 @@ function normalise(target: string): string {
 
 describe('every router.push target resolves to a route', () => {
   const found = files
-    .filter((f) => f.endsWith('.tsx'))
+    // .ts as well as .tsx: route constants live in plain modules.
+    .filter((f) => f.endsWith('.tsx') || f.endsWith('.ts'))
     .flatMap((f) => targetsIn(readFileSync(f, 'utf8')).map((t) => ({ file: f.slice(APP.length), t })));
 
   it('finds targets to check at all (guards the regex itself)', () => {
@@ -91,5 +107,22 @@ describe('every router.push target resolves to a route', () => {
     // Dynamic targets built entirely from a variable cannot be checked.
     if (target.startsWith(':param')) return;
     expect(routes).toContain(normalise(target));
+  });
+});
+
+/**
+ * Redirect targets that live outside `src/app`.
+ *
+ * The walker above only reads the route tree, so a constant defined in
+ * `src/lib` is invisible to it however good its regex is. `ONBOARDING_ROUTE`
+ * is exactly that: AuthGuard redirects a gated manager through it, and the
+ * route did not exist in this app at all.
+ *
+ * Imported rather than re-scanned, so the assertion breaks if the constant is
+ * renamed or moved — a grep would silently find nothing and pass.
+ */
+describe('redirect constants resolve to a route', () => {
+  it('ONBOARDING_ROUTE exists as a screen', () => {
+    expect(routes.has(normalise(ONBOARDING_ROUTE))).toBe(true);
   });
 });

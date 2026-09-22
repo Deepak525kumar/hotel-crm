@@ -20,6 +20,7 @@ import {
   useToast,
 } from '@hotel-crm/mobile-shared';
 
+import { AssignAfterApprove } from '@/components/AssignAfterApprove';
 import { BackLink } from '@/components/BackLink';
 import { needsAssignAfterApproval } from '@/lib/review-queue';
 
@@ -57,19 +58,26 @@ export default function ReviewQueue() {
     }
   }, [mutate]);
 
+  // The employee awaiting the SECOND half of the chain, if any.
+  const [assigning, setAssigning] = useState<{ id: string; needsHotel: boolean } | null>(null);
+
   const approve = useCallback(
     async (employeeId: string, role: string | null | undefined) => {
       if (busy) return;
       setBusy(true);
       try {
         await api.employee.transition(employeeId, 'approve');
-        if (needsAssignAfterApproval(role)) {
-          // The second half of the chain. Deliberately NOT swallowed: if the
-          // assign fails the approval already happened, and saying "approved"
-          // would hide a half-finished promotion.
-          toast.show(t('onboarding.assignApprovedEmployee'), 'neutral');
-        }
         await mutate();
+
+        if (needsAssignAfterApproval(role)) {
+          // Do NOT report success here. The approval landed, but a Manager or
+          // RM is not finished until they are assigned -- an approved,
+          // unassigned manager leaves the hotel with none, and every response
+          // so far said 200. Hand over to the assign sheet instead.
+          setAssigning({ id: employeeId, needsHotel: role === 'manager' });
+          return;
+        }
+
         toast.show(t('employees.approveAction'), 'success');
       } catch (e) {
         toast.show(translateApiError(e, t), 'danger');
@@ -78,6 +86,27 @@ export default function ReviewQueue() {
       }
     },
     [busy, mutate, toast, t]
+  );
+
+  const completeAssignment = useCallback(
+    async (input: { hotel_group_id: string; primary_hotel_id?: string }) => {
+      if (!assigning || busy) return;
+      setBusy(true);
+      try {
+        await api.employee.assign(assigning.id, input);
+        await mutate();
+        setAssigning(null);
+        toast.show(t('employees.approveAction'), 'success');
+      } catch (e) {
+        // The approval already happened and cannot be undone here, so the
+        // message must not read as "nothing happened": the record is approved
+        // and still needs assigning.
+        toast.show(translateApiError(e, t), 'danger');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [assigning, busy, mutate, toast, t]
   );
 
   const rows = data ?? [];
@@ -130,6 +159,19 @@ export default function ReviewQueue() {
             </>
           ) : null}
         </ScrollView>
+
+        <AssignAfterApprove
+          visible={assigning !== null}
+          employeeId={assigning?.id ?? null}
+          needsHotel={assigning?.needsHotel ?? false}
+          busy={busy}
+          // Cancelling leaves an approved-but-unassigned record, which is a
+          // real state the reviewer must be able to return to -- the queue is
+          // refreshed so it reflects reality rather than pretending the
+          // approval did not happen.
+          onCancel={() => setAssigning(null)}
+          onAssign={(input) => void completeAssignment(input)}
+        />
 
         <ConfirmDialog
           visible={rejecting !== null}
