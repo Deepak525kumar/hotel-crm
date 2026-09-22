@@ -101,6 +101,17 @@ Developer with push enabled, `APNS_BUNDLE_ID_MANAGER` is set in the EC2
       routes need.
 - [ ] Token ownership reassigns when a second user signs in on one device.
 
+## 4b. Running an OLD build
+
+The failure mode that no CI run can reproduce: a development build cut
+*before* a native dependency was added does not contain it.
+
+- [ ] **Install a build older than the current dependency list and open every
+      screen.** Nothing may fail to render. Dictation, haptics, downloads and
+      sharing each degrade to absent; none of them may take a screen down.
+- [ ] Specifically: Rota (haptics), Assistant (speech), Settings → Export and
+      Contract (file system + sharing).
+
 ## 5. Permissions
 
 - [ ] **Camera** prompt appears with the app's own wording, not a bare system

@@ -41,7 +41,23 @@ on no runner. Two real consequences:
   route that does not exist compiles fine there. `route-targets-exist.test.ts`
   is the actual gate, and it has caught two dead links.
 
-**4. Icons are generated, not hand-edited.** `mobile/scripts/generate-app-icons.mjs`
+**4. Never import an optional native module at the top level.**
+A static `import ... from 'expo-<native>'` whose native half is absent from
+the running binary throws during MODULE EVALUATION, taking down every
+importer — and expo-router reports it as *"Route is missing the required
+default export"*, which sends you looking in entirely the wrong place. It has
+happened three times: `expo-location` in worker-app's `shift/[id].tsx`,
+`expo-file-system`/`expo-sharing` in the contract download, and
+`expo-speech-recognition` in manager-app's `assistant.tsx` — the last
+reported as *"I am not able to log into the app"*, because a route that
+cannot be evaluated breaks navigation, not just its own screen.
+
+Typecheck cannot see it: the JS half is installed, so the import resolves.
+Only a device running a build cut before the dependency was added fails.
+`require()` it inside the function that uses it and degrade gracefully;
+manager-app's `native-module-imports.test.ts` enforces this.
+
+**5. Icons are generated, not hand-edited.** `mobile/scripts/generate-app-icons.mjs`
 renders every size for all three apps from one vector source each. Re-run it
 after touching `GLYPHS` or `BRANDS`; it is reproducible, so a clean `git status`
 afterwards is the check that nothing drifted.
