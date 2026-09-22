@@ -10,11 +10,14 @@ const root = join(__dirname, '..', '..');
 const read = (f: string) => readFileSync(join(root, f), 'utf8');
 
 /**
- * The checker app's dev server is 8083; worker-app keeps Expo's default 8081.
+ * The manager app's dev server is 8083. worker-app keeps Expo's default 8081
+ * and checker-app took 8082.
  *
- * Both apps are Expo projects in one repo and both default to 8081, so a
- * checker build that resolves to 8081 attaches to worker-app's Metro and runs
- * the other app's JavaScript. It has been reported twice from real iOS builds.
+ * Three Expo projects in one repository, all defaulting to 8081, so a manager
+ * build that resolves to 8081 attaches to worker-app's Metro and runs the
+ * other app's JavaScript inside this app's shell. It has been reported twice
+ * from real iOS builds of checker-app, which is why checker-app has this test
+ * and why it was carried here rather than reinvented.
  *
  * The port has to be set in three places because there are three ways in:
  *   1. npm scripts (`--port`)      — `npm start`, `npm run ios`
@@ -24,6 +27,11 @@ const read = (f: string) => readFileSync(join(root, f), 'utf8');
  *                                    runs at all and the port is compiled into
  *                                    RCTBundleURLProvider.mm
  * Miss any one and the app silently falls back to worker-app's server.
+ *
+ * The .env assertion below earned its place on 2026-09-22: the file existed
+ * locally and was never committed, because the REPOSITORY ROOT's .gitignore
+ * lists `.env` and `git add mobile/manager-app` skipped it without a word.
+ * Every local run passed. CI failed on a file that was simply not there.
  */
 describe('dev server port', () => {
   const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
@@ -58,10 +66,14 @@ describe('dev server port', () => {
     expect(applyMetroPort(once)).toBe(once);
   });
 
-  it('never falls back to the port worker-app occupies', () => {
+  it('never falls back to a port another app in this repo occupies', () => {
+    // 8081 is worker-app's, 8082 is checker-app's. Colliding with either
+    // produces the same silent wrong-JavaScript failure.
     expect(METRO_PORT).not.toBe(8081);
+    expect(METRO_PORT).not.toBe(8082);
     for (const script of Object.values(pkg.scripts)) {
       expect(script).not.toContain('--port 8081');
+      expect(script).not.toContain('--port 8082');
     }
   });
 });
