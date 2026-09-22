@@ -5,7 +5,9 @@ role **and resolved scope**. The plan is
 `docs/implementation/MANAGER_APP_PLAN.md`; screens land PR by PR against §7.
 
 Most of this app's design system, API client and stores come from
-`@hotel-crm/mobile-shared`. Read `mobile/shared/CLAUDE.md` too.
+`@hotel-crm/mobile-shared`. Read `mobile/CLAUDE.md` (rules shared by all four
+packages, including the locale lockstep and the port trio) and
+`mobile/shared/CLAUDE.md` too.
 
 ## Gates
 
@@ -35,13 +37,14 @@ catalogues it is pinned against.
   Checker-only. No rating or rework affordance belongs here.
 - **This app does not log rooms.** Those routes are `requireRole('worker')`.
   A manager enters only the aggregate count.
-- **Port 8083**, in three places: `package.json`'s `--port` flags, `.env`'s
-  `RCT_METRO_PORT`, and `plugins/with-metro-port.js`. `dev-server-port.test.ts`
-  asserts all three agree. Get it wrong and an Xcode build serves
-  worker-app's JavaScript inside this app's shell.
-- **Locale keys are all-or-nothing** across four catalogues (frontend,
-  worker, checker, shared). Adding one key to one package fails CI in
-  packages your branch never opened.
+- **Dead links are not caught by typecheck.** `.expo/types` is gitignored, so
+  expo-router's typed routes protect nothing in CI.
+  `route-targets-exist.test.ts` is the gate; it has caught two —
+  `/admin/archive` from the More menu, and `ONBOARDING_ROUTE`, which AuthGuard
+  redirects a gated manager through.
+- **Approving a Manager or RM is two calls.** `approve` then `assign`
+  (`ADR-065`). Reporting success after the first leaves the record approved,
+  unassigned, and the hotel with no manager — while every response said 200.
 - **`PushRegistration` must stay inside `ConsentGate`.** Registering before
   the daily notice is accepted returns 403 `CONSENT_REQUIRED` and the token is
   then silently absent for the whole session.

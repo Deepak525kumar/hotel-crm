@@ -2,8 +2,13 @@
 
 # frontend
 
-Next.js web app for admin, manager and regional-manager roles. Workers and
-checkers use the Expo apps, not this.
+Next.js web app for admin, manager and regional-manager roles.
+
+**It is no longer the only surface for those roles.** `mobile/manager-app`
+serves the same three, and both are maintained — a manager-facing change here
+usually needs its mobile counterpart (the owner's standing instruction in
+`docs/10-testing/e2e/REMAINING_WORK.md`). Workers and checkers have their own
+apps and never use this one.
 
 The block above is written and re-added by `next dev`. Leave it; removing it
 from a diff only re-creates the uncommitted change.
@@ -57,6 +62,7 @@ the recent-activity card overflowing to the right). They were one bug.
   crossing the API boundary where the mismatch lives.
 - **Honour `turn.status`.** A conversation the server has closed is not
   reusable; holding its id means every later message is refused.
-- Locale keys must exist in the frontend **and** both mobile apps —
-  `locales.test.ts` deep-equals the catalogues and will fail CI in a branch
-  that never touched mobile.
+- Locale keys must exist in the frontend **and all three mobile packages**
+  (`worker-app`, `checker-app`, `shared`) — `locales.test.ts` deep-equals the
+  catalogues and will fail CI in a branch that never touched mobile. Four
+  sources, all pinned to this one.

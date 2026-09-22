@@ -7,21 +7,19 @@ Expo (SDK 57) app for quality checkers. Its sibling is `mobile/worker-app`.
 The line above is written by the Expo tooling — leave it, and read the exact
 versioned docs it points at before writing code.
 
-## Gates
+## Read `mobile/CLAUDE.md` first
 
-```bash
-npm run typecheck && npx expo lint && npx jest --forceExit
-```
+It holds what is true across all four mobile packages: the gates, the
+four-way locale lockstep, the dev-server port trio, the
+generated-files-never-in-CI trap, and the icon generator. Only what is
+specific to **this** app is below.
 
-## The two apps are kept in lockstep by a test
-
-`locales.test.ts` asserts this app's locale catalogue **deep-equals** the
-frontend's. A key added to the web app alone fails CI here, in a branch that
-never touched mobile. Add a string to all three catalogues, or to none — never
-add a dead key just to satisfy the assertion; implement the feature.
+## Its twins
 
 Most non-locale code in `src/stores/` and `src/lib/api.ts` is intentionally
-near-identical between the two apps. Patch both.
+near-identical to worker-app and manager-app. Patch the ones that share it.
+`mobile/shared/MIGRATION.md` lists every file with a twin, and the
+divergences that are decisions rather than drift.
 
 ## Lint traps that have actually failed CI
 

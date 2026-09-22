@@ -585,6 +585,28 @@ export interface CalendarEntry {
   updated_at: string;
 }
 
+/**
+ * A hotel's daily shift summary — the numbers a manager records for a day.
+ *
+ * `date` is anchored to 00:00:00 UTC for the LOCAL day on the backend
+ * (`DailyShiftSummary.date`). The client sends and receives `YYYY-MM-DD` and
+ * never constructs a Date from it, for the reason `lib/today.ts` records.
+ */
+export interface DailyShiftSummary {
+  id: string;
+  hotel_id: string;
+  date: string;
+  total_rooms: number;
+  stay_over_rooms: number;
+  checkout_rooms: number;
+  total_people_working: number;
+  notes?: string | null;
+  created_by_id: string;
+  updated_by_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** GET /calendar/availability — today-only, one row per worker. */
 export interface WorkerAvailability {
   worker_id: string;
