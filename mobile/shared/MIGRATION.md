@@ -56,6 +56,36 @@ migration does not "fix" it back:
 4. **`PushApp` includes `MANAGER`.** Matches the backend enum as of the
    migration in `backend/prisma/migrations/20260922090000_push_app_manager`.
 
+5. **`DashboardStats` describes the response the endpoint actually returns.**
+   The copies in both shipped apps declare
+   `{ total_shifts, completed_shifts, upcoming_shifts, average_rating }` and
+   **not one of those four fields exists**. `GET /analytics/stats` returns a
+   nested `work_requests`/`assignments`/`attendance`/`quality`/`ratings`/
+   `rooms_completed` shape and always has. The old type was hand-written to
+   describe a response nobody had read back, so `tsc` checked against a
+   fiction and every stat card rendered `undefined`.
+
+   Corrected here and pinned by `manager-app`'s `analytics-contract.test.ts`,
+   which type-checks against the backend's own declaration in both directions.
+   The shipped apps are deliberately left alone: a worker's call to that route
+   403s before the shape ever matters (`SIR-ANLY-002`), so this is latent
+   there, and reaching into a production app to fix a latent bug is its own
+   change with its own gates. Tracked as `SIR-ANLY-016`.
+
+6. **`User` carries `scope_hotel_id` / `scope_hotel_group_id`.** Present in the
+   login response all along; simply absent from the copied type because the
+   worker app had no use for them. Every manager surface branches on these,
+   never on `role` — an admin and a regional manager both have a null
+   `scope_hotel_id`, so `role === 'admin'` silently shows an RM the whole
+   platform.
+
+7. **`AnalyticsLeaderboardEntry` is a second, distinct leaderboard row.**
+   `/quality/leaderboard` (`quality:read`) and `/analytics/leaderboard`
+   (`analytics:read`) return different shapes sharing only `worker_id` and
+   `rating_tier`. Managers hold `analytics:read` and never `quality:write`, so
+   reading one with the other's type yields undefined in every column that
+   matters.
+
 ## Not copied, and why
 
 - **`constants/app-config.ts`** is per-app by design: `PUSH_APP` and

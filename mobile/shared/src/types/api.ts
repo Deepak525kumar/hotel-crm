@@ -19,6 +19,24 @@ export interface User {
   preferred_language?: string | null;
   employment_status?: string | null;
   /**
+   * The actor's RESOLVED scope, as the login response carries it
+   * (`backend/src/modules/auth/service.ts`). Present on the wire all along;
+   * simply absent from this type because the worker app never had a use for
+   * it.
+   *
+   * These are what a manager surface must branch on -- NOT `role`. A hotel
+   * manager has `scope_hotel_id` set and no choice to make; an admin AND a
+   * regional manager both have it null, which is why `role === 'admin'` is
+   * the wrong test and puts an RM in the admin branch. An RM's own group is
+   * `scope_hotel_group_id`; an admin has neither and sees everything.
+   *
+   * Server-derived at token issuance from `Hotel.manager_user_id` /
+   * `HotelGroup.regional_manager_user_id`. Never client-writable, and never
+   * a permission by itself -- every endpoint re-derives authorization.
+   */
+  scope_hotel_id?: string | null;
+  scope_hotel_group_id?: string | null;
+  /**
    * Never the raw S3 key -- just whether one exists. The bytes come from the
    * stable, cacheable `GET /users/:id/photo` route (components/UserAvatar.tsx).
    */
@@ -312,11 +330,114 @@ export interface EmploymentRecordDto {
   submitted_for_review_at?: string | null;
 }
 
+/**
+ * GET /analytics/stats — the manager/admin dashboard shape.
+ *
+ * CORRECTED 2026-09-22. This interface previously declared
+ * `{ total_shifts, completed_shifts, upcoming_shifts, average_rating }`, and
+ * not one of those four field names exists in the response. The backend has
+ * always returned the nested shape below
+ * (`backend/src/modules/analytics/types.ts`).
+ *
+ * Nothing caught it because nothing could: the type was written by hand to
+ * describe an endpoint nobody had read back, so `tsc` cheerfully checked the
+ * app against a fiction and every stat card rendered `undefined`. It is the
+ * same failure mode as a test that fabricates a permission -- the code agrees
+ * with itself and with nothing else.
+ *
+ * `analytics-contract.test.ts` now pins this against the backend's own
+ * declaration at compile time, so the next divergence fails the build.
+ *
+ * worker-app and checker-app still carry the old, wrong copy. Deliberately
+ * not changed here: they are in production, and a worker's call to this route
+ * 403s before the shape ever matters (SIR-ANLY-002). Recorded in
+ * mobile/shared/MIGRATION.md rather than fixed by reaching into a shipped app.
+ */
 export interface DashboardStats {
-  total_shifts: number;
-  completed_shifts: number;
-  upcoming_shifts: number;
-  average_rating?: number;
+  work_requests: {
+    total: number;
+    open: number;
+    partially_filled: number;
+    filled: number;
+    cancelled: number;
+    expired: number;
+  };
+  assignments: {
+    total: number;
+    completed: number;
+    in_progress: number;
+    no_show: number;
+    cancelled: number;
+  };
+  attendance: {
+    total: number;
+    present: number;
+    late: number;
+    absent: number;
+    on_time_rate: number;
+  };
+  quality: {
+    total_verifications: number;
+    average_score: number | null;
+    pass_rate: number;
+  };
+  ratings: {
+    total: number;
+    average_score: number | null;
+  };
+  rooms_completed: {
+    total: number;
+    entries: number;
+  };
+}
+
+/**
+ * A row of GET /analytics/leaderboard.
+ *
+ * NOT the same as `LeaderboardEntry`, and the difference is not cosmetic.
+ * There are two leaderboards in this system behind two different permission
+ * tokens: `/quality/leaderboard` (`quality:read`) aggregates WorkerRating
+ * rows and is what `LeaderboardEntry` describes, while this one
+ * (`analytics:read`) counts tasks. Managers and RMs hold `analytics:read`
+ * but NOT `quality:write`, and the two responses share only `worker_id` and
+ * `rating_tier` -- so reading one with the other's type yields undefined in
+ * every column that matters.
+ */
+export interface AnalyticsLeaderboardEntry {
+  worker_id: string;
+  name: string;
+  total_tasks: number;
+  completed_tasks: number;
+  average_rating: number;
+  /** TREQ-003 tier label derived from average_rating; null when unrated. */
+  rating_tier: RatingTier | null;
+  position: number;
+}
+
+/** GET /analytics/hotel-summary/:hotel_id */
+export interface HotelSummary {
+  hotel_id: string;
+  open_requests: {
+    count: number;
+    workers_needed: number;
+    workers_confirmed: number;
+  };
+  active_assignments: number;
+  today_attendance: {
+    expected: number;
+    present: number;
+    late: number;
+    absent: number;
+  };
+  quality: {
+    average_score: number | null;
+    recent_pass_rate: number;
+  };
+  rooms_completed: {
+    total: number;
+    entries: number;
+  };
+  top_workers: AnalyticsLeaderboardEntry[];
 }
 
 // GD-06: matches backend WorkerStats (analytics/types.ts) exactly — the
