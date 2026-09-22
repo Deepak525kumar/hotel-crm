@@ -306,6 +306,10 @@ export class PushTransportHandler implements TransportHandler {
    * unconfigured deployment — indistinguishable from a real config gap. The
    * `default: assertNever(...)` branch makes that a compile error instead:
    * adding a PushApp member without wiring it here fails the build.
+   *
+   * That guard paid for itself on 2026-09-22: adding MANAGER to the enum
+   * failed `tsc` here and nowhere else, which is precisely the silent-skip
+   * outage it was written to prevent.
    */
   private topicFor(pushToken: { platform: PushPlatform; app: PushApp }): string | undefined {
     if (pushToken.platform !== PushPlatform.IOS) return undefined;
@@ -315,6 +319,8 @@ export class PushTransportHandler implements TransportHandler {
         return this.apnsTopics[PushApp.WORKER];
       case PushApp.CHECKER:
         return this.apnsTopics[PushApp.CHECKER];
+      case PushApp.MANAGER:
+        return this.apnsTopics[PushApp.MANAGER];
       default:
         return assertNever(pushToken.app);
     }
@@ -482,6 +488,7 @@ export function resolvePushTransportHandler(
     apnsTeamId?: string;
     apnsBundleIdWorker?: string;
     apnsBundleIdChecker?: string;
+    apnsBundleIdManager?: string;
     firebaseProjectId?: string;
     firebaseServiceAccountKeyBase64?: string;
   }
@@ -492,6 +499,7 @@ export function resolvePushTransportHandler(
     apnsTeamId,
     apnsBundleIdWorker,
     apnsBundleIdChecker,
+    apnsBundleIdManager,
     firebaseProjectId,
     firebaseServiceAccountKeyBase64,
   } = config;
@@ -502,6 +510,7 @@ export function resolvePushTransportHandler(
   const apnsTopics: Partial<Record<PushApp, string>> = {};
   if (apnsBundleIdWorker) apnsTopics[PushApp.WORKER] = apnsBundleIdWorker;
   if (apnsBundleIdChecker) apnsTopics[PushApp.CHECKER] = apnsBundleIdChecker;
+  if (apnsBundleIdManager) apnsTopics[PushApp.MANAGER] = apnsBundleIdManager;
 
   // One client, one team-scoped signing key, one cached JWT — the topic is
   // supplied per delivery, so a second client per app would only duplicate the

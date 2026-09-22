@@ -263,6 +263,14 @@ enum PushPlatform {
 enum PushApp {
   WORKER
   CHECKER
+  // MANAGER (2026-09-22): the manager app serves manager, regional_manager and
+  // admin from one binary (ADR-030 D-5 — RM is Manager's capability set at
+  // group scope, so one app covers both). A third value rather than reusing
+  // CHECKER because `app` selects the APNs topic at delivery time, and a
+  // manager device answering to the checker topic gets DeviceTokenNotForTopic
+  // on every send — the exact asymmetric outage PushApp was introduced to
+  // prevent (Epic 7 PR 7.8).
+  MANAGER
 }
 
 // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-002 / RULE-EMP-02, 03, 12): employee

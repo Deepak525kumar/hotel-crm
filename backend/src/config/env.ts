@@ -190,6 +190,10 @@ const envSchema = z.object({
   // one key and one cached JWT serve both topics.
   APNS_BUNDLE_ID_WORKER: z.string().optional(),
   APNS_BUNDLE_ID_CHECKER: z.string().optional(),
+  // The manager app (2026-09-22). Optional like the other two: a deployment
+  // that has not yet provisioned the manager app's APNs key still delivers to
+  // the apps it has configured, rather than failing closed for all three.
+  APNS_BUNDLE_ID_MANAGER: z.string().optional(),
   FIREBASE_PROJECT_ID: z.string().optional(),
   // Base64-encoded Firebase service-account JSON key. Required for FCM HTTP
   // v1 (the only current, non-deprecated FCM API): sends use a short-lived

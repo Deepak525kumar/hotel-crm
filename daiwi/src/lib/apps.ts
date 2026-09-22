@@ -4,13 +4,15 @@
  * A build's identity comes from the bundle identifier baked into the binary
  * (CFBundleIdentifier on iOS, the manifest's package on Android), never from
  * which section an operator dropped it into. Both platforms of a given app share
- * one identifier, so a single registry covers all four artifacts.
+ * one identifier, so a single registry covers all six artifacts.
  *
- * Adding a third app is a matter of adding a row here plus a migration for the
- * new enum value; nothing else in the codebase enumerates apps by name.
+ * Adding an app is a matter of adding a row here; `app` is stored as TEXT
+ * rather than a database enum, so no migration is needed. Nothing else in the
+ * codebase enumerates apps by name. The manager app was added this way on
+ * 2026-09-22.
  */
 
-export const APPS = ["WORKER", "CHECKER"] as const;
+export const APPS = ["WORKER", "CHECKER", "MANAGER"] as const;
 export type AppKey = (typeof APPS)[number];
 
 export interface AppDefinition {
@@ -34,11 +36,18 @@ export const APP_DEFINITIONS: readonly AppDefinition[] = [
     audience: "For checkers and supervisors",
     bundleId: "com.fhmhotelservices.checkerapp",
   },
+  {
+    key: "MANAGER",
+    label: "Manager app",
+    audience: "For hotel managers, regional managers and admins",
+    bundleId: "com.fhmhotelservices.managerapp",
+  },
 ];
 
 export const APP_LABELS: Record<AppKey, string> = {
   WORKER: "Worker app",
   CHECKER: "Checker app",
+  MANAGER: "Manager app",
 };
 
 export function isAppKey(value: unknown): value is AppKey {
