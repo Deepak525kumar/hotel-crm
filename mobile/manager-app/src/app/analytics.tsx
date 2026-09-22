@@ -18,12 +18,15 @@ import {
   api,
   scopeOf,
   useAuthStore,
+  useTheme,
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
 import { HotelPicker } from '@/components/HotelPicker';
 import { hotelFilterFor } from '@/lib/hotel-filter';
 import { Breakdown } from '@/components/Breakdown';
+import { StackedStat } from '@/components/DonutStat';
+import { TrendBar, TrendCard } from '@/components/TrendBar';
 import { ScopeNote } from '@/components/ScopeNote';
 import { percent, score } from '@/lib/format-metrics';
 
@@ -39,6 +42,7 @@ export default function Analytics() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const scope = scopeOf(user);
+  const theme = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [hotelId, setHotelId] = useState<string | null>(null);
 
@@ -124,6 +128,90 @@ export default function Analytics() {
                 </View>
               </Card>
 
+              {/* Rates first, as proportions rather than bare percentages:
+                  "87%" and a bar that is nearly full say the same thing, and
+                  only one of them is readable at a glance. */}
+              <SectionHeader title={t('analytics.description')} />
+              <TrendCard>
+                <TrendBar
+                  label={t('analytics.onTimeRate')}
+                  value={fraction(data.attendance.on_time_rate)}
+                  display={percent(data.attendance.on_time_rate)}
+                  tone="success"
+                />
+                <TrendBar
+                  label={t('analytics.qualityPassRate')}
+                  value={fraction(data.quality.pass_rate)}
+                  display={percent(data.quality.pass_rate)}
+                />
+                <TrendBar
+                  label={t('analytics.averageRating')}
+                  value={fraction(data.ratings.average_score)}
+                  display={score(data.ratings.average_score)}
+                  tone="warning"
+                />
+              </TrendCard>
+
+              <SectionHeader title={t('nav.attendance')} />
+              <Card>
+                <StackedStat
+                  total={data.attendance.total}
+                  slices={[
+                    {
+                      key: 'present',
+                      label: t('attendance.statusPRESENT'),
+                      value: data.attendance.present,
+                      tone: theme.success,
+                    },
+                    {
+                      key: 'late',
+                      label: t('attendance.statusLATE'),
+                      value: data.attendance.late,
+                      tone: theme.warning,
+                    },
+                    {
+                      key: 'absent',
+                      label: t('attendance.statusABSENT'),
+                      value: data.attendance.absent,
+                      tone: theme.danger,
+                    },
+                  ]}
+                />
+              </Card>
+
+              <SectionHeader title={t('nav.assignments')} />
+              <Card>
+                <StackedStat
+                  total={data.assignments.total}
+                  slices={[
+                    {
+                      key: 'completed',
+                      label: t('status.completed'),
+                      value: data.assignments.completed,
+                      tone: theme.success,
+                    },
+                    {
+                      key: 'in_progress',
+                      label: t('status.inProgress'),
+                      value: data.assignments.in_progress,
+                      tone: theme.primary,
+                    },
+                    {
+                      key: 'no_show',
+                      label: t('analytics.noShows'),
+                      value: data.assignments.no_show,
+                      tone: theme.danger,
+                    },
+                    {
+                      key: 'cancelled',
+                      label: t('status.cancelled'),
+                      value: data.assignments.cancelled,
+                      tone: theme.warning,
+                    },
+                  ]}
+                />
+              </Card>
+
               <SectionHeader title={t('nav.requests')} />
               <Breakdown
                 rows={[
@@ -143,39 +231,6 @@ export default function Analytics() {
                 total={data.work_requests.total}
               />
 
-              <SectionHeader title={t('nav.attendance')} />
-              <Breakdown
-                rows={[
-                  { key: 'present', label: t('status.present'), value: data.attendance.present },
-                  { key: 'late', label: t('status.late'), value: data.attendance.late },
-                  { key: 'absent', label: t('status.absent'), value: data.attendance.absent },
-                ]}
-                total={data.attendance.total}
-              />
-
-              <SectionHeader title={t('nav.assignments')} />
-              <Breakdown
-                rows={[
-                  {
-                    key: 'completed',
-                    label: t('status.completed'),
-                    value: data.assignments.completed,
-                  },
-                  {
-                    key: 'in_progress',
-                    label: t('status.inProgress'),
-                    value: data.assignments.in_progress,
-                  },
-                  { key: 'no_show', label: t('analytics.noShows'), value: data.assignments.no_show },
-                  {
-                    key: 'cancelled',
-                    label: t('status.cancelled'),
-                    value: data.assignments.cancelled,
-                  },
-                ]}
-                total={data.assignments.total}
-              />
-
               <ThemedText type="small" themeColor="textSecondary">
                 {t('analytics.qualityPassRate')}: {percent(data.quality.pass_rate)} ·{' '}
                 {data.quality.total_verifications}
@@ -186,6 +241,12 @@ export default function Analytics() {
       </SafeAreaView>
     </ThemedView>
   );
+}
+
+/** A 0-100 API rate as a 0..1 fraction, or null when never measured. */
+function fraction(value: number | null | undefined): number | null {
+  if (value === null || value === undefined || Number.isNaN(value)) return null;
+  return Math.max(0, Math.min(1, value > 1 ? value / 100 : value));
 }
 
 const styles = StyleSheet.create({

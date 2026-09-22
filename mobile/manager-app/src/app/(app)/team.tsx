@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -6,26 +6,27 @@ import { router } from 'expo-router';
 import useSWR from 'swr';
 
 import {
-  Badge,
   BottomSheet,
   BottomTabInset,
   Button,
-  DataRow,
   EmptyState,
   FilterBar,
   Input,
   MaxContentWidth,
   ScreenHeader,
+  SectionHeader,
   SelectSheet,
   SkeletonList,
   Spacing,
+  ThemedText,
   ThemedView,
   api,
   useAuthStore,
 } from '@hotel-crm/mobile-shared';
 
+import { NotificationBell } from '@/components/NotificationBell';
 import { PersonRow } from '@/components/PersonRow';
-import { creatableRoles } from '@/lib/creatable-roles';
+import { creatableRoles, roleLabelKey } from '@/lib/creatable-roles';
 import { useDebounced } from '@/lib/use-debounced';
 
 const ROLES = ['worker', 'checker', 'manager', 'regional_manager', 'admin'] as const;
@@ -65,6 +66,24 @@ export default function Team() {
     q ? `${u.first_name} ${u.last_name} ${u.email}`.toLowerCase().includes(q) : true
   );
 
+  /**
+   * Grouped by role, in seniority order.
+   *
+   * The flat list repeated a role badge on every row and had no structure —
+   * eight people read as eight identical cards. A section header states the
+   * role once and frees the row for the name and the email, which is what
+   * actually distinguishes one person from another.
+   *
+   * Roles with nobody in them are dropped rather than rendering an empty
+   * header.
+   */
+  const sections = useMemo(() => {
+    const order = ['admin', 'regional_manager', 'manager', 'checker', 'worker'] as const;
+    return order
+      .map((r) => ({ role: r, people: rows.filter((u) => u.role === r) }))
+      .filter((section) => section.people.length > 0);
+  }, [rows]);
+
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -74,10 +93,7 @@ export default function Team() {
             <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
           }
         >
-          <ScreenHeader
-            title={t('nav.users')}
-            subtitle={rows.length > 0 ? `${rows.length}` : undefined}
-          />
+          <ScreenHeader title={t('nav.users')} action={<NotificationBell />} />
           <View style={styles.bar}>
             <FilterBar
               activeCount={(role ? 1 : 0) + (q ? 1 : 0)}
@@ -101,17 +117,28 @@ export default function Team() {
           ) : rows.length === 0 ? (
             <EmptyState title={t('users.noneFound')} />
           ) : (
-            rows.map((u) => (
-              <PersonRow
-                key={u.id}
-                id={u.id}
-                name={`${u.first_name} ${u.last_name}`.trim() || u.email}
-                email={u.email}
-                role={u.role}
-                status={u.employment_status}
-                hasPhoto={u.has_profile_photo}
-                onPress={() => router.push(`/team/${u.id}`)}
-              />
+            sections.map((section) => (
+              <View key={section.role} style={styles.section}>
+                <SectionHeader
+                  title={t(roleLabelKey(section.role))}
+                  action={
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {section.people.length}
+                    </ThemedText>
+                  }
+                />
+                {section.people.map((u) => (
+                  <PersonRow
+                    key={u.id}
+                    id={u.id}
+                    name={`${u.first_name} ${u.last_name}`.trim() || u.email}
+                    email={u.email}
+                    status={u.employment_status}
+                    hasPhoto={u.has_profile_photo}
+                    onPress={() => router.push(`/team/${u.id}`)}
+                  />
+                ))}
+              </View>
             ))
           )}
         </ScrollView>
@@ -142,6 +169,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
   bar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
+  section: { gap: Spacing.two },
   content: {
     padding: Spacing.three,
     gap: Spacing.two,
