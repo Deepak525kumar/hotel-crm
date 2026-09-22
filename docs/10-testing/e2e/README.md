@@ -88,7 +88,14 @@ by `backend/scripts/chatbot-e2e-conversations.ts` (paid model calls, not in CI).
 > the same change, which corrected a dead end where nothing could move a room
 > out of `NEEDS_REWORK`.
 
-### Known coverage gaps (recorded 2026-08-22, extended 2026-08-25, all closed by 2026-09-02)
+### What a device has to check
+
+`DEVICE_VERIFICATION_CHECKLIST.md` inventories what no scenario here can
+execute: gestures, multipart uploads, push delivery, OS permission dialogs,
+RTL text, and offline behaviour. The manager app's suite is large and says
+nothing about any of it. Read it before signing off a mobile release.
+
+## Known coverage gaps (recorded 2026-08-22, extended 2026-08-25, all closed by 2026-09-02)
 
 The three shipped-features-with-no-scenario originally listed here (`13-language-and-rtl.md`,
 `14-payslip-requests.md`, `15-re-onboarding.md`) are now all written **and run live** — see

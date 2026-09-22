@@ -1376,6 +1376,24 @@ export const api = {
     fulfilPayslip: (requestId: string) =>
       request<PayslipRequestDto>(`/hr/payroll/${requestId}/fulfil`, { method: 'POST' }),
 
+    /**
+     * Upload a signed contract scan. MULTIPART, like every other file path in
+     * this client — the request helper omits Content-Type so the runtime sets
+     * its own boundary.
+     *
+     * This is the step that cannot happen on a laptop: the signed page is on
+     * paper, and the phone's camera is the scanner. The web equivalent
+     * assumes a printer and a flatbed.
+     */
+    uploadContractScan: (workerId: string, file: { uri: string; name: string; type: string }) => {
+      const form = new FormData();
+      form.append('file', file as unknown as Blob);
+      return request<ContractDto>(`/hr/workers/${workerId}/contract-scan`, {
+        method: 'POST',
+        body: form,
+      });
+    },
+
     confirmContract: (workerId: string) =>
       request<ContractDto>(`/hr/workers/${workerId}/contract-confirm`, { method: 'POST' }),
 
