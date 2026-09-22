@@ -1,0 +1,7 @@
+-- Postgres cannot DROP a value from an enum type. Reverting would mean
+-- recreating "PushApp" without MANAGER and rewriting every column that uses
+-- it, which would destroy any PushToken row already registered by the manager
+-- app. Deliberately a no-op: the added value is inert unless a row uses it.
+--
+-- Same convention, and the same reasoning, as
+-- 20260813020000_onboarding_notification_types/down.sql.
