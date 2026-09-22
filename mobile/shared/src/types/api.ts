@@ -357,6 +357,21 @@ export interface EmploymentRecordDto {
   start_date: string;
   status: string;
   submitted_for_review_at?: string | null;
+  /**
+   * The applicant, nested by the review-queue read path (`include: { user }`).
+   *
+   * Present on that path and not on every employment-record response, so a
+   * screen outside the queue must not assume it. Without it the queue would
+   * render a cuid, which is exactly what the attendance DTO had to fix for
+   * the same reason.
+   */
+  user?: {
+    id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    role: UserRole;
+  } | null;
 }
 
 /**
@@ -434,6 +449,21 @@ export interface Hotel {
   city: string;
   is_active: boolean;
   hotel_group_id: string | null;
+}
+
+/**
+ * A hotel group, as GET /crm/hotel-groups returns it.
+ *
+ * Only the fields this client reads. `regional_manager_user_id` is nullable
+ * by design (2026-08-06 vacancy model): a group may be temporarily
+ * unassigned, and rendering that as "no group" rather than "no RM" would
+ * misreport a vacancy as a missing entity.
+ */
+export interface HotelGroup {
+  id: string;
+  name: string;
+  regional_manager_user_id: string | null;
+  is_active: boolean;
 }
 
 /**

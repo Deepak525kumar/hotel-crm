@@ -5,6 +5,7 @@
 import { scopeOf } from '@hotel-crm/mobile-shared/src/lib/scope';
 import { percent, score } from '@/lib/format-metrics';
 import { ALL_HOTELS, canChooseHotel, hotelFilterFor } from '@/lib/hotel-filter';
+import { needsAssignAfterApproval } from '@/lib/review-queue';
 
 /**
  * Scope derivation, and the reason it is a function rather than an inline
@@ -115,5 +116,32 @@ describe('hotel filtering', () => {
     expect(hotelFilterFor(ALL_HOTELS)).toBeUndefined();
     expect(hotelFilterFor(null)).toBeUndefined();
     expect(hotelFilterFor('h1')).toBe('h1');
+  });
+});
+
+describe('approval chain', () => {
+  /**
+   * ADR-065 makes Manager and Regional Manager a TWO-STEP approval: approve,
+   * then assign. Worker and Checker are one step.
+   *
+   * The failure mode is silent in exactly the way this repository keeps
+   * getting caught by. The approve returns 200, the record reads APPROVED,
+   * and the hotel simply has no manager -- scenario 02 records the mirror
+   * image of it ("`assign` returned 200 but the hotel had no manager"), which
+   * is why it is worth pinning from this side too.
+   */
+  it('requires a second assign call for a manager and a regional manager', () => {
+    expect(needsAssignAfterApproval('manager')).toBe(true);
+    expect(needsAssignAfterApproval('regional_manager')).toBe(true);
+  });
+
+  it('does not for a worker or a checker', () => {
+    expect(needsAssignAfterApproval('worker')).toBe(false);
+    expect(needsAssignAfterApproval('checker')).toBe(false);
+  });
+
+  it('does not for an absent role rather than guessing', () => {
+    expect(needsAssignAfterApproval(null)).toBe(false);
+    expect(needsAssignAfterApproval(undefined)).toBe(false);
   });
 });

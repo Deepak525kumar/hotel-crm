@@ -67,6 +67,15 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
+          name="team"
+          options={{
+            title: t('nav.users'),
+            tabBarIcon: ({ color }) => (
+              <SymbolView name="person.2" tintColor={color} size={24} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="attendance"
           options={{
             title: t('nav.attendance'),
