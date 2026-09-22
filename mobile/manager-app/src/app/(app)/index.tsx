@@ -105,6 +105,16 @@ export default function Today() {
                 variant="ghost"
                 onPress={() => router.push('/analytics')}
               />
+              <Button
+                label={t('nav.assignments')}
+                variant="ghost"
+                onPress={() => router.push('/assignments')}
+              />
+              <Button
+                label={t('nav.requests')}
+                variant="ghost"
+                onPress={() => router.push('/requests')}
+              />
             </Card>
           )}
 

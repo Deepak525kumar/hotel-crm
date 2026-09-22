@@ -563,6 +563,24 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ skill }),
       }),
+
+    /**
+     * Manager writes (2026-09-22). `PATCH /work-requests/:id` carries both
+     * publish and cancel -- there is no separate route for either, so the
+     * caller sends the status it wants.
+     */
+    update: (id: string, input: Record<string, unknown>) =>
+      request<WorkRequest>(`/work-requests/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+
+    /**
+     * Close a broadcast early. Gated by FEATURE_JOBDISPATCH_PHASE2, and 404s
+     * rather than 403s when it is off.
+     */
+    closeBroadcast: (id: string) =>
+      request<WorkRequest>(`/work-requests/broadcasts/${id}/close`, { method: 'POST' }),
   },
   assignments: {
     list: (params?: { page?: number; limit?: number }) => {
@@ -606,6 +624,43 @@ export const api = {
      * cancelling and re-placing -- which is why the agenda's drag targets are
      * days and never hotel sections.
      */
+    /**
+     * The manager's assignment list. `per_page`, not `limit` -- the backend
+     * schema names it that, and `limit` is silently ignored (a default page
+     * of 20 that looks like "there are only 20").
+     */
+    listFiltered: (params: {
+      page?: number;
+      perPage?: number;
+      status?: string;
+      q?: string;
+      hotelId?: string;
+    }) => {
+      const qs = new URLSearchParams();
+      qs.set('page', String(params.page ?? 1));
+      qs.set('per_page', String(params.perPage ?? 20));
+      if (params.status) qs.set('status', params.status);
+      if (params.q) qs.set('q', params.q);
+      if (params.hotelId) qs.set('hotel_id', params.hotelId);
+      return request<WorkerAssignment[]>(`/assignments?${qs.toString()}`);
+    },
+
+    reassign: (id: string, workerId: string) =>
+      request<WorkerAssignment>(`/assignments/${id}/reassign`, {
+        method: 'POST',
+        body: JSON.stringify({ worker_id: workerId }),
+      }),
+
+    /**
+     * The aggregate count a manager enters, NOT a room-level log. Workers own
+     * the per-room record and those routes are `requireRole('worker')`.
+     */
+    logRoomsCompleted: (id: string, input: { rooms_completed: number; notes?: string }) =>
+      request<void>(`/assignments/${id}/rooms-completed`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
     moveCalendarEntry: (id: string, day: string) =>
       request<CalendarEntry>(`/assignments/calendar-entries/${id}/move`, {
         method: 'PATCH',
@@ -641,9 +696,52 @@ export const api = {
     // Resolve the attendance record for an assignment dynamically. The backend
     // does not embed attendance on AssignmentDto, so the shift screen looks it
     // up by assignment_id to obtain the id needed for check-out.
+    /**
+     * The team's attendance. Scope is the server's: a manager sees their
+     * hotel's rows, an RM their group's.
+     */
+    listTeam: (params: { from?: string; to?: string; status?: string; hotelId?: string }) => {
+      const qs = new URLSearchParams();
+      if (params.from) qs.set('from', params.from);
+      if (params.to) qs.set('to', params.to);
+      if (params.status) qs.set('status', params.status);
+      if (params.hotelId) qs.set('hotel_id', params.hotelId);
+      const q = qs.toString();
+      return request<Attendance[]>(`/attendance${q ? `?${q}` : ''}`);
+    },
+
+    /**
+     * Manager verification and timesheet correction.
+     *
+     * `PATCH /attendance/:id` has NO route-level role gate -- authorization is
+     * entirely service-layer, so this client is a new caller of a route whose
+     * only guard is downstream. It never invents `verified_by`: the server
+     * derives the actor from the token.
+     *
+     * At least one field is required (the schema refuses an empty body), and
+     * latitude/longitude must be sent together or not at all.
+     */
+    updateRecord: (
+      id: string,
+      input: {
+        status?: 'PRESENT' | 'ABSENT' | 'LATE' | 'PARTIAL' | 'EXCUSED';
+        is_verified?: boolean;
+        check_in_at?: string;
+        check_out_at?: string;
+        minutes_late?: number;
+        minutes_worked?: number;
+        notes?: string;
+      }
+    ) =>
+      request<Attendance>(`/attendance/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+
     listByAssignment: (assignmentId: string) =>
       request<Attendance[]>(`/attendance?assignment_id=${encodeURIComponent(assignmentId)}`),
   },
+
   notifications: {
     list: () => request<Notification[]>('/notifications'),
     markRead: (notificationId: string) =>

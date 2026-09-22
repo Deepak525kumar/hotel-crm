@@ -18,8 +18,8 @@ import { PushRegistration } from '@/components/PushRegistration';
  * scannable at a glance.
  *
  * Tabs land with the PRs that build their screens (MANAGER_APP_PLAN.md §7).
- * Today and Rota exist; Team, Attendance and More follow in PR-9, PR-7 and
- * PR-13. A tab is declared here only once the screen behind it does
+ * Today, Rota and Attendance exist; Team and More follow with their own
+ * screens. A tab is declared here only once the screen behind it does
  * something -- a tab that opens an empty page is worse than no tab, because
  * it reads as a broken app rather than an unfinished one.
  *
@@ -63,6 +63,15 @@ export default function AppLayout() {
             title: t('nav.calendar'),
             tabBarIcon: ({ color }) => (
               <SymbolView name="calendar" tintColor={color} size={24} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="attendance"
+          options={{
+            title: t('nav.attendance'),
+            tabBarIcon: ({ color }) => (
+              <SymbolView name="checkmark.circle" tintColor={color} size={24} />
             ),
           }}
         />

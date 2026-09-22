@@ -176,8 +176,37 @@ export interface Attendance {
   check_in_at?: string | null;
   check_out_at?: string | null;
   status: AttendanceStatus;
-  notes?: string;
+  notes?: string | null;
   created_at: string;
+
+  /**
+   * Manager-facing fields (2026-09-22). Present on the wire all along; this
+   * type was a narrow subset written for the worker app, which needs none of
+   * them.
+   *
+   * `is_verified` is the one that matters most: it is the whole point of the
+   * manager's attendance queue, and without it the client cannot tell a
+   * checked record from an unchecked one.
+   */
+  hotel_id?: string;
+  expected_start?: string | null;
+  expected_end?: string | null;
+  minutes_late?: number | null;
+  minutes_worked?: number | null;
+  is_verified?: boolean;
+  verified_by_id?: string | null;
+  verified_at?: string | null;
+  verified_by_name?: string | null;
+  /**
+   * Resolved names, on the READ paths only (list/getById). Nested by the
+   * backend precisely because a checker cannot call /users/:id or
+   * /crm/hotels/:id -- both are scoped against them -- so without these a
+   * verification screen showed the last six characters of a cuid and no
+   * hotel at all.
+   */
+  worker?: { id: string; first_name: string; last_name: string } | null;
+  hotel?: { id: string; name: string } | null;
+  updated_at?: string;
 }
 
 export interface Notification {
