@@ -88,7 +88,13 @@
     "submit": "إرسال",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "حدث خطأ ما."
+    "unknownError": "حدث خطأ ما.",
+    "filters": "عوامل التصفية",
+    "filtersWithCount": "عوامل التصفية ({{count}})",
+    "filtersHint": "يفتح خيارات التصفية لهذه القائمة",
+    "reset": "إعادة تعيين",
+    "share": "مشاركة",
+    "lastNDays": "آخر {{count}} يومًا"
   },
   "fields": {
     "name": "الاسم",
@@ -177,7 +183,9 @@
     "jobTitlePlaceholder": "مثال: عاملة تنظيف غرف",
     "targetRole": "الوردية لـ",
     "targetRoleWorker": "عامل",
-    "targetRoleChecker": "مُدقِّق"
+    "targetRoleChecker": "مُدقِّق",
+    "peopleWorking": "عدد العاملين",
+    "format": "الصيغة"
   },
   "nav": {
     "history": "السجل",
@@ -215,7 +223,8 @@
     "rateWorker": "تقييم العامل",
     "schedule": "الجدول",
     "rooms": "الغرف",
-    "more": "المزيد"
+    "more": "المزيد",
+    "reports": "التقارير"
   },
   "roles": {
     "admin": "مدير النظام",
@@ -254,7 +263,16 @@
     "alreadyFilled": "مكتمل بالفعل",
     "inProgress": "قيد التنفيذ",
     "present": "حاضر",
-    "late": "متأخر"
+    "late": "متأخر",
+    "noShow": "لم يحضر",
+    "reassigned": "أُعيد تعيينه",
+    "partial": "جزئي",
+    "excused": "بعذر",
+    "expected": "متوقع",
+    "draft": "مسودة",
+    "open": "مفتوح",
+    "partiallyFilled": "مكتمل جزئيًا",
+    "filled": "مكتمل"
   },
   "assignments": {
     "shiftDetails": "تفاصيل الوردية",
@@ -1270,5 +1288,8 @@
     "copied": "تم النسخ",
     "openForm": "افتح نموذج المستخدم الجديد المعبأ",
     "untitled": "محادثة بدون عنوان"
+  },
+  "reports": {
+    "pageDescription": "تصدير بيانات الفريق كملف."
   }
 }

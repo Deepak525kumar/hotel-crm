@@ -152,6 +152,19 @@ route-level role gate**. The service is the entire authorization boundary, so
 this assertion is the only thing standing between a manager and another
 hotel's timesheets.
 
+> **Run live 2026-09-23 — PASS.** Recorded as "could not test" for weeks
+> because no attendance row existed at a second hotel. The fixture is not hard,
+> it just has to be built from real paths, and `28` Step 6 is now the recipe:
+> place an **eligible** worker at hotel B, have that worker check in (no
+> coordinates needed — `CheckInSchema` takes latitude/longitude together or not
+> at all), then attempt the verify as hotel A's manager.
+>
+> Observed: `403 "Cannot access this attendance record"`, `is_verified` still
+> `false` and `verified_by_id` still null when read back from Postgres — and
+> the same manager also gets **`403` on the GET**, so the record is not merely
+> unwritable but invisible. Assert both; a boundary that refuses the write
+> while serving the row still discloses another hotel's timesheet.
+
 ## Pass criteria summary
 
 - [ ] Agenda opens on the Berlin day from a device in another timezone

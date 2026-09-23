@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { router } from 'expo-router';
 import useSWR from 'swr';
 
 import {
@@ -107,7 +108,12 @@ export default function Notifications() {
                 trailing={
                   n.read_at ? null : <Badge label={t('status.unread')} tone="primary" />
                 }
-                onPress={() => void api.notifications.markRead(n.id).then(() => mutate())}
+                // Opens the notification (2026-09-23). Tapping a row used to
+                // mark it read and nothing else, so an alert about a no-show
+                // told you it had been read and left you where you were. The
+                // detail screen marks it read on open, so the row no longer
+                // needs to.
+                onPress={() => router.push(`/notification/${n.id}`)}
               />
             ))
           )}

@@ -81,6 +81,31 @@ describe('APNs topic configuration', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  /**
+   * The boot summary must cover EVERY app, not a hand-written subset.
+   *
+   * It listed `worker` and `checker` only, from before MANAGER existed
+   * (2026-09-22) until 2026-09-23. A production host with
+   * `APNS_BUNDLE_ID_MANAGER` correctly set still logged a two-app summary, so
+   * a configured manager topic and an unconfigured one looked identical in the
+   * boot log — the exact thing that line exists to make visible. Found by
+   * setting the variable on the live host and not believing the log.
+   */
+  it('the APNs boot summary is derived from the enum, not hand-listed', () => {
+    const src = readFileSync(
+      path.join(__dirname, '..', 'modules', 'notifications', 'outbox-transport.ts'),
+      'utf8'
+    );
+    const summary = src.slice(src.indexOf("'PUSH transport: APNs configured for'"));
+    const body = summary.slice(0, summary.indexOf('fcmClient'));
+
+    // Enum-driven: adding a PushApp member extends the log automatically.
+    expect(body).toContain('Object.values(PushApp)');
+    // And NOT a literal list, which is how it fell behind the enum before.
+    expect(body).not.toMatch(/worker:\s*apnsTopics\[PushApp\.WORKER\]/);
+    expect(body).not.toMatch(/checker:\s*apnsTopics\[PushApp\.CHECKER\]/);
+  });
+
   it('does not carry the placeholder values that caused the outage', () => {
     // Named explicitly rather than left to the equality assertions above: if
     // someone later changes app.json to match a placeholder instead of the

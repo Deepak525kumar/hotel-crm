@@ -93,7 +93,44 @@ export default function HotelDetail() {
                     label={hotel.data?.is_active ? t('status.active') : t('status.inactive')}
                     tone={hotel.data?.is_active ? 'success' : 'neutral'}
                   />
+                  {/* A live hotel can still be closed to new work -- two
+                      different facts, and a manager placing staff needs the
+                      second one. */}
+                  {hotel.data?.is_active && hotel.data.accepting_jobs === false ? (
+                    <Badge label={t('requests.notAcceptingNew')} tone="warning" />
+                  ) : null}
                 </View>
+
+                {/*
+                  The property itself (2026-09-23).
+
+                  This screen showed a name, a city and a badge. The server has
+                  always sent the whole row -- address, country, timezone,
+                  contacts -- but the client's `Hotel` type declared five
+                  fields, so a manager sending someone to a hotel could not see
+                  where it was or who to call. Rows omitted when null rather
+                  than rendered blank.
+                */}
+                {hotel.data?.address ? (
+                  <DataRow
+                    title={t('fields.address')}
+                    meta={[hotel.data.address, hotel.data.city, hotel.data.country]
+                      .filter(Boolean)
+                      .join(', ')}
+                  />
+                ) : null}
+                {hotel.data?.hotel_group?.name ? (
+                  <DataRow title={t('fields.hotelGroup')} meta={hotel.data.hotel_group.name} />
+                ) : null}
+                {hotel.data?.contact_phone ? (
+                  <DataRow title={t('fields.phone')} meta={hotel.data.contact_phone} />
+                ) : null}
+                {hotel.data?.contact_email ? (
+                  <DataRow title={t('fields.email')} meta={hotel.data.contact_email} />
+                ) : null}
+                {hotel.data?.timezone ? (
+                  <DataRow title={t('fields.timezone')} meta={hotel.data.timezone} />
+                ) : null}
                 <View style={styles.tiles}>
                   <StatTile
                     label={t('analytics.openRequests')}
@@ -146,8 +183,8 @@ export default function HotelDetail() {
               ) : (
                 (blocklist.data ?? []).map((entry) => (
                   <DataRow
-                    key={entry.employee_id}
-                    title={entry.employee_id}
+                    key={entry.id}
+                    title={entry.worker_name ?? entry.employee_id ?? entry.employment_record_id}
                     subtitle={entry.reason ?? undefined}
                   />
                 ))

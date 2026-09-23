@@ -18,7 +18,7 @@ import { PushRegistration } from '@/components/PushRegistration';
  * scannable at a glance.
  *
  * Tabs land with the PRs that build their screens (MANAGER_APP_PLAN.md §7).
- * Five tabs: Today, Rota, Team, Attendance, More. Everything else on the
+ * Five tabs: Home, Calendar, Users, More, Profile. Everything else on the
  * web's eighteen-entry sidebar is reachable from More rather than competing
  * for a slot in a bar that stops being scannable past five. A tab is declared here only once the screen behind it does
  * something -- a tab that opens an empty page is worse than no tab, because
@@ -89,6 +89,18 @@ export default function AppLayout() {
             title: t('nav.more'),
             tabBarIcon: ({ color }) => (
               <SymbolView name="ellipsis.circle" tintColor={color} size={24} />
+            ),
+          }}
+        />
+        {/* Profile LAST, matching where every other app in this family puts
+            the account. Settings live inside it rather than in More, so there
+            is one place to look for "my things". */}
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: t('nav.profile'),
+            tabBarIcon: ({ color }) => (
+              <SymbolView name="person.crop.circle" tintColor={color} size={24} />
             ),
           }}
         />

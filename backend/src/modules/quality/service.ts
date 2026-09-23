@@ -1768,6 +1768,102 @@ export class QualityService extends BaseService {
   }
 
   /**
+   * Inspection history for a MANAGER, RM or admin, scoped to their hotels.
+   *
+   * Added 2026-09-23. The web's History tab called `/quality/my-inspections`,
+   * which filters on `verified_by_id = caller`. That is exactly right for a
+   * checker and exactly wrong for everyone else the page admitted: an admin
+   * has never recorded an inspection, so the tab was permanently empty and
+   * looked broken rather than inapplicable. Reported by the owner as an empty
+   * History tab.
+   *
+   * Same rows, same DTO and same search as listOwnChecks -- the only
+   * difference is which checks the caller may see, and that is derived from
+   * `actor.scope`, never from a parameter. Admin is unscoped, as everywhere
+   * else in this service; a scoped manager with NO scope claim gets nothing,
+   * matching assignments/service.ts: an absent claim is not "see everything".
+   *
+   * `hotel_id` narrows WITHIN that scope and can never widen it -- a hotel
+   * outside the claim resolves to a filter that matches nothing rather than
+   * to an error, so a stale bookmark reads as an empty list.
+   */
+  async listChecksInScope(
+    actor: Actor,
+    options: { page?: number; perPage?: number; q?: string; hotelId?: string } = {}
+  ) {
+    const page = options.page ?? 1;
+    const perPage = options.perPage ?? 20;
+    const raw = options.q?.trim();
+    const q = raw ? escapeLikeTerm(raw) : undefined;
+
+    let scopeFilter: Prisma.QualityVerificationWhereInput = {};
+
+    if (actor.role.toLowerCase() === 'admin') {
+      // Unscoped by design, as everywhere else in this service.
+    } else if (isScopedManagerRole(actor.role)) {
+      const scope = actor.scope ?? null;
+      if (!scope) {
+        return {
+          checks: [],
+          pagination: { page, per_page: perPage, total: 0, total_pages: 0 },
+        };
+      }
+      if (scope.type === 'hotel') {
+        scopeFilter = { hotel_id: scope.hotel_id };
+      } else if (scope.type === 'hotel_group') {
+        scopeFilter = { hotel: { hotel_group_id: scope.hotel_group_id } };
+      }
+      // scope.type === 'global' -> no added restriction, deliberately.
+    } else {
+      // Not reachable through the route (requireRole admits the three
+      // management roles only), and not a silent pass if that ever changes.
+      throw new ForbiddenError('Cannot list inspections');
+    }
+
+    // A requested hotel is an AND with the scope filter above, never a
+    // replacement for it.
+    const hotelNarrowing: Prisma.QualityVerificationWhereInput = options.hotelId
+      ? { hotel_id: options.hotelId }
+      : {};
+
+    // Identical to listOwnChecks': one box, four columns, case-insensitive.
+    const search: Prisma.QualityVerificationWhereInput | undefined = q
+      ? {
+          OR: [
+            { room_number: { contains: q, mode: 'insensitive' } },
+            { notes: { contains: q, mode: 'insensitive' } },
+            { worker: { first_name: { contains: q, mode: 'insensitive' } } },
+            { worker: { last_name: { contains: q, mode: 'insensitive' } } },
+            { hotel: { name: { contains: q, mode: 'insensitive' } } },
+          ],
+        }
+      : undefined;
+
+    const where: Prisma.QualityVerificationWhereInput = {
+      AND: [scopeFilter, hotelNarrowing, ...(search ? [search] : [])],
+    };
+
+    const [total, checks] = await Promise.all([
+      this.prisma.qualityVerification.count({ where }),
+      this.prisma.qualityVerification.findMany({
+        where,
+        select: QUALITY_CHECK_SELECT,
+        // `id` breaks ties: without it two checks written in one transaction
+        // can swap places between requests and, under pagination, silently
+        // drop or duplicate one across a page boundary.
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * perPage,
+        take: perPage,
+      }),
+    ]);
+
+    return {
+      checks: checks.map(toCheckDto),
+      pagination: { page, per_page: perPage, total, total_pages: Math.ceil(total / perPage) },
+    };
+  }
+
+  /**
    * Every check recorded against one shift.
    *
    * Backs the worker's shift screen (owner decision, 2026-08-29: "when the

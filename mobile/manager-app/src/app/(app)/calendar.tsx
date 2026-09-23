@@ -1,103 +1,103 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { CalendarProvider, ExpandableCalendar } from 'react-native-calendars';
+
 import useSWR from 'swr';
 
 import {
   ApiError,
+  Badge,
   BottomTabInset,
   Button,
   Card,
   EmptyState,
   MaxContentWidth,
+  ProgressSheet,
   ScreenHeader,
   SectionHeader,
   SkeletonList,
-  ProgressSheet,
   Spacing,
   ThemedText,
   ThemedView,
   api,
-  scopeOf,
   translateApiError,
-  useAuthStore,
+  useTheme,
   useToast,
 } from '@hotel-crm/mobile-shared';
 
 import { AddPlacementSheet } from '@/components/AddPlacementSheet';
-import { CoverageGrid, type DayCoverage } from '@/components/CoverageGrid';
-import { DateStrip, type DayCellLayout } from '@/components/DateStrip';
-import { PeriodNav } from '@/components/PeriodNav';
-import { ViewSwitcher } from '@/components/ViewSwitcher';
+import { assignmentStatusLabel, assignmentTone } from '@/lib/assignment-format';
 import { MarkAbsenceSheet } from '@/components/MarkAbsenceSheet';
+import { NotificationBell } from '@/components/NotificationBell';
+import { ShiftSheet } from '@/components/ShiftSheet';
 import { ShiftSummarySheet } from '@/components/ShiftSummarySheet';
-import { PlacementRow } from '@/components/PlacementRow';
-import { absencesForDay, addDays, dayStrip, dropTargetAt, groupByHotel, isRealMove } from '@/lib/agenda';
-import { isCompleteSuccess, summarise, weeklyOccurrences, type OccurrenceOutcome } from '@/lib/recurring';
-import { isSameMonth, monthGrid, step, weekDays, type CalendarView } from '@/lib/calendar-views';
 import { useDirectory } from '@/hooks/useDirectory';
+import { absencesForDay, groupByHotel } from '@/lib/agenda';
+import { calendarTheme } from '@/lib/calendar-theme';
+import { monthGrid } from '@/lib/calendar-views';
+import { isCompleteSuccess, weeklyOccurrences, type OccurrenceOutcome } from '@/lib/recurring';
 import { todayInBerlin } from '@/lib/today';
 
 /**
- * The rota.
+ * The rota, on `react-native-calendars`.
  *
- * AGENDA-FIRST, not a grid. The web renders a 42-cell month with stacked
- * tags per cell; at 375pt each cell is ~50x50 and the tags truncate to
- * nothing. A vertical list of today's placements grouped by hotel answers
- * the question a supervisor actually has -- who is on, where, and who is
- * missing.
+ * REBUILT 2026-09-23 on the Wix kit, at the project owner's request, after
+ * the hand-rolled version (a scrolling date strip, then a segmented
+ * day/week/month switcher over my own grid) was judged poor UX twice.
  *
- * MOVING IS A DRAG ONTO A DAY. The web's reschedule is HTML5 drag-and-drop,
- * which does not fire on touch at all, and its edit modal deliberately omits
- * a date field because "move is what drag/drop already covers" -- so moving
- * a placement has been unreachable on a phone entirely. Here a long press
- * lifts a row and a release over the date strip moves it.
+ * `ExpandableCalendar` is the reason the kit is worth adopting: a week strip
+ * that pulls down into a month is one gesture instead of a three-way switch,
+ * and it is the interaction people already know from every native calendar.
+ * `CalendarProvider` keeps the selected day in sync between the calendar and
+ * the list below it, which is precisely the state I was threading by hand.
  *
- * The move is DAY-ONLY, matching the endpoint (product decision 2026-08-05):
- * the hotel and worker on a placement never change this way, and moving
- * someone to a different hotel means cancelling and re-placing. That is why
- * the drop targets are days and never the hotel sections below.
+ * The kit ships a light-only palette of its own. `calendarTheme()` maps every
+ * colour it exposes onto our tokens, so this does not become a second design
+ * system inside the app and dark mode does not render black on white.
+ *
+ * `markedDates` carries the workload: a dot per day with placements, a second
+ * in the warning colour when somebody is off. That is what makes a month view
+ * worth opening — the shape of the fortnight, not thirty truncated names.
  */
 export default function Calendar() {
   const { t } = useTranslation();
+  const theme = useTheme();
   const toast = useToast();
-  const user = useAuthStore((s) => s.user);
-  const scope = scopeOf(user);
-
-  const [day, setDay] = useState(() => todayInBerlin());
-  const [view, setView] = useState<CalendarView>('day');
-  const today = useMemo(() => todayInBerlin(), []);
-  // Names for the ids the calendar DTO carries. See useDirectory.
   const { workerName, hotelName } = useDirectory();
+
+  const today = useMemo(() => todayInBerlin(), []);
+  const [day, setDay] = useState(today);
   const [refreshing, setRefreshing] = useState(false);
-  const [hovered, setHovered] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [markingAbsence, setMarkingAbsence] = useState(false);
   const [summaryFor, setSummaryFor] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [run, setRun] = useState<OccurrenceOutcome[] | null>(null);
-  const cancelled = useRef(false);
-
-  // Measured, not assumed: the strip scrolls and the labels are localised, so
-  // a hardcoded cell width would drift and drop shifts on the wrong day.
-  const cells = useRef(new Map<string, DayCellLayout>());
-  const stripOriginX = useRef(0);
 
   /**
-   * The days the current view needs.
+   * The day's STORED summary, loaded before the editor opens.
    *
-   * The fetch range follows the VIEW, not a fixed strip: a month grid that
-   * only loaded a week would render empty cells that look like quiet days
-   * rather than unloaded ones, which is worse than a spinner.
+   * saveShiftSummary is a PUT upsert keyed by (hotel, day). The editor used to
+   * open blank over an existing row, so saving replaced all four numbers with
+   * whatever was typed -- silently, with a success toast, and with no way to
+   * get the old figures back. The sheet is not rendered until this settles;
+   * an empty form shown for half a second is exactly the window in which a
+   * manager types over yesterday's count.
    */
-  const days = useMemo(() => {
-    if (view === 'week') return weekDays(day);
-    if (view === 'month') return monthGrid(day);
-    return dayStrip(day);
-  }, [view, day]);
+  const summaries = useSWR(
+    summaryFor ? ['shift-summaries', summaryFor] : null,
+    () => api.calendar.shiftSummaries(String(summaryFor))
+  );
+  const [openShift, setOpenShift] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [run, setRun] = useState<OccurrenceOutcome[] | null>(null);
 
-  const range = useMemo(() => ({ from: days[0], to: days[days.length - 1] }), [days]);
+  // A month of data behind the calendar, so expanding to month view does not
+  // render empty cells that look like quiet days rather than unloaded ones.
+  const range = useMemo(() => {
+    const grid = monthGrid(day);
+    return { from: grid[0], to: grid[grid.length - 1] };
+  }, [day]);
 
   const placements = useSWR(['calendar-entries', range.from, range.to], () =>
     api.assignments.calendarEntries({ from: range.from, to: range.to })
@@ -115,60 +115,35 @@ export default function Calendar() {
     }
   }, [placements, absences]);
 
-  const resolveDay = useCallback((absoluteX: number) => {
-    const list = [...cells.current.values()].map((c) => ({
-      day: c.day,
-      x: c.x + stripOriginX.current,
-      width: c.width,
-    }));
-    return dropTargetAt(absoluteX, list);
-  }, []);
-
-  const move = useCallback(
-    async (entryId: string, from: string, to: string) => {
-      try {
-        await api.assignments.moveCalendarEntry(entryId, to);
-        await placements.mutate();
-        // Undo rather than a confirmation dialog before the fact: the gesture
-        // is deliberate (a 400ms hold), so the risk worth covering is the
-        // accidental release, and an undo costs one tap instead of blocking
-        // every correct move behind a prompt.
-        toast.show(`${t('fields.updated')} · ${to}`, 'success');
-      } catch (e) {
-        // The row has already sprung home, so the screen still shows the
-        // truth. Only the message is owed.
-        // A 404 here is "feature flag off", not "entry missing": these routes
-        // fall through to the 404 handler when FEATURE_JOBDISPATCH_PHASE2 is
-        // disabled, so the generic error string would send a manager to
-        // support over a deliberate configuration.
-        const unavailable = e instanceof ApiError && e.status === 404;
-        toast.show(unavailable ? t('status.unavailable') : translateApiError(e, t), 'danger');
+  /** Dots under each day: how much is on, and whether anyone is off. */
+  const markedDates = useMemo(() => {
+    const marks: Record<string, { dots: { key: string; color: string }[]; selected?: boolean }> = {};
+    for (const entry of placements.data ?? []) {
+      marks[entry.day] ??= { dots: [] };
+      // One dot per day, not per placement: twelve dots under a date is
+      // noise, and the count belongs in the list.
+      if (!marks[entry.day].dots.some((d) => d.key === 'shift')) {
+        marks[entry.day].dots.push({ key: 'shift', color: theme.primary });
       }
-    },
-    [placements, toast, t]
-  );
+    }
+    for (const off of absences.data ?? []) {
+      marks[off.day] ??= { dots: [] };
+      if (!marks[off.day].dots.some((d) => d.key === 'off')) {
+        marks[off.day].dots.push({ key: 'off', color: theme.warning });
+      }
+    }
+    return marks;
+  }, [placements.data, absences.data, theme]);
 
-  /**
-   * Creates one placement per occurrence, reporting each as it lands.
-   *
-   * Sequential, not Promise.all: 26 simultaneous writes on a hotel's
-   * connection is how you get a partially-applied rota with no idea which
-   * half applied. One at a time also makes cancellation meaningful — the
-   * occurrences after the stop are left `pending`, which `summarise()` counts
-   * separately from failures because "never attempted" and "refused" are
-   * different facts about someone's rota.
-   */
   const createPlacements = useCallback(
     async (input: { workerId: string; hotelId: string; weeks: number }) => {
       const days = weeklyOccurrences(day, input.weeks);
-      cancelled.current = false;
       setAdding(false);
       setBusy(true);
       const outcomes: OccurrenceOutcome[] = days.map((d) => ({ day: d, state: 'pending' }));
       setRun([...outcomes]);
 
       for (let i = 0; i < days.length; i += 1) {
-        if (cancelled.current) break;
         outcomes[i] = { day: days[i], state: 'running' };
         setRun([...outcomes]);
         try {
@@ -179,9 +154,6 @@ export default function Calendar() {
           });
           outcomes[i] = { day: days[i], state: 'done' };
         } catch (e) {
-          // Kept going deliberately: a conflict on one week says nothing about
-          // the others, and abandoning the run would leave the manager with a
-          // partial rota AND no record of which weeks were tried.
           outcomes[i] = { day: days[i], state: 'failed', detail: translateApiError(e, t) };
         }
         setRun([...outcomes]);
@@ -189,222 +161,160 @@ export default function Calendar() {
 
       setBusy(false);
       await placements.mutate();
-
       if (isCompleteSuccess(outcomes)) {
         setRun(null);
         toast.show(t('fields.updated'), 'success');
       }
-      // Otherwise the sheet stays open showing exactly which weeks landed.
-      // Closing it with a success toast is the lie this whole flow exists to
-      // avoid.
     },
     [day, placements, toast, t]
-  );
-
-  const markAbsence = useCallback(
-    async (input: Parameters<typeof api.calendar.markAbsenceForWorker>[0]) => {
-      setBusy(true);
-      try {
-        await api.calendar.markAbsenceForWorker(input);
-        await absences.mutate();
-        setMarkingAbsence(false);
-        toast.show(t('fields.updated'), 'success');
-      } catch (e) {
-        toast.show(translateApiError(e, t), 'danger');
-      } finally {
-        setBusy(false);
-      }
-    },
-    [absences, toast, t]
-  );
-
-  const saveSummary = useCallback(
-    async (hotelId: string, input: Parameters<typeof api.calendar.saveShiftSummary>[2]) => {
-      setBusy(true);
-      try {
-        await api.calendar.saveShiftSummary(hotelId, day, input);
-        setSummaryFor(null);
-        toast.show(t('fields.updated'), 'success');
-      } catch (e) {
-        toast.show(translateApiError(e, t), 'danger');
-      } finally {
-        setBusy(false);
-      }
-    },
-    [day, toast, t]
   );
 
   const entriesUnavailable =
     placements.error instanceof ApiError && placements.error.status === 404;
 
-  const coverage: DayCoverage[] = useMemo(() => {
-    const entries = placements.data ?? [];
-    const offs = absences.data ?? [];
-    return days.map((d) => ({
-      day: d,
-      placements: entries.filter((e) => e.day === d).length,
-      absences: offs.filter((a) => a.day === d).length,
-      inPeriod: view === 'month' ? isSameMonth(d, day) : true,
-    }));
-  }, [days, placements.data, absences.data, view, day]);
-
-  const periodLabel = useMemo(() => {
-    if (view === 'day') return day;
-    if (view === 'week') return `${days[0]} – ${days[days.length - 1]}`;
-    return day.slice(0, 7);
-  }, [view, day, days]);
-
   const groups = groupByHotel(placements.data ?? [], day);
   const dayAbsences = absencesForDay(absences.data ?? [], day);
+  const shift = (placements.data ?? []).find((e) => e.id === openShift) ?? null;
 
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <ScrollView
-          contentContainerStyle={styles.content}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
-          }
+        <CalendarProvider
+          date={day}
+          onDateChanged={setDay}
+          showTodayButton
+          theme={{ todayButtonTextColor: theme.primary }}
         >
-          <ScreenHeader title={t('nav.calendar')} />
-
-          <ViewSwitcher
-            value={view}
-            onChange={setView}
-            options={[
-              { value: 'day', label: t('calendar.viewDay') },
-              { value: 'week', label: t('calendar.viewWeek') },
-              { value: 'month', label: t('calendar.viewMonth') },
-            ]}
-          />
-
-          <PeriodNav
-            label={periodLabel}
-            atToday={day === today}
-            todayLabel={t('common.today')}
-            onToday={() => setDay(today)}
-            onPrev={() => setDay(step(view, day, -1))}
-            onNext={() => setDay(step(view, day, 1))}
-          />
-
-          {view === 'day' ? (
-            // The strip stays in day view only: it is the drag target, and a
-            // drag needs day-sized drop zones. In week and month the grid
-            // itself is the navigation.
-            <View
-              onLayout={(e) => {
-                stripOriginX.current = e.nativeEvent.layout.x;
-              }}
-            >
-              <DateStrip
-                days={days}
-                selected={day}
-                highlight={hovered}
-                onSelect={setDay}
-                onCellLayout={(layout) => cells.current.set(layout.day, layout)}
-              />
-            </View>
-          ) : (
-            <CoverageGrid
-              days={coverage}
-              selected={day}
-              today={today}
-              onSelect={(next) => {
-                setDay(next);
-                // Drop into the day, because that is where the names and the
-                // actions are — a count is a reason to look, not an answer.
-                setView('day');
-              }}
-            />
-          )}
-
-          <View style={styles.actions}>
-            <Button
-              label={t('calendar.placements')}
-              variant="ghost"
-              onPress={() => setAdding(true)}
-            />
-            <Button
-              label={t('calendar.markAbsence')}
-              variant="ghost"
-              onPress={() => setMarkingAbsence(true)}
-            />
+          <View style={styles.header}>
+            <ScreenHeader title={t('nav.calendar')} action={<NotificationBell />} />
           </View>
 
-          {placements.isLoading || absences.isLoading ? (
-            <SkeletonList rows={5} />
-          ) : entriesUnavailable ? (
-            // Flag off: the routes 404 rather than 403, so this is "not
-            // built here", not "not permitted". Saying "error" would send a
-            // manager to support over a deliberate configuration.
-            <EmptyState title={t('status.unavailable')} body={t('calendar.loadFailed')} />
-          ) : groups.length === 0 && dayAbsences.length === 0 ? (
-            <EmptyState title={t('calendar.nothingScheduled')} />
-          ) : (
-            <>
-              {groups.map((group) => (
-                <View key={group.hotelId} style={styles.group}>
-                  <SectionHeader
-                    title={hotelName(group.hotelId)}
-                    action={
-                      <Button
-                        label={t('calendar.dailySummary')}
-                        variant="ghost"
-                        onPress={() => setSummaryFor(group.hotelId)}
-                      />
-                    }
-                  />
-                  {group.entries.map((entry) => (
-                    <PlacementRow
-                      key={entry.id}
-                      title={workerName(entry.worker_id)}
-                      subtitle={entry.day}
-                      status={entry.assignment_status}
-                      onDragStart={() => setHovered(entry.day)}
-                      onDragMove={(x) => setHovered(resolveDay(x))}
-                      onDragEnd={(x) => {
-                        const target = resolveDay(x);
-                        setHovered(null);
-                        if (isRealMove(entry.day, target)) void move(entry.id, entry.day, target);
-                      }}
-                      onRequestMove={() => {
-                        // The accessible equivalent of the drag. Moves to the
-                        // next day, which is the overwhelmingly common case;
-                        // a full picker lands with the edit sheet.
-                        void move(entry.id, entry.day, addDays(entry.day, 1));
-                      }}
+          <ExpandableCalendar
+            firstDay={1}
+            markedDates={markedDates}
+            markingType="multi-dot"
+            theme={calendarTheme(theme)}
+            allowShadow={false}
+            // Closed by default: the week strip plus the day's list is what a
+            // supervisor needs, and a month open on arrival pushes the actual
+            // work below the fold.
+            initialPosition={ExpandableCalendar.positions.CLOSED}
+          />
+
+          <ScrollView
+            contentContainerStyle={styles.content}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
+            }
+          >
+            <View style={styles.actions}>
+              <Button
+                label={t('calendar.placements')}
+                variant="ghost"
+                onPress={() => setAdding(true)}
+              />
+              <Button
+                label={t('calendar.markAbsence')}
+                variant="ghost"
+                onPress={() => setMarkingAbsence(true)}
+              />
+            </View>
+
+            {placements.isLoading || absences.isLoading ? (
+              <SkeletonList rows={4} />
+            ) : entriesUnavailable ? (
+              <EmptyState title={t('status.unavailable')} body={t('calendar.loadFailed')} />
+            ) : groups.length === 0 && dayAbsences.length === 0 ? (
+              <EmptyState title={t('calendar.nothingScheduled')} />
+            ) : (
+              <>
+                {groups.map((group) => (
+                  <View key={group.hotelId} style={styles.group}>
+                    <SectionHeader
+                      title={group.hotelName ?? hotelName(group.hotelId)}
+                      action={
+                        <Button
+                          label={t('calendar.dailySummary')}
+                          variant="ghost"
+                          onPress={() => setSummaryFor(group.hotelId)}
+                        />
+                      }
                     />
-                  ))}
-                </View>
-              ))}
+                    <Card>
+                      {/*
+                        The WHOLE ROW opens the shift, not a "Day" button at
+                        the end of it (2026-09-23). The button was labelled
+                        `calendar.viewDay` -- "Day" -- which says nothing about
+                        what it opens, and it made the row itself dead: tapping
+                        a worker's name, the obvious target, did nothing.
+                      */}
+                      {group.entries.map((entry) => (
+                        <Pressable
+                          key={entry.id}
+                          style={styles.shiftRow}
+                          onPress={() => setOpenShift(entry.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={
+                            entry.worker
+                              ? `${entry.worker.first_name} ${entry.worker.last_name}`.trim()
+                              : workerName(entry.worker_id)
+                          }
+                        >
+                          <View style={styles.shiftText}>
+                            <ThemedText type="smallBold" numberOfLines={1}>
+                              {entry.worker
+                                ? `${entry.worker.first_name} ${entry.worker.last_name}`.trim()
+                                : workerName(entry.worker_id)}
+                            </ThemedText>
+                            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                              {entry.hotel?.name ?? hotelName(entry.hotel_id)}
+                            </ThemedText>
+                          </View>
+                          {entry.assignment_status ? (
+                            <Badge
+                              label={assignmentStatusLabel(entry.assignment_status, t)}
+                              tone={assignmentTone(entry.assignment_status)}
+                            />
+                          ) : null}
+                        </Pressable>
+                      ))}
+                    </Card>
+                  </View>
+                ))}
 
-              {dayAbsences.length > 0 ? (
-                <View style={styles.group}>
-                  <SectionHeader title={t('nav.sickVacation')} />
-                  <Card>
-                    {dayAbsences.map((absence) => (
-                      <View key={absence.id} style={styles.absence}>
-                        <ThemedText type="smallBold" numberOfLines={1}>
-                          {absence.worker_name ?? workerName(absence.worker_id)}
-                        </ThemedText>
-                        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                          {absence.kind}
-                          {absence.reason ? ` · ${absence.reason}` : ''}
-                        </ThemedText>
-                      </View>
-                    ))}
-                  </Card>
-                </View>
-              ) : null}
-            </>
-          )}
+                {dayAbsences.length > 0 ? (
+                  <View style={styles.group}>
+                    <SectionHeader title={t('nav.sickVacation')} />
+                    <Card>
+                      {dayAbsences.map((absence) => (
+                        <View key={absence.id} style={styles.shiftRow}>
+                          <View style={styles.shiftText}>
+                            <ThemedText type="smallBold" numberOfLines={1}>
+                              {absence.worker_name ?? workerName(absence.worker_id)}
+                            </ThemedText>
+                            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                              {absence.kind}
+                              {absence.reason ? ` · ${absence.reason}` : ''}
+                            </ThemedText>
+                          </View>
+                        </View>
+                      ))}
+                    </Card>
+                  </View>
+                ) : null}
+              </>
+            )}
+          </ScrollView>
+        </CalendarProvider>
 
-          {scope.kind === 'none' ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              {t('analytics.noPermission')}
-            </ThemedText>
-          ) : null}
-        </ScrollView>
+        <ShiftSheet
+          visible={shift !== null}
+          entry={shift}
+          workerName={workerName}
+          hotelName={hotelName}
+          onClose={() => setOpenShift(null)}
+          onMove={() => setOpenShift(null)}
+        />
 
         <AddPlacementSheet
           visible={adding}
@@ -419,16 +329,39 @@ export default function Calendar() {
           day={day}
           busy={busy}
           onClose={() => setMarkingAbsence(false)}
-          onSubmit={(input) => void markAbsence(input)}
+          onSubmit={(input) => {
+            setBusy(true);
+            void api.calendar
+              .markAbsenceForWorker(input)
+              .then(() => absences.mutate())
+              .then(() => {
+                setMarkingAbsence(false);
+                toast.show(t('fields.updated'), 'success');
+              })
+              .catch((e) => toast.show(translateApiError(e, t), 'danger'))
+              .finally(() => setBusy(false));
+          }}
         />
 
-        {summaryFor ? (
+        {summaryFor && !summaries.isLoading ? (
           <ShiftSummarySheet
             visible
             day={day}
+            initial={summaries.data?.find((row) => row.date === day)}
             busy={busy}
             onClose={() => setSummaryFor(null)}
-            onSave={(input) => void saveSummary(summaryFor, input)}
+            onSave={(input) => {
+              setBusy(true);
+              void api.calendar
+                .saveShiftSummary(summaryFor, day, input)
+                .then(() => {
+                  void summaries.mutate();
+                  setSummaryFor(null);
+                  toast.show(t('fields.updated'), 'success');
+                })
+                .catch((e) => toast.show(translateApiError(e, t), 'danger'))
+                .finally(() => setBusy(false));
+            }}
           />
         ) : null}
 
@@ -441,7 +374,6 @@ export default function Calendar() {
             state: o.state,
             detail: o.detail,
           }))}
-          onCancel={busy ? () => { cancelled.current = true; } : undefined}
           onClose={() => setRun(null)}
         />
       </SafeAreaView>
@@ -452,6 +384,7 @@ export default function Calendar() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
+  header: { paddingHorizontal: Spacing.three },
   content: {
     padding: Spacing.three,
     gap: Spacing.three,
@@ -462,5 +395,6 @@ const styles = StyleSheet.create({
   },
   actions: { flexDirection: 'row', gap: Spacing.two },
   group: { gap: Spacing.two },
-  absence: { paddingVertical: Spacing.two, gap: 2 },
+  shiftRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.two },
+  shiftText: { flex: 1, flexShrink: 1, minWidth: 0, gap: 1 },
 });

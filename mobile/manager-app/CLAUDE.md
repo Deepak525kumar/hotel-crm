@@ -51,14 +51,41 @@ catalogues it is pinned against.
 
 ## Not yet configured — owner actions, not PRs
 
-- **EAS project.** `app.json` has no `extra.eas.projectId` and no `updates`
-  block, so `eas build` and OTA updates will not work until someone runs
-  `eas init` in this directory. Deliberately left empty rather than filled
-  with a plausible-looking placeholder: a wrong project id fails at build
-  time with a confusing error, and a wrong *update url* would point this app
-  at another app's OTA channel.
-- **Push credentials.** `APNS_BUNDLE_ID_MANAGER` is wired end to end and
-  `com.fhmhotelservices.managerapp` is pinned against this `app.json`, but
-  the APNs key and `google-services.json` are real secrets that belong in
-  environment config. Until they exist, push in this app is untestable — and
-  per the E2E suite's own rule, that is a recorded gap, never a pass.
+- **EAS project — DONE (2026-09-23).** `eas init` was run by the owner;
+  `app.json` now carries `extra.eas.projectId` and a matching `updates.url`
+  on the `production` channel. The note that used to stand here said neither
+  existed and was stale — verify `app.json` before believing any claim in
+  this section.
+- **Push credentials — iOS DONE (2026-09-23), Android client still open.**
+  `APNS_BUNDLE_ID_MANAGER=com.fhmhotelservices.managerapp` is now set in the
+  EC2 `backend/.env` and the Platform Worker has been restarted. Verified on
+  the host, not inferred: the deployed bundle contains
+  `apnsTopics[PushApp.MANAGER] = apnsBundleIdManager`, and dotenv reads the
+  value back.
+
+  **Do not trust the boot log to tell you this.** Until 2026-09-23 the
+  `PUSH transport: APNs configured for {...}` line listed `worker` and
+  `checker` only — it predated the MANAGER enum member and was never extended
+  — so a correctly-configured manager topic logged exactly like an
+  unconfigured one. That cost a live debugging session. The line is now
+  derived from `Object.values(PushApp)`, but **a host running a build older
+  than that fix will still print the two-app summary**, and its silence about
+  manager means nothing either way.
+
+  **Android — DONE (2026-09-23).** `com.fhmhotelservices.managerapp` is now a
+  registered Android app in the `fhm-hotelservice` Firebase project
+  (`1:14495829635:android:bc0c1cec7f926becf095b6`), and
+  `google-services.json` is committed here **exactly as the Firebase API
+  generated it**, with `expo.android.googleServicesFile` pointing at it.
+  `fcm-config.test.ts` pins the package/app-id/project agreement.
+
+  **Never hand-edit that file.** Worker and checker are registered in Firebase
+  under `com.hotelcrm.workerapp` / `com.hotelcrm.checkerapp` — the placeholder
+  namespace that had already caused one APNs outage — while their committed
+  configs claim `com.fhmhotelservices.*`, because commit `3e425c0e` edited the
+  package names in the JSON instead of re-registering the apps. Firebase and
+  the file disagree, and as of 2026-09-23 **not one Android device had ever
+  registered a push token for any of the three apps**. A Firebase app's
+  package name cannot be changed after creation, so fixing those two means
+  registering them afresh and regenerating their configs; nothing is lost,
+  since there are no Android tokens to invalidate.

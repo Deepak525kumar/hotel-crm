@@ -77,6 +77,19 @@ let _onConsentRequired: (() => void) | null = null;
 // Shared promise to serialize concurrent refresh attempts
 let _refreshPromise: Promise<{ access_token: string; refresh_token: string }> | null = null;
 
+export interface BlocklistEntryDto {
+  id: string;
+  hotel_id: string;
+  employment_record_id: string;
+  /** The human-facing id ("EMP-W-001") the write path is keyed by. */
+  employee_id: string | null;
+  user_id: string | null;
+  worker_name: string | null;
+  reason: string | null;
+  created_by_id: string;
+  created_at: string;
+}
+
 export function setAccessToken(token: string | null): void {
   _accessToken = token;
 }
@@ -423,12 +436,35 @@ export const api = {
      * is a poor place to read a report and a good place to send one. The
      * response is a download the caller shares or opens elsewhere.
      */
-    exportTeam: (input: { dataset: string; from?: string; to?: string }) =>
+    /**
+     * `format`, `from` and `to` are ALL REQUIRED (2026-09-23).
+     *
+     * This sent `{ dataset }` alone and the range was typed optional, so every
+     * team export the app could make was rejected -- and, because the route
+     * used a bare `.parse()`, it came back as `500 INTERNAL_ERROR` rather than
+     * a validation error, so it read as the server being broken. The route now
+     * answers 422 with the missing field names; this signature is what it
+     * actually accepts.
+     *
+     * The range is capped at 366 days and `from` must not be after `to`, both
+     * enforced server-side by the same `DateRangeSchema` the read path uses.
+     */
+    exportTeam: (input: {
+      dataset: 'assignments' | 'attendance' | 'absences' | 'rooms';
+      format: 'xlsx' | 'pdf';
+      from: string; // YYYY-MM-DD
+      to: string; // YYYY-MM-DD
+    }) =>
       request<GeneratedReportDto>('/reports/export', {
         method: 'POST',
         body: JSON.stringify(input),
       }),
 
+    /**
+     * The caller's OWN data (GDPR Article 15/20). The range is genuinely
+     * optional here and the server defaults it to the last year -- someone
+     * exercising a data-access right should not have to know a date range.
+     */
     exportMine: (range?: { from: string; to: string }) =>
       request<GeneratedReportDto>('/reports/export/mine', {
         method: 'POST',
@@ -552,11 +588,17 @@ export const api = {
       }),
   },
   workRequests: {
-    list: (params?: { status?: string; page?: number; limit?: number; is_broadcast?: boolean }) => {
+    /**
+     * `per_page`, NOT `limit` (2026-09-23). ListWorkRequestsQuerySchema names
+     * the page size `per_page`; zod dropped the unknown `limit` key without
+     * complaint, so every caller silently got the default page size and a
+     * "show me 50" control did nothing at all.
+     */
+    list: (params?: { status?: string; page?: number; per_page?: number; is_broadcast?: boolean }) => {
       const qs = new URLSearchParams();
       if (params?.status) qs.set('status', params.status);
       if (params?.page) qs.set('page', String(params.page));
-      if (params?.limit) qs.set('limit', String(params.limit));
+      if (params?.per_page) qs.set('per_page', String(params.per_page));
       // The backend accepts only the literal strings "true"/"false".
       if (params?.is_broadcast !== undefined) qs.set('is_broadcast', params.is_broadcast ? 'true' : 'false');
       const q = qs.toString();
@@ -656,10 +698,20 @@ export const api = {
       return request<WorkerAssignment[]>(`/assignments${q ? `?${q}` : ''}`);
     },
     get: (id: string) => request<WorkerAssignment>(`/assignments/${id}`),
-    updateStatus: (id: string, status: string) =>
+    /**
+     * `cancellation_reason` is accepted by UpdateAssignmentSchema and stored
+     * on the row. The manager app asked for a reason, made it MANDATORY in
+     * the dialog, and then dropped it on the floor with `void reason`
+     * (2026-09-23) -- so every cancelled shift in production carries a null
+     * reason that someone typed.
+     */
+    updateStatus: (id: string, status: string, cancellationReason?: string) =>
       request<WorkerAssignment>(`/assignments/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          ...(cancellationReason ? { cancellation_reason: cancellationReason } : {}),
+        }),
       }),
 
     /**
@@ -914,6 +966,52 @@ export const api = {
      * Admin-only, like restore below: archiving and restoring are master-data
      * lifecycle (ADR-030 D-2), not operations.
      */
+    /**
+     * Master data — S-36, admin only (2026-09-23).
+     *
+     * `POST /crm/hotels` is gated `requireRoleFlagged(['admin','manager'], 'admin')`,
+     * so with `FEATURE_GD02_MATRIX` off a *manager* also passes the role gate
+     * while an RM does not. That asymmetry is `SIR-CRM-020`, open and
+     * deliberately unfixed — the app gates its own UI on `admin` alone rather
+     * than mirroring the quirk, because a screen that appears for managers on
+     * some deployments and not others is worse than one that never does.
+     *
+     * `createHotel` IGNORES `hotel_group_id`: assign the group with a
+     * separate PATCH, exactly as the E2E setup does. Sending it here is
+     * silently dropped, which is how a hotel ends up ungrouped.
+     */
+    createHotel: (input: {
+      name: string;
+      city: string;
+      address: string;
+      country?: string;
+      timezone?: string;
+      latitude?: number;
+      longitude?: number;
+    }) => request<Hotel>('/crm/hotels', { method: 'POST', body: JSON.stringify(input) }),
+
+    updateHotel: (
+      id: string,
+      input: Partial<{
+        name: string;
+        city: string;
+        address: string;
+        country: string;
+        timezone: string;
+        hotel_group_id: string | null;
+        accepting_jobs: boolean;
+      }>
+    ) => request<Hotel>(`/crm/hotels/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+
+    createHotelGroup: (input: { name: string; billing_info?: string }) =>
+      request<HotelGroup>('/crm/hotel-groups', { method: 'POST', body: JSON.stringify(input) }),
+
+    updateHotelGroup: (id: string, input: { name?: string; billing_info?: string }) =>
+      request<HotelGroup>(`/crm/hotel-groups/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+
     archivedHotels: () => request<Hotel[]>('/crm/hotels?only_deleted=true'),
     archivedHotelGroups: () => request<HotelGroup[]>('/crm/hotel-groups?only_deleted=true'),
 
@@ -1305,10 +1403,15 @@ export const api = {
         body: JSON.stringify(input),
       }),
 
+    /**
+     * 2026-09-23: this declared `{ employee_id, reason }[]` and the service
+     * returned raw Prisma rows, which carry NEITHER. The manager app rendered
+     * blank rows keyed by `undefined` (duplicate React keys) because both
+     * sides had agreed on a field that has never existed on this wire. The
+     * service now returns a real DTO; this type is that DTO.
+     */
     blocklist: (hotelId: string) =>
-      request<{ employee_id: string; reason?: string | null }[]>(
-        `/employees/hotels/${hotelId}/blocklist`
-      ),
+      request<BlocklistEntryDto[]>(`/employees/hotels/${hotelId}/blocklist`),
 
     /**
      * Block an employee from a hotel. A REASON IS REQUIRED by the schema

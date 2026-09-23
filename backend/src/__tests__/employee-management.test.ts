@@ -624,6 +624,79 @@ describe('EmployeeManagementService', () => {
     });
   });
 
+  describe('getBlocklist DTO (2026-09-23)', () => {
+    /**
+     * This returned RAW Prisma rows. The only person reference on an
+     * EmployeeBlocklistEntry is `employment_record_id` -- not a name, not a
+     * user id, and not the human-facing `employee_id` that the WRITE path is
+     * keyed by. The manager app rendered blank rows keyed by `undefined`,
+     * because it had declared an `employee_id` field that has never been on
+     * this wire, and tsc happily checked it against that fiction.
+     */
+    it('resolves the blocked person: name, employee_id and user id', async () => {
+      mockPrisma.employeeBlocklistEntry.findMany.mockResolvedValue([
+        {
+          id: 'bl_1',
+          hotel_id: 'h1',
+          employment_record_id: 'emp_1',
+          reason: 'No-show repeatedly',
+          created_by_id: 'admin_1',
+          created_at: new Date('2026-09-01T00:00:00.000Z'),
+          employment_record: {
+            employee_id: 'EMP-W-001',
+            user: { id: 'u1', first_name: 'Ada', last_name: 'Lovelace' },
+          },
+        },
+      ]);
+      mockPrisma.employeeBlocklistEntry.count.mockResolvedValue(1);
+
+      const result = await service.getBlocklist(admin as any, { hotelId: 'h1' });
+
+      expect(result.data[0]).toMatchObject({
+        id: 'bl_1',
+        employee_id: 'EMP-W-001',
+        user_id: 'u1',
+        worker_name: 'Ada Lovelace',
+        reason: 'No-show repeatedly',
+      });
+      // `employee_id` specifically: it is what setBlocklist/removeBlocklist
+      // are keyed by, so a client that lists and then unblocks needs it back
+      // without a second lookup. Sending the User cuid instead 404'd every
+      // add from the manager app.
+      expect(result.data[0].employee_id).toBe('EMP-W-001');
+    });
+
+    /**
+     * A row whose employment record or user has since gone. Nullable, not
+     * absent: a blocklist entry that stops being listed is a person who
+     * silently stops being barred from a property.
+     */
+    it('still lists an entry whose person cannot be resolved', async () => {
+      mockPrisma.employeeBlocklistEntry.findMany.mockResolvedValue([
+        {
+          id: 'bl_2',
+          hotel_id: 'h1',
+          employment_record_id: 'emp_2',
+          reason: 'Safety incident',
+          created_by_id: 'admin_1',
+          created_at: new Date('2026-09-01T00:00:00.000Z'),
+          employment_record: null,
+        },
+      ]);
+      mockPrisma.employeeBlocklistEntry.count.mockResolvedValue(1);
+
+      const result = await service.getBlocklist(admin as any, { hotelId: 'h1' });
+
+      expect(result.total).toBe(1);
+      expect(result.data[0]).toMatchObject({
+        id: 'bl_2',
+        employee_id: null,
+        worker_name: null,
+        reason: 'Safety incident',
+      });
+    });
+  });
+
   describe('setBlocklist (REQ-EMP-005 / RULE-EMP-07)', () => {
     it('rejects a missing reason with ValidationError', async () => {
       await expect(

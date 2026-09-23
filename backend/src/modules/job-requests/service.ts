@@ -114,7 +114,10 @@ export class JobRequestService extends BaseService {
     return stored;
   }
 
-  private toDto(wr: JobRequest, skillSlots?: JobRequestSkillSlot[]): WorkRequestDto {
+  private toDto(
+    wr: JobRequest & { hotel?: { id: string; name: string; city: string } | null },
+    skillSlots?: JobRequestSkillSlot[]
+  ): WorkRequestDto {
     return {
       id: wr.id,
       hotel_id: wr.hotel_id,
@@ -151,6 +154,8 @@ export class JobRequestService extends BaseService {
       ...(skillSlots && skillSlots.length > 0
         ? { skill_slots: skillSlots.map((s) => this.toSkillSlotDto(s)) }
         : {}),
+      // Present only where the caller joined it; see WorkRequestDto.hotel.
+      ...(wr.hotel !== undefined ? { hotel: wr.hotel } : {}),
     };
   }
 
@@ -329,7 +334,7 @@ export class JobRequestService extends BaseService {
         // making broadcast job requests indistinguishable from marketplace
         // requests. getById() already returned this field; list() now
         // matches that behavior.
-        include: { skill_slots: true },
+        include: { skill_slots: true, hotel: { select: { id: true, name: true, city: true } } },
       }),
       this.prisma.jobRequest.count({ where }),
     ]);
@@ -343,7 +348,7 @@ export class JobRequestService extends BaseService {
   ): Promise<WorkRequestDto> {
     const wr = await this.prisma.jobRequest.findUnique({
       where: { id },
-      include: { skill_slots: true },
+      include: { skill_slots: true, hotel: { select: { id: true, name: true, city: true } } },
     });
     if (!wr) throw new NotFoundError('Work request not found');
 

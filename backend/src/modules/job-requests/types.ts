@@ -229,4 +229,17 @@ export interface WorkRequestDto {
   // publish/apply row (this PR does not backfill or infer skill_slots for
   // pre-existing rows).
   skill_slots?: JobRequestSkillSlotDto[];
+  /**
+   * The hotel this request is for, nested (2026-09-23).
+   *
+   * Every client showed a blank where the property name belongs, because the
+   * row carries only `hotel_id` and the web client's own type had already
+   * declared a `hotel` that the server never sent. Fetching it per row on the
+   * client is both N+1 and a second authorization surface -- the list is
+   * already scoped, so the name travels with the row it was scoped by.
+   *
+   * Optional because only the read paths (list/getById) join it; a DTO
+   * returned straight out of a write does not.
+   */
+  hotel?: { id: string; name: string; city: string } | null;
 }

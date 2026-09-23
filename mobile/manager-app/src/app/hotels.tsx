@@ -6,16 +6,15 @@ import useSWR from 'swr';
 
 import {
   Badge,
+  Button,
   DataRow,
   EmptyState,
   MaxContentWidth,
   ScreenHeader,
-  SectionHeader,
   SkeletonList,
   Spacing,
   ThemedView,
   api,
-  scopeOf,
   useAuthStore,
 } from '@hotel-crm/mobile-shared';
 
@@ -32,22 +31,32 @@ import { BackLink } from '@/components/BackLink';
  */
 export default function Hotels() {
   const { t } = useTranslation();
-  const user = useAuthStore((s) => s.user);
-  const scope = scopeOf(user);
+  const role = useAuthStore((st) => st.user?.role);
 
   const hotels = useSWR('crm/hotels', () => api.crm.hotels());
-  // A manager holds hotel_groups:read for their OWN group only, so this is
-  // fetched for everyone and simply comes back narrow for a hotel manager.
-  const groups = useSWR('crm/hotel-groups', () => api.crm.hotelGroups());
-
-  const canSeeOrgChart = scope.kind === 'group' || scope.kind === 'global';
 
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.content}>
           <BackLink />
-          <ScreenHeader title={t('nav.hotels')} />
+          <ScreenHeader
+            title={t('nav.hotels')}
+            // Admin only: creating a hotel is master data. The route is
+            // `requireRoleFlagged(['admin','manager'], 'admin')`, so with the
+            // matrix flag off a manager would also pass the SERVER gate
+            // (SIR-CRM-020) -- the app deliberately does not mirror that, so
+            // the control does not appear and disappear with a flag.
+            action={
+              role === 'admin' ? (
+                <Button
+                  label={t('hotels.new')}
+                  variant="ghost"
+                  onPress={() => router.push('/admin/hotels/new')}
+                />
+              ) : undefined
+            }
+          />
 
           {hotels.isLoading ? (
             <SkeletonList rows={5} />
@@ -67,32 +76,14 @@ export default function Hotels() {
                     tone={hotel.is_active ? 'success' : 'neutral'}
                   />
                 }
+                // Opens the hotel: today's numbers, rooms logged, and the
+                // blocklist. The list rows were not tappable before, so the
+                // detail screen existed and nothing reached it.
+                onPress={() => router.push(`/hotel/${hotel.id}`)}
               />
             ))
           )}
 
-          <SectionHeader title={t('nav.hotelGroups')} />
-          {(groups.data ?? []).map((group) => (
-            <DataRow
-              key={group.id}
-              title={group.name}
-              // A vacancy is not a missing group: regional_manager_user_id is
-              // nullable by design (2026-08-06 vacancy model), so an empty
-              // value reads as "no RM assigned", never as broken data.
-              subtitle={
-                // 'Unassigned', not 'no hotels assigned' -- the vacancy is of
-                // the REGIONAL MANAGER, and the nearest-looking key would have
-                // told the manager something false about the group's hotels.
-                group.regional_manager_user_id ? undefined : t('status.unassigned')
-              }
-              onPress={
-                canSeeOrgChart ? () => router.push(`/org-chart/${group.id}`) : undefined
-              }
-            />
-          ))}
-          {groups.data && groups.data.length === 0 ? (
-            <EmptyState title={t('hotelGroups.noneYet')} />
-          ) : null}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>

@@ -87,7 +87,13 @@
     "submit": "Absenden",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "Etwas ist schiefgelaufen."
+    "unknownError": "Etwas ist schiefgelaufen.",
+    "filters": "Filter",
+    "filtersWithCount": "Filter ({{count}})",
+    "filtersHint": "Öffnet die Filteroptionen für diese Liste",
+    "reset": "Zurücksetzen",
+    "share": "Teilen",
+    "lastNDays": "Letzte {{count}} Tage"
   },
   "fields": {
     "name": "Name",
@@ -176,7 +182,9 @@
     "jobTitlePlaceholder": "z. B. Zimmermädchen",
     "targetRole": "Schicht für",
     "targetRoleWorker": "Mitarbeiter",
-    "targetRoleChecker": "Prüfer"
+    "targetRoleChecker": "Prüfer",
+    "peopleWorking": "Arbeitende Personen",
+    "format": "Format"
   },
   "nav": {
     "history": "Verlauf",
@@ -214,7 +222,8 @@
     "rateWorker": "Mitarbeiter bewerten",
     "schedule": "Dienstplan",
     "rooms": "Zimmer",
-    "more": "Mehr"
+    "more": "Mehr",
+    "reports": "Berichte"
   },
   "roles": {
     "admin": "Administrator",
@@ -253,7 +262,16 @@
     "alreadyFilled": "Bereits besetzt",
     "inProgress": "In Bearbeitung",
     "present": "Anwesend",
-    "late": "Verspätet"
+    "late": "Verspätet",
+    "noShow": "Nicht erschienen",
+    "reassigned": "Neu zugewiesen",
+    "partial": "Teilweise",
+    "excused": "Entschuldigt",
+    "expected": "Erwartet",
+    "draft": "Entwurf",
+    "open": "Offen",
+    "partiallyFilled": "Teilweise besetzt",
+    "filled": "Besetzt"
   },
   "assignments": {
     "shiftDetails": "Schichtdetails",
@@ -1269,5 +1287,8 @@
     "copied": "Kopiert",
     "openForm": "Ausgefülltes Formular „Neuer Benutzer“ öffnen",
     "untitled": "Unbenanntes Gespräch"
+  },
+  "reports": {
+    "pageDescription": "Teamdaten als Datei exportieren."
   }
 }

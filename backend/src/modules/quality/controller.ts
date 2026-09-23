@@ -7,6 +7,7 @@ import {
   CreateQualityVerificationSchema,
   ListLeaderboardQuerySchema,
   ListOwnInspectionsQuerySchema,
+  ListScopedInspectionsQuerySchema,
   RecordInspectionSchema,
 } from './types.js';
 import { unlink } from 'node:fs/promises';
@@ -224,6 +225,33 @@ export class QualityController {
       const result = await qualityService.listOwnChecks(
         { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null },
         { page: parsed.data.page, perPage: parsed.data.per_page, q: parsed.data.q }
+      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // The management-facing inspection history. Scope is derived from req.auth
+  // inside the service; nothing about WHICH checks are visible comes from the
+  // query string except a narrowing hotel_id.
+  async listChecksInScope(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const parsed = ListScopedInspectionsQuerySchema.safeParse(req.query);
+      if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message);
+      const result = await qualityService.listChecksInScope(
+        { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null },
+        {
+          page: parsed.data.page,
+          perPage: parsed.data.per_page,
+          q: parsed.data.q,
+          hotelId: parsed.data.hotel_id,
+        }
       );
       res.status(200).json({
         status: 'success',

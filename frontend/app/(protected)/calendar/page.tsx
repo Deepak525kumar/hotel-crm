@@ -113,9 +113,12 @@ export default function CalendarGridPage() {
   // fixed-size "first N workers" fetch silently misses anyone outside its
   // first page/sort order, which is exactly what surfaced this as a raw id
   // in the placement-details modal instead of a name.
+  // A placement now ARRIVES with its worker nested (2026-09-23), so only the
+  // ids that nothing has named still need fetching -- in practice, absences,
+  // which carry no nested person.
   const visibleWorkerIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const e of entries ?? []) ids.add(e.worker_id);
+    for (const e of entries ?? []) if (!e.worker) ids.add(e.worker_id);
     for (const a of absences ?? []) ids.add(a.worker_id);
     return Array.from(ids);
   }, [entries, absences]);
@@ -125,9 +128,12 @@ export default function CalendarGridPage() {
     if (user) {
       map.set(user.id, `${user.first_name} ${user.last_name}`);
     }
+    for (const e of entries ?? []) {
+      if (e.worker) map.set(e.worker_id, `${e.worker.first_name} ${e.worker.last_name}`.trim());
+    }
     for (const [id, u] of usersById) map.set(id, `${u.first_name} ${u.last_name}`);
     return map;
-  }, [usersById, user]);
+  }, [usersById, user, entries]);
 
   // Scope-driven filtering (2026-08-10). Three distinct shapes, driven by the
   // scope the backend resolved for this user (AuthUser.scope_*), NOT by role

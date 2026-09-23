@@ -79,9 +79,23 @@ curl -s -o /dev/null -w '%{http_code}\n' -X PUT \
   -d '{"role":"admin"}' http://localhost:3001/api/v1/users/$TARGET
 ```
 
-**PASS:** refused **at the route/schema boundary** (400/404), not merely
-denied by service logic — `ADR-030` D-4a requires that a scoped caller never
-reaches a handler that can write `User.role`.
+**PASS:** refused, and `User.role` unchanged when read back from Postgres.
+
+> **Clarified 2026-09-23 after running it.** There are **two** gates here and
+> the outer one fires first, so the status code depends on the target:
+>
+> - Target **outside** the caller's write scope → `403 FORBIDDEN — "User not
+>   in your scope"`. This is what you will normally see, including for a user
+>   the manager can *list* — read visibility is wider than write scope.
+> - Target **inside** it → `400` from the schema, because
+>   `UpdateUserProfileSchema` is `.strict()` and an unknown `role` key fails
+>   validation before it is ever read (`users/types.ts`).
+>
+> `ADR-030` D-4a's requirement — a scoped caller never reaches a handler that
+> can write `User.role` — is satisfied by **either** outcome. A `403` here is
+> not evidence that the schema gate is missing; confirm the `.strict()` DTO
+> separately rather than inferring it from the code. What is **never**
+> acceptable is a `200`, or a changed `role` column.
 
 ## Step 6 — A manager does not see peers
 

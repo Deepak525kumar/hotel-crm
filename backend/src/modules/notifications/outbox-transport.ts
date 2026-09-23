@@ -537,15 +537,31 @@ export function resolvePushTransportHandler(
     // One line summarizing per-app configuration at startup, so a deployment
     // gap (e.g. forgetting APNS_BUNDLE_ID_CHECKER) is visible in the boot log
     // rather than only discoverable from a later per-delivery warning.
-    logger.info('PUSH transport: APNs configured for', {
-      worker: apnsTopics[PushApp.WORKER] ? 'configured' : 'MISSING (APNS_BUNDLE_ID_WORKER unset)',
-      checker: apnsTopics[PushApp.CHECKER] ? 'configured' : 'MISSING (APNS_BUNDLE_ID_CHECKER unset)',
-    });
-    if (!apnsTopics[PushApp.WORKER]) {
-      logger.warn('PUSH transport: APNS_BUNDLE_ID_WORKER unset — worker-app iOS devices will be skipped');
-    }
-    if (!apnsTopics[PushApp.CHECKER]) {
-      logger.warn('PUSH transport: APNS_BUNDLE_ID_CHECKER unset — checker-app iOS devices will be skipped');
+    // MANAGER was added to the enum on 2026-09-22 and to THIS SUMMARY on
+    // 2026-09-23. In between, the line reported a two-app summary for a
+    // three-app system: a production host with `APNS_BUNDLE_ID_MANAGER`
+    // correctly set still logged `{worker, checker}` and nothing else, so the
+    // only way to tell a configured manager topic from an unconfigured one
+    // was to read the file. That is precisely the failure this line exists to
+    // prevent, and it cost a live debugging session to work out.
+    //
+    // Derived from the enum rather than hand-listed, so a fourth app cannot
+    // repeat it: adding a PushApp member extends this automatically.
+    logger.info(
+      'PUSH transport: APNs configured for',
+      Object.fromEntries(
+        Object.values(PushApp).map((app) => [
+          app.toLowerCase(),
+          apnsTopics[app] ? 'configured' : `MISSING (APNS_BUNDLE_ID_${app} unset)`,
+        ])
+      )
+    );
+    for (const app of Object.values(PushApp)) {
+      if (!apnsTopics[app]) {
+        logger.warn(
+          `PUSH transport: APNS_BUNDLE_ID_${app} unset — ${app.toLowerCase()}-app iOS devices will be skipped`
+        );
+      }
     }
   }
   if (!fcmClient) {

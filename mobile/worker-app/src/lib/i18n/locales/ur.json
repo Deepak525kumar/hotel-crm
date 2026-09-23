@@ -88,7 +88,13 @@
     "submit": "جمع کریں",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "کچھ غلط ہو گیا۔"
+    "unknownError": "کچھ غلط ہو گیا۔",
+    "filters": "فلٹرز",
+    "filtersWithCount": "فلٹرز ({{count}})",
+    "filtersHint": "اس فہرست کے فلٹر اختیارات کھولتا ہے",
+    "reset": "ری سیٹ",
+    "share": "شیئر کریں",
+    "lastNDays": "پچھلے {{count}} دن"
   },
   "fields": {
     "name": "نام",
@@ -177,7 +183,9 @@
     "jobTitlePlaceholder": "مثلاً ہاؤس کیپر",
     "targetRole": "شفٹ برائے",
     "targetRoleWorker": "ورکر",
-    "targetRoleChecker": "چیکر"
+    "targetRoleChecker": "چیکر",
+    "peopleWorking": "کام کرنے والے افراد",
+    "format": "فارمیٹ"
   },
   "nav": {
     "history": "تاریخ",
@@ -215,7 +223,8 @@
     "rateWorker": "ورکر کی درجہ بندی",
     "schedule": "شیڈول",
     "rooms": "کمرے",
-    "more": "مزید"
+    "more": "مزید",
+    "reports": "رپورٹس"
   },
   "roles": {
     "admin": "ایڈمن",
@@ -254,7 +263,16 @@
     "alreadyFilled": "پہلے سے بھرا ہوا",
     "inProgress": "جاری",
     "present": "حاضر",
-    "late": "دیر سے"
+    "late": "دیر سے",
+    "noShow": "حاضر نہیں ہوا",
+    "reassigned": "دوبارہ تفویض شدہ",
+    "partial": "جزوی",
+    "excused": "رخصت منظور",
+    "expected": "متوقع",
+    "draft": "مسودہ",
+    "open": "کھلا",
+    "partiallyFilled": "جزوی طور پر پُر",
+    "filled": "پُر"
   },
   "assignments": {
     "shiftDetails": "شفٹ کی تفصیلات",
@@ -1270,5 +1288,8 @@
     "copied": "کاپی ہو گیا",
     "openForm": "بھرا ہوا نیا صارف فارم کھولیں",
     "untitled": "بغیر عنوان گفتگو"
+  },
+  "reports": {
+    "pageDescription": "ٹیم کا ڈیٹا فائل کے طور پر برآمد کریں۔"
   }
 }

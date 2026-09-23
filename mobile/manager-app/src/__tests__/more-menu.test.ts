@@ -34,13 +34,47 @@ describe('the More menu', () => {
     expect(odd.some((g) => g.items.some((i) => i.route === '/admin/archive'))).toBe(false);
   });
 
-  // org_chart:read is the ONE token an RM holds that a manager does not.
-  it('offers the org chart to an RM and an admin, not to a hotel manager', () => {
-    const hasOrgChart = (menu: ReturnType<typeof buildMenu>) =>
-      menu.some((g) => g.items.some((i) => i.label === 'hotels.orgChart'));
-    expect(hasOrgChart(rmMenu)).toBe(true);
-    expect(hasOrgChart(adminMenu)).toBe(true);
-    expect(hasOrgChart(managerMenu)).toBe(false);
+  /**
+   * The org chart is GONE (2026-09-23, project owner's decision).
+   *
+   * It rendered the endpoint's raw JSON because the client never pinned that
+   * response's shape, and it shared a route with Hotels, so both menu rows
+   * opened the same screen.
+   */
+  it('no longer offers an org chart', () => {
+    for (const menu of [managerMenu, rmMenu, adminMenu]) {
+      expect(menu.some((g) => g.items.some((i) => i.label === 'hotels.orgChart'))).toBe(false);
+    }
+  });
+
+  /**
+   * Hotels and Hotel groups are SEPARATE destinations.
+   *
+   * Both pointed at '/hotels' until 2026-09-23: the org-chart row opened the
+   * hotels screen, and React warned "Encountered two children with the same
+   * key, /hotels" — the duplicated route WAS the key. Asserting route
+   * uniqueness catches the whole class, not just this instance.
+   */
+  it('gives every destination a distinct route', () => {
+    for (const menu of [managerMenu, rmMenu, adminMenu]) {
+      const routes = menu.flatMap((g) => g.items.map((i) => i.route));
+      expect(new Set(routes).size).toBe(routes.length);
+    }
+  });
+
+  it('offers hotel groups as its own screen', () => {
+    expect(
+      managerMenu.some((g) => g.items.some((i) => i.route === '/hotel-groups'))
+    ).toBe(true);
+  });
+
+  // Users is a tab; listing it again makes the menu a sitemap.
+  it('does not repeat the tabs', () => {
+    for (const menu of [managerMenu, rmMenu, adminMenu]) {
+      const routes = menu.flatMap((g) => g.items.map((i) => i.route));
+      expect(routes).not.toContain('/(app)/team');
+      expect(routes.some((r) => r.includes('attendance'))).toBe(false);
+    }
   });
 
   // Attendance is hidden for all three roles (2026-09-23 decision), but its
