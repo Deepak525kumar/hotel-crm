@@ -68,4 +68,36 @@ describe('Android FCM configuration (checker-app)', () => {
     const config = readFileSync('src/constants/app-config.ts', 'utf8');
     expect(config).toContain("PushApp = 'CHECKER'");
   });
+
+  it('no two clients share a Firebase app id', () => {
+    // Added 2026-09-23, after the defect this whole file failed to catch.
+    //
+    // The assertions above check the file against ITSELF, which is exactly
+    // what a hand-edit preserves. On 2026-09-23 the Firebase project was
+    // found holding this app under `com.hotelcrm.checkerapp` while this
+    // config claimed `com.fhmhotelservices.checkerapp` — commit `3e425c0e`
+    // had edited the package names in the JSON instead of re-registering the
+    // apps. Every assertion above still passed, and not one Android device
+    // had ever registered a token.
+    //
+    // A duplicated `mobilesdk_app_id` is the fingerprint of that edit: two
+    // package names pointing at one registration. It cannot prove the file
+    // matches Firebase — only a call to Firebase can — but it catches the
+    // specific way this file gets corrupted by hand.
+    const services = JSON.parse(readFileSync('google-services.json', 'utf8'));
+    const ids = services.client.map(
+      (c: { client_info: { mobilesdk_app_id: string } }) => c.client_info.mobilesdk_app_id
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('is the same project-level file the other apps ship', () => {
+    // Firebase generates ONE config per project listing every client, so all
+    // three apps must ship byte-identical files. Divergence means someone
+    // edited a copy — the failure mode above — rather than regenerating.
+    const mine = readFileSync('google-services.json', 'utf8');
+    for (const sibling of ['../worker-app/google-services.json', '../manager-app/google-services.json']) {
+      expect(readFileSync(sibling, 'utf8')).toBe(mine);
+    }
+  });
 });
