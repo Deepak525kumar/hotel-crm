@@ -56,21 +56,24 @@ catalogues it is pinned against.
   on the `production` channel. The note that used to stand here said neither
   existed and was stale — verify `app.json` before believing any claim in
   this section.
-- **Push credentials — STILL OPEN, and the blocker is one line.**
-  `APNS_BUNDLE_ID_MANAGER` is wired end to end and
-  `com.fhmhotelservices.managerapp` is pinned against this `app.json`, but the
-  variable is **not set** in `backend/.env` (2026-09-23) while
-  `APNS_BUNDLE_ID_WORKER` and `_CHECKER` both are.
+- **Push credentials — iOS DONE (2026-09-23), Android client still open.**
+  `APNS_BUNDLE_ID_MANAGER=com.fhmhotelservices.managerapp` is now set in the
+  EC2 `backend/.env` and the Platform Worker has been restarted. Verified on
+  the host, not inferred: the deployed bundle contains
+  `apnsTopics[PushApp.MANAGER] = apnsBundleIdManager`, and dotenv reads the
+  value back.
 
-  The consequence is silent, which is why it is worth stating precisely:
-  `topicFor()` (`notifications/outbox-transport.ts`) returns `undefined` for a
-  MANAGER token with no configured topic, and that device is **skipped, not
-  failed**. The APNs client is still constructed — the other two apps have
-  topics — so nothing logs an error, the outbox event still reaches
-  `DELIVERED`, and manager push simply never arrives. Per the E2E suite's own
-  rule, outbox status is not evidence of delivery.
+  **Do not trust the boot log to tell you this.** Until 2026-09-23 the
+  `PUSH transport: APNs configured for {...}` line listed `worker` and
+  `checker` only — it predated the MANAGER enum member and was never extended
+  — so a correctly-configured manager topic logged exactly like an
+  unconfigured one. That cost a live debugging session. The line is now
+  derived from `Object.values(PushApp)`, but **a host running a build older
+  than that fix will still print the two-app summary**, and its silence about
+  manager means nothing either way.
 
-  `google-services.json` is also absent, so Android push is unconfigured too.
-  Both are real secrets in environment config: on EC2 that file is an
-  untracked production copy edited by hand, so **this cannot be fixed by a
-  PR** — it is an owner action.
+  FCM is configured server-side (`FIREBASE_PROJECT_ID` and
+  `FIREBASE_SERVICE_ACCOUNT_KEY_BASE64` are both set in production), but
+  `google-services.json` is still absent from this app, so it cannot mint an
+  Android token to send to. That one is a client build artifact and a real
+  secret: still an owner action.
