@@ -184,7 +184,8 @@
     "targetRoleWorker": "Працівник",
     "targetRoleChecker": "Перевіряючий",
     "peopleWorking": "Працівників",
-    "format": "Формат"
+    "format": "Формат",
+    "photo": "Фото профілю"
   },
   "nav": {
     "history": "Історія",
@@ -696,7 +697,8 @@
     "yourMarkedDays": "Ваші позначені дні",
     "viewmonth": "Місяць",
     "viewweek": "Тиждень",
-    "viewday": "День"
+    "viewday": "День",
+    "moveShift": "Перенести на інший день"
   },
   "hotels": {
     "inThisGroup": "Готелі цієї групи",

@@ -313,7 +313,32 @@ export default function Calendar() {
           workerName={workerName}
           hotelName={hotelName}
           onClose={() => setOpenShift(null)}
-          onMove={() => setOpenShift(null)}
+          moving={busy}
+          /*
+            The move actually happens now (2026-09-23).
+
+            This was `onMove={() => setOpenShift(null)}` -- the button closed
+            the sheet and wrote nothing, so a manager pressing "move" saw the
+            shift stay exactly where it was. The endpoint and the client
+            method both existed the whole time; only the call was missing.
+          */
+          onMove={(day) => {
+            const id = openShift;
+            if (!id) return;
+            setBusy(true);
+            void api.assignments
+              .moveCalendarEntry(id, day)
+              .then(async () => {
+                // Refetch rather than patch in place: the agenda groups by
+                // hotel and day, and a locally-moved row would sit under the
+                // wrong heading until the next load.
+                await placements.mutate();
+                setOpenShift(null);
+                toast.show(t('fields.updated'), 'success');
+              })
+              .catch((e) => toast.show(translateApiError(e, t), 'danger'))
+              .finally(() => setBusy(false));
+          }}
         />
 
         <AddPlacementSheet

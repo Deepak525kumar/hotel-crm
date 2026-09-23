@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
@@ -8,6 +9,7 @@ import {
   BottomSheet,
   Button,
   SectionHeader,
+  SelectSheet,
   Spacing,
   ThemedText,
   api,
@@ -34,7 +36,42 @@ import { attendanceStatusLabel } from '@/lib/attendance-format';
  * both need their own confirmation and their own reason, and duplicating
  * those flows inside a sheet would mean two implementations of a destructive
  * write that must behave identically.
+ *
+ * MOVING A SHIFT IS A DAY PICKER, NOT A DRAG (2026-09-23).
+ *
+ * The button here previously called `onMove()`, which closed the sheet and
+ * did nothing else -- a dead control. The rebuilt calendar has no drag
+ * handler at all, and the owner reported it on a real iPhone: "I'm not able
+ * to drag and drop the shifts". The cards sit below the calendar and there is
+ * nothing to drag them onto, because the month strip deliberately does not
+ * mark individual shifts.
+ *
+ * A list is the better control here regardless of that. A drag is
+ * inoperable with VoiceOver and TalkBack -- there is no gesture for "pick up
+ * and move to the 24th" -- so the accessible path had to exist anyway, and
+ * two ways to do one thing is two things to keep working. `MoveCalendarEntrySchema`
+ * accepts a day and nothing else, so a day is all this needs to collect.
  */
+/**
+ * A fortnight either side of `day`, as `YYYY-MM-DD`.
+ *
+ * Built by stepping a Date and reading LOCAL getters, never
+ * `toISOString().slice(0, 10)`: that is UTC, so between midnight and 02:00
+ * Berlin it names the previous day and every option would be off by one --
+ * the same trap `CALENDAR_TIMEZONE` exists for.
+ */
+function dayOptions(day: string): { value: string; label: string }[] {
+  const [y, m, d] = day.split('-').map(Number);
+  const out: { value: string; label: string }[] = [];
+  for (let offset = -14; offset <= 14; offset += 1) {
+    const cursor = new Date(y!, m! - 1, d! + offset);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const iso = `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(cursor.getDate())}`;
+    out.push({ value: iso, label: iso });
+  }
+  return out;
+}
+
 export function ShiftSheet({
   visible,
   entry,
@@ -42,6 +79,7 @@ export function ShiftSheet({
   hotelName,
   onClose,
   onMove,
+  moving = false,
 }: {
   visible: boolean;
   entry: {
@@ -55,9 +93,12 @@ export function ShiftSheet({
   workerName: (id: string) => string;
   hotelName: (id: string) => string;
   onClose: () => void;
-  onMove: () => void;
+  /** Receives the target day; the caller performs the write and refreshes. */
+  onMove: (day: string) => void;
+  moving?: boolean;
 }) {
   const { t } = useTranslation();
+  const [targetDay, setTargetDay] = useState<string | null>(null);
 
   // Only fetched while the sheet is open: the agenda can hold thirty of these
   // and pre-loading every assignment would be thirty round trips on a hotel's
@@ -142,9 +183,24 @@ export function ShiftSheet({
         }
       />
 
-      {/* `calendar.dragToMoveHint` is a HINT ("drag a shift to move it"),
-          which read as a button caption. The button moves the shift; say so. */}
-      <Button label={t('common.reassign')} variant="ghost" onPress={onMove} />
+      <SectionHeader title={t('calendar.moveShift')} />
+      <SelectSheet
+        label={t('fields.date')}
+        value={targetDay}
+        // A fortnight either side of the shift's own day. Wide enough for the
+        // rota changes anyone actually makes, and short enough to scroll.
+        options={dayOptions(entry.day)}
+        onChange={setTargetDay}
+      />
+      <Button
+        label={t('calendar.moveShift')}
+        variant="ghost"
+        // Moving a shift to the day it is already on is not a move; the server
+        // would accept it and write nothing, which reads as a silent failure.
+        disabled={targetDay === null || targetDay === entry.day}
+        loading={moving}
+        onPress={() => targetDay && onMove(targetDay)}
+      />
     </BottomSheet>
   );
 }
