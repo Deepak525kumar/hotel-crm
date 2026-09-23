@@ -185,7 +185,8 @@
     "targetRoleWorker": "ورکر",
     "targetRoleChecker": "چیکر",
     "peopleWorking": "کام کرنے والے افراد",
-    "format": "فارمیٹ"
+    "format": "فارمیٹ",
+    "photo": "پروفائل تصویر"
   },
   "nav": {
     "history": "تاریخ",
@@ -697,7 +698,8 @@
     "yourMarkedDays": "آپ کے نشان زد دن",
     "viewmonth": "ماہ",
     "viewweek": "ہفتہ",
-    "viewday": "دن"
+    "viewday": "دن",
+    "moveShift": "دوسرے دن منتقل کریں"
   },
   "hotels": {
     "inThisGroup": "اس گروپ کے ہوٹل",

@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import useSWR from 'swr';
+import * as ImagePicker from 'expo-image-picker';
 
 import {
   Button,
@@ -11,7 +12,9 @@ import {
   EmptyState,
   Input,
   MaxContentWidth,
+  Radius,
   ScreenHeader,
+  SectionHeader,
   SelectSheet,
   Spacing,
   ThemedText,
@@ -25,6 +28,7 @@ import {
 import { BackLink } from '@/components/BackLink';
 import { creatableRoles, scopeFieldFor } from '@/lib/creatable-roles';
 import { SKILL_TAGS } from '@/lib/shift-form';
+import { resolvePickedPhoto } from '@/lib/picked-photo';
 
 /**
  * Create an account.
@@ -60,7 +64,73 @@ export default function NewTeamMember() {
     api.crm.hotelGroups()
   );
 
+  /**
+   * THE PROFILE PHOTO IS MANDATORY (2026-09-23).
+   *
+   * This screen had no photo field at all, and `POST /users` refuses a
+   * request without one -- `controller.ts` throws
+   * `ValidationError('A profile photo is required')` before Zod ever runs.
+   * So every submission from the phone failed, and the message the app showed
+   * was the generic "request body validation failed", which named nothing.
+   * Reported from a real device.
+   *
+   * The web has had this field since the endpoint gained it; only the mobile
+   * form was missing it.
+   */
+  const [photo, setPhoto] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  const pickPhoto = useCallback(
+    async (source: 'camera' | 'library') => {
+      setPhotoError(null);
+      const permission =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setPhotoError(
+          t(
+            source === 'camera'
+              ? 'documents.cameraPermissionDenied'
+              : 'documents.libraryPermissionDenied'
+          )
+        );
+        return;
+      }
+
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              quality: 0.8,
+              // An iPhone hands back HEIC by default, which the endpoint's
+              // allowlist rejects. `Compatible` asks for JPEG instead --
+              // iOS 14+ only, so resolvePickedPhoto still checks what arrived.
+              preferredAssetRepresentationMode:
+                ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+            })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.8,
+              preferredAssetRepresentationMode:
+                ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+            });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (!asset) return;
+
+      const resolved = resolvePickedPhoto({ mimeType: asset.mimeType, fileName: asset.fileName });
+      if (!resolved.ok) {
+        setPhotoError(t(resolved.errorKey));
+        return;
+      }
+      setPhoto({ uri: asset.uri, name: resolved.name, type: resolved.mimeType });
+    },
+    [t]
+  );
+
   const ready =
+    photo !== null &&
     role !== null &&
     /\S+@\S+\.\S+/.test(email.trim()) &&
     password.length >= 8 &&
@@ -85,6 +155,8 @@ export default function NewTeamMember() {
         // Comma-separated, not an array: multipart cannot carry one and the
         // schema preprocesses the string.
         ...(skills.length > 0 ? { skills: skills.join(',') } : {}),
+        // Mandatory; `ready` above will not let this be null.
+        ...(photo ? { photo } : {}),
       });
       toast.show(t('fields.updated'), 'success');
       router.replace(`/team/${created.id}`);
@@ -183,6 +255,37 @@ export default function NewTeamMember() {
             </Card>
           ) : null}
 
+          {/* Mandatory, and last so the keyboard-heavy fields come first. */}
+          <Card>
+            <SectionHeader title={t('fields.photo')} />
+            {photo ? (
+              <Image source={{ uri: photo.uri }} style={styles.preview} resizeMode="cover" />
+            ) : (
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('common.required')}
+              </ThemedText>
+            )}
+            <View style={styles.photoActions}>
+              <Button
+                label={t('documents.takePhoto')}
+                variant="ghost"
+                style={styles.photoAction}
+                onPress={() => void pickPhoto('camera')}
+              />
+              <Button
+                label={t('documents.choosePhoto')}
+                variant="ghost"
+                style={styles.photoAction}
+                onPress={() => void pickPhoto('library')}
+              />
+            </View>
+            {photoError ? (
+              <ThemedText type="small" themeColor="danger">
+                {photoError}
+              </ThemedText>
+            ) : null}
+          </Card>
+
           <Button label={t('common.save')} disabled={!ready} loading={busy} onPress={() => void submit()} />
         </ScrollView>
       </SafeAreaView>
@@ -191,6 +294,9 @@ export default function NewTeamMember() {
 }
 
 const styles = StyleSheet.create({
+  preview: { width: '100%', height: 180, borderRadius: Radius.md },
+  photoActions: { flexDirection: 'row', gap: Spacing.two },
+  photoAction: { flex: 1 },
   root: { flex: 1 },
   safe: { flex: 1 },
   content: {

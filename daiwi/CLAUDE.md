@@ -17,6 +17,19 @@ the binary actually carries, because `appForBundleId()` resolves builds by
 that and **refuses rather than guesses** when nothing matches. Guessing would
 publish one app under another's name.
 
+## The registry is code, so the portal needs a DEPLOY
+
+Adding a row to `APP_DEFINITIONS` changes nothing anyone can see until daiwi
+is rebuilt. The manager app was added to the source on 2026-09-22 and was
+still absent from the live catalogue on 2026-09-23, because `dist/` on the
+host dated from 2026-09-10 — the source had been synced and never built.
+`grep -c MANAGER dist/lib/apps.js` returned 0 while the same grep on `src/`
+returned 3.
+
+`./scripts/deploy.sh` on the host is the fix (install, migrate, build, reload,
+health-check). The host is **not a git checkout**, so "the code is on main" is
+not evidence that the portal is running it.
+
 ## Uploading is not publishing
 
 Root `CLAUDE.md` says this and it is the single most important fact here: a

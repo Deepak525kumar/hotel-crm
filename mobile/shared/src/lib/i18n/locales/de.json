@@ -184,7 +184,8 @@
     "targetRoleWorker": "Mitarbeiter",
     "targetRoleChecker": "Prüfer",
     "peopleWorking": "Arbeitende Personen",
-    "format": "Format"
+    "format": "Format",
+    "photo": "Profilfoto"
   },
   "nav": {
     "history": "Verlauf",
@@ -696,7 +697,8 @@
     "yourMarkedDays": "Ihre markierten Tage",
     "viewmonth": "Monat",
     "viewweek": "Woche",
-    "viewday": "Tag"
+    "viewday": "Tag",
+    "moveShift": "Auf einen anderen Tag verschieben"
   },
   "hotels": {
     "inThisGroup": "Hotels in dieser Gruppe",

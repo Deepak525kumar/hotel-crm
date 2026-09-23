@@ -185,7 +185,8 @@
     "targetRoleWorker": "عامل",
     "targetRoleChecker": "مُدقِّق",
     "peopleWorking": "عدد العاملين",
-    "format": "الصيغة"
+    "format": "الصيغة",
+    "photo": "صورة الملف الشخصي"
   },
   "nav": {
     "history": "السجل",
@@ -697,7 +698,8 @@
     "yourMarkedDays": "أيامك المسجَّلة",
     "viewmonth": "شهر",
     "viewweek": "أسبوع",
-    "viewday": "يوم"
+    "viewday": "يوم",
+    "moveShift": "النقل إلى يوم آخر"
   },
   "hotels": {
     "inThisGroup": "الفنادق في هذه المجموعة",
