@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useHotel, useHotelGroup, useUsersByIds } from "@/hooks/useHotels";
+import { ApiError } from "@/lib/api";
 import { hotelsApi } from "@/lib/api";
 import { HotelWriteGate, BlocklistReadGate, RoleGate } from "@/components/auth/RoleGate";
 import { BlocklistCard } from "@/components/employees/BlocklistCard";
@@ -70,7 +71,23 @@ export default function HotelDetailPage() {
       {error ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
-            {t("hotels.loadOneFailedRemoved")}
+            {/*
+              A 403 is not a deletion (2026-09-23).
+
+              Every failure here rendered "It may have been removed", so a
+              manager opening a hotel outside their scope was told the property
+              had been deleted. Reported as "Failed to load this hotel" against
+              a hotel that plainly still exists. Three distinct causes reach
+              this branch and only one of them is a removal:
+                403 -> not in your scope
+                404 -> no such hotel, or soft-deleted
+                anything else -> a real failure
+            */}
+            {error instanceof ApiError && error.status === 403
+              ? t("errors.forbidden")
+              : error instanceof ApiError && error.status === 404
+                ? t("hotels.loadOneFailedRemoved")
+                : t("hotels.loadOneFailed")}
           </CardContent>
         </Card>
       ) : isLoading || !hotel ? (

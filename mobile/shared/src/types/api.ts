@@ -538,6 +538,18 @@ export interface HotelGroup {
   name: string;
   regional_manager_user_id: string | null;
   is_active: boolean;
+  /**
+   * The vacancy story, which the server sends and this client ignored
+   * (2026-09-23). A null `regional_manager_user_id` was rendered as a bare
+   * "Unassigned", which conflates "never had one" with "the RM left on the
+   * 4th because they moved group" -- and only the second needs acting on.
+   *
+   * Optional: the list and detail paths both populate them, but a display
+   * field must not be able to crash a response.
+   */
+  regional_manager_vacated_at?: string | null;
+  regional_manager_vacancy_reason?: string | null;
+  billing_info?: string | null;
 }
 
 /**

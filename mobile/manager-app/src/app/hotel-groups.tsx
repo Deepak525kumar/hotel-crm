@@ -21,6 +21,7 @@ import {
 
 import { BackLink } from '@/components/BackLink';
 import { useDirectory } from '@/hooks/useDirectory';
+import { formatDateTime } from '@/lib/assignment-format';
 
 /**
  * Hotel groups, as their own screen.
@@ -97,6 +98,19 @@ export default function HotelGroups() {
                       ? workerName(group.regional_manager_user_id)
                       : t('status.unassigned')}
                   </ThemedText>
+
+                  {/* WHY it is vacant, when the server knows. "Unassigned"
+                      alone conflates a group that never had an RM with one
+                      whose RM left last week -- and only the second is
+                      something a regional manager needs to act on. */}
+                  {!group.regional_manager_user_id && group.regional_manager_vacancy_reason ? (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {group.regional_manager_vacancy_reason}
+                      {group.regional_manager_vacated_at
+                        ? ` · ${formatDateTime(group.regional_manager_vacated_at)}`
+                        : ''}
+                    </ThemedText>
+                  ) : null}
 
                   {members.length === 0 ? (
                     <ThemedText type="small" themeColor="textSecondary">
