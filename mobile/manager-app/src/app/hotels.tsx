@@ -6,6 +6,7 @@ import useSWR from 'swr';
 
 import {
   Badge,
+  Button,
   DataRow,
   EmptyState,
   MaxContentWidth,
@@ -14,6 +15,7 @@ import {
   Spacing,
   ThemedView,
   api,
+  useAuthStore,
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
@@ -29,6 +31,7 @@ import { BackLink } from '@/components/BackLink';
  */
 export default function Hotels() {
   const { t } = useTranslation();
+  const role = useAuthStore((st) => st.user?.role);
 
   const hotels = useSWR('crm/hotels', () => api.crm.hotels());
 
@@ -37,7 +40,23 @@ export default function Hotels() {
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.content}>
           <BackLink />
-          <ScreenHeader title={t('nav.hotels')} />
+          <ScreenHeader
+            title={t('nav.hotels')}
+            // Admin only: creating a hotel is master data. The route is
+            // `requireRoleFlagged(['admin','manager'], 'admin')`, so with the
+            // matrix flag off a manager would also pass the SERVER gate
+            // (SIR-CRM-020) -- the app deliberately does not mirror that, so
+            // the control does not appear and disappear with a flag.
+            action={
+              role === 'admin' ? (
+                <Button
+                  label={t('hotels.new')}
+                  variant="ghost"
+                  onPress={() => router.push('/admin/hotels/new')}
+                />
+              ) : undefined
+            }
+          />
 
           {hotels.isLoading ? (
             <SkeletonList rows={5} />

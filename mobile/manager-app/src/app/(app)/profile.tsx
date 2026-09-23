@@ -110,9 +110,21 @@ export default function Profile() {
           <LanguagePicker />
 
           <SectionHeader title={t('settings.exportData')} />
-          <ExportRow
-            label={t('settings.exportDataAction')}
-            run={() => api.reports.exportTeam({ dataset: 'attendance' })}
+          {/*
+            The TEAM export moved to /reports (2026-09-23).
+
+            It stood here as a single row that sent `{ dataset: 'attendance' }`
+            and nothing else — no `format`, no date range, all three of which
+            the endpoint requires. It could therefore never succeed, and
+            because the route used a bare `.parse()` it failed as a 500, so it
+            read as the server being broken rather than the request being
+            incomplete. The reports screen sends a complete body and reaches
+            all four datasets; only the personal export belongs on this tab.
+          */}
+          <Button
+            label={t('nav.reports')}
+            variant="ghost"
+            onPress={() => router.push('/reports')}
           />
           <ExportRow label={t('settings.exportDataShort')} run={() => api.reports.exportMine()} />
 

@@ -93,7 +93,8 @@
     "filtersWithCount": "فلٹرز ({{count}})",
     "filtersHint": "اس فہرست کے فلٹر اختیارات کھولتا ہے",
     "reset": "ری سیٹ",
-    "share": "شیئر کریں"
+    "share": "شیئر کریں",
+    "lastNDays": "پچھلے {{count}} دن"
   },
   "fields": {
     "name": "نام",
@@ -183,7 +184,8 @@
     "targetRole": "شفٹ برائے",
     "targetRoleWorker": "ورکر",
     "targetRoleChecker": "چیکر",
-    "peopleWorking": "کام کرنے والے افراد"
+    "peopleWorking": "کام کرنے والے افراد",
+    "format": "فارمیٹ"
   },
   "nav": {
     "history": "تاریخ",
@@ -221,7 +223,8 @@
     "rateWorker": "ورکر کی درجہ بندی",
     "schedule": "شیڈول",
     "rooms": "کمرے",
-    "more": "مزید"
+    "more": "مزید",
+    "reports": "رپورٹس"
   },
   "roles": {
     "admin": "ایڈمن",
@@ -1285,5 +1288,8 @@
     "copied": "کاپی ہو گیا",
     "openForm": "بھرا ہوا نیا صارف فارم کھولیں",
     "untitled": "بغیر عنوان گفتگو"
+  },
+  "reports": {
+    "pageDescription": "ٹیم کا ڈیٹا فائل کے طور پر برآمد کریں۔"
   }
 }

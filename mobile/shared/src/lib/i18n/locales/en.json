@@ -92,7 +92,8 @@
     "filtersWithCount": "Filters ({{count}})",
     "filtersHint": "Opens the filter options for this list",
     "reset": "Reset",
-    "share": "Share"
+    "share": "Share",
+    "lastNDays": "Last {{count}} days"
   },
   "fields": {
     "name": "Name",
@@ -182,7 +183,8 @@
     "targetRole": "Shift for",
     "targetRoleWorker": "Worker",
     "targetRoleChecker": "Checker",
-    "peopleWorking": "People working"
+    "peopleWorking": "People working",
+    "format": "Format"
   },
   "nav": {
     "history": "History",
@@ -220,7 +222,8 @@
     "rateWorker": "Rate Worker",
     "schedule": "Schedule",
     "rooms": "Rooms",
-    "more": "More"
+    "more": "More",
+    "reports": "Reports"
   },
   "roles": {
     "admin": "Admin",
@@ -1284,5 +1287,8 @@
     "copied": "Copied",
     "openForm": "Open the filled-in New user form",
     "untitled": "Untitled conversation"
+  },
+  "reports": {
+    "pageDescription": "Export team data as a file."
   }
 }

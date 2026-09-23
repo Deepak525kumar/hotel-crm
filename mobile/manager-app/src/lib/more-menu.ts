@@ -110,6 +110,14 @@ export function buildMenu(context: {
           glyph: '★',
           keywords: ['ranking', 'top', 'quality', 'rating'],
         },
+        // S-37. The only way to reach three of the four report datasets:
+        // nothing in the web portal spends `reports:export-team` at all.
+        {
+          route: '/reports',
+          label: t('nav.reports'),
+          glyph: '⎙',
+          keywords: ['export', 'xlsx', 'pdf', 'download', 'csv'],
+        },
       ],
     },
     {

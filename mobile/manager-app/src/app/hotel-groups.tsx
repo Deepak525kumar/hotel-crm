@@ -7,6 +7,7 @@ import useSWR from 'swr';
 
 import {
   Badge,
+  Button,
   Card,
   DataRow,
   EmptyState,
@@ -17,6 +18,7 @@ import {
   ThemedText,
   ThemedView,
   api,
+  useAuthStore,
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
@@ -39,6 +41,7 @@ import { formatDateTime } from '@/lib/assignment-format';
  */
 export default function HotelGroups() {
   const { t } = useTranslation();
+  const role = useAuthStore((st) => st.user?.role);
   const { workerName } = useDirectory();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -66,7 +69,20 @@ export default function HotelGroups() {
           }
         >
           <BackLink />
-          <ScreenHeader title={t('nav.hotelGroups')} />
+          <ScreenHeader
+            title={t('nav.hotelGroups')}
+            // Admin only, and here the client and server agree exactly:
+            // POST /crm/hotel-groups is `requireRole('admin')` outright.
+            action={
+              role === 'admin' ? (
+                <Button
+                  label={t('hotelGroups.newTitle')}
+                  variant="ghost"
+                  onPress={() => router.push('/admin/hotel-groups/new')}
+                />
+              ) : undefined
+            }
+          />
 
           {groups.isLoading ? (
             <SkeletonList rows={4} />

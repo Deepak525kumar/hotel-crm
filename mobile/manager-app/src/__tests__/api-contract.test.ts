@@ -79,6 +79,62 @@ describe('client/server request contracts', () => {
   });
 
   /**
+   * Every team export the app could make was rejected, and reported as a 500.
+   *
+   * `POST /reports/export` requires `dataset`, `format`, `from` AND `to`. The
+   * client sent `{ dataset }` alone, so it could never succeed — and because
+   * the route used a bare `.parse()`, a missing field surfaced as
+   * `500 INTERNAL_ERROR` rather than a validation error, which reads as the
+   * server being broken rather than the request being incomplete. Both halves
+   * are fixed; this pins both.
+   */
+  it('the team export sends every field the endpoint requires', () => {
+    const client = readFileSync(
+      join(REPO, 'mobile', 'shared', 'src', 'lib', 'api.ts'),
+      'utf8'
+    );
+    const sig = client.match(/exportTeam: \(input: \{([\s\S]*?)\}\) =>/);
+    expect(sig).not.toBeNull();
+    for (const field of ['dataset', 'format', 'from', 'to']) {
+      expect(sig![1]).toContain(field);
+    }
+    // Required, not optional: an optional `format` is how this broke.
+    expect(sig![1]).not.toMatch(/format\?:/);
+    expect(sig![1]).not.toMatch(/from\?:/);
+    expect(sig![1]).not.toMatch(/to\?:/);
+
+    // And the server still demands them, so this test fails if the
+    // requirement is ever relaxed and the strictness here becomes a lie.
+    const routes = backendSource('src', 'modules', 'reports', 'routes.ts');
+    expect(routes).toContain('parseExportBody');
+    // A bare `.parse()` on the body is what turned a 422 into a 500.
+    expect(routes).not.toMatch(/ReportFormatSchema\.exclude\(\['json'\]\)\.parse\(/);
+  });
+
+  /**
+   * All four datasets are reachable. The app shipped with one hard-coded
+   * `dataset: 'attendance'` row, so three of the four could not be exported
+   * at all -- and this is the only surface that reaches them, since nothing
+   * in the web portal spends `reports:export-team`.
+   */
+  it('the reports screen offers every dataset the server defines', () => {
+    const screen = readFileSync(
+      join(REPO, 'mobile', 'manager-app', 'src', 'app', 'reports.tsx'),
+      'utf8'
+    );
+    const offered = screen.match(/const DATASETS = \[([^\]]*)\]/);
+    expect(offered).not.toBeNull();
+    const offeredNames = [...offered![1].matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort();
+
+    const types = backendSource('src', 'modules', 'reports', 'types.ts');
+    const declared = types.match(/ReportDatasetSchema = z\.enum\(\[([^\]]*)\]/);
+    expect(declared).not.toBeNull();
+    const declaredNames = [...declared![1].matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort();
+
+    expect(offeredNames).toEqual(declaredNames);
+  });
+
+  /**
    * /users caps `limit` at 100, and validateQuery THROWS rather than clamping.
    * useDirectory asked for 200, so the whole directory 400'd -- and the rota
    * then rendered a raw cuid for every name, which looked like a missing-name

@@ -92,7 +92,8 @@
     "filtersWithCount": "Filter ({{count}})",
     "filtersHint": "Öffnet die Filteroptionen für diese Liste",
     "reset": "Zurücksetzen",
-    "share": "Teilen"
+    "share": "Teilen",
+    "lastNDays": "Letzte {{count}} Tage"
   },
   "fields": {
     "name": "Name",
@@ -182,7 +183,8 @@
     "targetRole": "Schicht für",
     "targetRoleWorker": "Mitarbeiter",
     "targetRoleChecker": "Prüfer",
-    "peopleWorking": "Arbeitende Personen"
+    "peopleWorking": "Arbeitende Personen",
+    "format": "Format"
   },
   "nav": {
     "history": "Verlauf",
@@ -220,7 +222,8 @@
     "rateWorker": "Mitarbeiter bewerten",
     "schedule": "Dienstplan",
     "rooms": "Zimmer",
-    "more": "Mehr"
+    "more": "Mehr",
+    "reports": "Berichte"
   },
   "roles": {
     "admin": "Administrator",
@@ -1284,5 +1287,8 @@
     "copied": "Kopiert",
     "openForm": "Ausgefülltes Formular „Neuer Benutzer“ öffnen",
     "untitled": "Unbenanntes Gespräch"
+  },
+  "reports": {
+    "pageDescription": "Teamdaten als Datei exportieren."
   }
 }

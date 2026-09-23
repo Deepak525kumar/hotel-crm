@@ -436,12 +436,35 @@ export const api = {
      * is a poor place to read a report and a good place to send one. The
      * response is a download the caller shares or opens elsewhere.
      */
-    exportTeam: (input: { dataset: string; from?: string; to?: string }) =>
+    /**
+     * `format`, `from` and `to` are ALL REQUIRED (2026-09-23).
+     *
+     * This sent `{ dataset }` alone and the range was typed optional, so every
+     * team export the app could make was rejected -- and, because the route
+     * used a bare `.parse()`, it came back as `500 INTERNAL_ERROR` rather than
+     * a validation error, so it read as the server being broken. The route now
+     * answers 422 with the missing field names; this signature is what it
+     * actually accepts.
+     *
+     * The range is capped at 366 days and `from` must not be after `to`, both
+     * enforced server-side by the same `DateRangeSchema` the read path uses.
+     */
+    exportTeam: (input: {
+      dataset: 'assignments' | 'attendance' | 'absences' | 'rooms';
+      format: 'xlsx' | 'pdf';
+      from: string; // YYYY-MM-DD
+      to: string; // YYYY-MM-DD
+    }) =>
       request<GeneratedReportDto>('/reports/export', {
         method: 'POST',
         body: JSON.stringify(input),
       }),
 
+    /**
+     * The caller's OWN data (GDPR Article 15/20). The range is genuinely
+     * optional here and the server defaults it to the last year -- someone
+     * exercising a data-access right should not have to know a date range.
+     */
     exportMine: (range?: { from: string; to: string }) =>
       request<GeneratedReportDto>('/reports/export/mine', {
         method: 'POST',
@@ -943,6 +966,52 @@ export const api = {
      * Admin-only, like restore below: archiving and restoring are master-data
      * lifecycle (ADR-030 D-2), not operations.
      */
+    /**
+     * Master data — S-36, admin only (2026-09-23).
+     *
+     * `POST /crm/hotels` is gated `requireRoleFlagged(['admin','manager'], 'admin')`,
+     * so with `FEATURE_GD02_MATRIX` off a *manager* also passes the role gate
+     * while an RM does not. That asymmetry is `SIR-CRM-020`, open and
+     * deliberately unfixed — the app gates its own UI on `admin` alone rather
+     * than mirroring the quirk, because a screen that appears for managers on
+     * some deployments and not others is worse than one that never does.
+     *
+     * `createHotel` IGNORES `hotel_group_id`: assign the group with a
+     * separate PATCH, exactly as the E2E setup does. Sending it here is
+     * silently dropped, which is how a hotel ends up ungrouped.
+     */
+    createHotel: (input: {
+      name: string;
+      city: string;
+      address: string;
+      country?: string;
+      timezone?: string;
+      latitude?: number;
+      longitude?: number;
+    }) => request<Hotel>('/crm/hotels', { method: 'POST', body: JSON.stringify(input) }),
+
+    updateHotel: (
+      id: string,
+      input: Partial<{
+        name: string;
+        city: string;
+        address: string;
+        country: string;
+        timezone: string;
+        hotel_group_id: string | null;
+        accepting_jobs: boolean;
+      }>
+    ) => request<Hotel>(`/crm/hotels/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+
+    createHotelGroup: (input: { name: string; billing_info?: string }) =>
+      request<HotelGroup>('/crm/hotel-groups', { method: 'POST', body: JSON.stringify(input) }),
+
+    updateHotelGroup: (id: string, input: { name?: string; billing_info?: string }) =>
+      request<HotelGroup>(`/crm/hotel-groups/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+
     archivedHotels: () => request<Hotel[]>('/crm/hotels?only_deleted=true'),
     archivedHotelGroups: () => request<HotelGroup[]>('/crm/hotel-groups?only_deleted=true'),
 

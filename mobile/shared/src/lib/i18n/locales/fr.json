@@ -92,7 +92,8 @@
     "filtersWithCount": "Filtres ({{count}})",
     "filtersHint": "Ouvre les options de filtre pour cette liste",
     "reset": "Réinitialiser",
-    "share": "Partager"
+    "share": "Partager",
+    "lastNDays": "{{count}} derniers jours"
   },
   "fields": {
     "name": "Nom",
@@ -182,7 +183,8 @@
     "targetRole": "Poste pour",
     "targetRoleWorker": "Employé",
     "targetRoleChecker": "Contrôleur",
-    "peopleWorking": "Personnes au travail"
+    "peopleWorking": "Personnes au travail",
+    "format": "Format"
   },
   "nav": {
     "history": "Historique",
@@ -220,7 +222,8 @@
     "rateWorker": "Évaluer l'employé",
     "schedule": "Planning",
     "rooms": "Chambres",
-    "more": "Plus"
+    "more": "Plus",
+    "reports": "Rapports"
   },
   "roles": {
     "admin": "Administrateur",
@@ -1284,5 +1287,8 @@
     "copied": "Copié",
     "openForm": "Ouvrir le formulaire Nouvel utilisateur prérempli",
     "untitled": "Conversation sans titre"
+  },
+  "reports": {
+    "pageDescription": "Exportez les données de l'équipe sous forme de fichier."
   }
 }

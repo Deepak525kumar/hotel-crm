@@ -92,7 +92,8 @@
     "filtersWithCount": "Фільтри ({{count}})",
     "filtersHint": "Відкриває параметри фільтрування для цього списку",
     "reset": "Скинути",
-    "share": "Поділитися"
+    "share": "Поділитися",
+    "lastNDays": "Останні {{count}} днів"
   },
   "fields": {
     "name": "Ім'я",
@@ -182,7 +183,8 @@
     "targetRole": "Зміна для",
     "targetRoleWorker": "Працівник",
     "targetRoleChecker": "Перевіряючий",
-    "peopleWorking": "Працівників"
+    "peopleWorking": "Працівників",
+    "format": "Формат"
   },
   "nav": {
     "history": "Історія",
@@ -220,7 +222,8 @@
     "rateWorker": "Оцінити працівника",
     "schedule": "Розклад",
     "rooms": "Кімнати",
-    "more": "Більше"
+    "more": "Більше",
+    "reports": "Звіти"
   },
   "roles": {
     "admin": "Адміністратор",
@@ -1284,5 +1287,8 @@
     "copied": "Скопійовано",
     "openForm": "Відкрити заповнену форму нового користувача",
     "untitled": "Розмова без назви"
+  },
+  "reports": {
+    "pageDescription": "Експортуйте дані команди у файл."
   }
 }
