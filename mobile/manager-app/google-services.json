@@ -7,9 +7,47 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:14495829635:android:35bd49a959269d01f095b6",
+        "android_client_info": {
+          "package_name": "com.fhmhotelservices.checkerapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqGe7aofnRBpvHkL1XURNbAfmVqrt8udc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:14495829635:android:bc0c1cec7f926becf095b6",
         "android_client_info": {
           "package_name": "com.fhmhotelservices.managerapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqGe7aofnRBpvHkL1XURNbAfmVqrt8udc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:14495829635:android:348375a0d70b0641f095b6",
+        "android_client_info": {
+          "package_name": "com.fhmhotelservices.workerapp"
         }
       },
       "oauth_client": [],

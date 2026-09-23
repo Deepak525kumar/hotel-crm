@@ -7,7 +7,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:14495829635:android:29d52ee5fd05f10bf095b6",
+        "mobilesdk_app_id": "1:14495829635:android:35bd49a959269d01f095b6",
         "android_client_info": {
           "package_name": "com.fhmhotelservices.checkerapp"
         }
@@ -26,9 +26,66 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:14495829635:android:814b079ac798b9f5f095b6",
+        "mobilesdk_app_id": "1:14495829635:android:bc0c1cec7f926becf095b6",
+        "android_client_info": {
+          "package_name": "com.fhmhotelservices.managerapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqGe7aofnRBpvHkL1XURNbAfmVqrt8udc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:14495829635:android:348375a0d70b0641f095b6",
         "android_client_info": {
           "package_name": "com.fhmhotelservices.workerapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqGe7aofnRBpvHkL1XURNbAfmVqrt8udc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:14495829635:android:29d52ee5fd05f10bf095b6",
+        "android_client_info": {
+          "package_name": "com.hotelcrm.checkerapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqGe7aofnRBpvHkL1XURNbAfmVqrt8udc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:14495829635:android:814b079ac798b9f5f095b6",
+        "android_client_info": {
+          "package_name": "com.hotelcrm.workerapp"
         }
       },
       "oauth_client": [],

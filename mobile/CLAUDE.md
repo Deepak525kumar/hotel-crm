@@ -17,7 +17,7 @@ only what is true across all four — do not restate it in a child.
 The web portal (`frontend/`) serves the same three roles as `manager-app`; it is
 not being retired. Both exist.
 
-## The four rules that cut across every package
+## The six rules that cut across every package
 
 **1. Locale catalogues are all-or-nothing, across four packages.**
 `frontend`, `worker-app`, `checker-app` and `shared` each deep-equal their
@@ -57,7 +57,26 @@ Only a device running a build cut before the dependency was added fails.
 `require()` it inside the function that uses it and degrade gracefully;
 manager-app's `native-module-imports.test.ts` enforces this.
 
-**5. Icons are generated, not hand-edited.** `mobile/scripts/generate-app-icons.mjs`
+**5. `google-services.json` is generated, not hand-edited.** All three apps
+ship the SAME project-level file, listing every client; each build picks the
+one whose `package_name` matches its `applicationId`.
+
+On 2026-09-23 the Firebase project was found holding worker and checker under
+`com.hotelcrm.*` while their committed configs claimed `com.fhmhotelservices.*`
+— commit `3e425c0e` had edited the package names in the JSON rather than
+re-registering the apps. The file was self-consistent, so every existing
+assertion passed, and **not one Android device had ever registered a push
+token for any app**. Nothing surfaced it: a device that cannot register simply
+has no token, the backend then finds no devices, and the outbox event is still
+marked `DELIVERED`.
+
+A Firebase app's package name cannot be changed after creation, so the fix was
+to register the real packages afresh and regenerate the config. Regenerate it;
+never correct it by hand. Each app's `android-fcm-config.test.ts` now also
+asserts that no two clients share an app id (the fingerprint of such an edit)
+and that all three files are byte-identical.
+
+**6. Icons are generated, not hand-edited.** `mobile/scripts/generate-app-icons.mjs`
 renders every size for all three apps from one vector source each. Re-run it
 after touching `GLYPHS` or `BRANDS`; it is reproducible, so a clean `git status`
 afterwards is the check that nothing drifted.

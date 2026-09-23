@@ -79,13 +79,12 @@ catalogues it is pinned against.
   generated it**, with `expo.android.googleServicesFile` pointing at it.
   `fcm-config.test.ts` pins the package/app-id/project agreement.
 
-  **Never hand-edit that file.** Worker and checker are registered in Firebase
-  under `com.hotelcrm.workerapp` / `com.hotelcrm.checkerapp` — the placeholder
-  namespace that had already caused one APNs outage — while their committed
-  configs claim `com.fhmhotelservices.*`, because commit `3e425c0e` edited the
-  package names in the JSON instead of re-registering the apps. Firebase and
-  the file disagree, and as of 2026-09-23 **not one Android device had ever
-  registered a push token for any of the three apps**. A Firebase app's
-  package name cannot be changed after creation, so fixing those two means
-  registering them afresh and regenerating their configs; nothing is lost,
-  since there are no Android tokens to invalidate.
+  **Never hand-edit that file.** Worker and checker were registered in
+  Firebase under `com.hotelcrm.*` — the placeholder namespace that had already
+  caused one APNs outage — while their committed configs claimed
+  `com.fhmhotelservices.*`, because commit `3e425c0e` edited the package names
+  in the JSON instead of re-registering the apps. As of 2026-09-23 **not one
+  Android device had ever registered a push token for any of the three
+  apps**. Both were re-registered under their real packages the same day and
+  all three now ship the identical, unedited project config — see
+  `mobile/CLAUDE.md` for the shared rule.
