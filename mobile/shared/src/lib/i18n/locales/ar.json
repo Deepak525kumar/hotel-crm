@@ -88,7 +88,11 @@
     "submit": "إرسال",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "حدث خطأ ما."
+    "unknownError": "حدث خطأ ما.",
+    "filters": "عوامل التصفية",
+    "filtersWithCount": "عوامل التصفية ({{count}})",
+    "filtersHint": "يفتح خيارات التصفية لهذه القائمة",
+    "reset": "إعادة تعيين"
   },
   "fields": {
     "name": "الاسم",
@@ -260,7 +264,11 @@
     "reassigned": "أُعيد تعيينه",
     "partial": "جزئي",
     "excused": "بعذر",
-    "expected": "متوقع"
+    "expected": "متوقع",
+    "draft": "مسودة",
+    "open": "مفتوح",
+    "partiallyFilled": "مكتمل جزئيًا",
+    "filled": "مكتمل"
   },
   "assignments": {
     "shiftDetails": "تفاصيل الوردية",

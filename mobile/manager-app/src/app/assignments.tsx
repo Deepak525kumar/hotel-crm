@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
@@ -105,7 +105,26 @@ export default function Assignments() {
           visible={filtersOpen}
           onClose={() => setFiltersOpen(false)}
           title={t('common.filter')}
-          footer={<Button label={t('common.done')} onPress={() => setFiltersOpen(false)} />}
+          footer={
+            /* A way BACK to "no filters" -- see requests.tsx's note. */
+            <View style={styles.sheetActions}>
+              <Button
+                label={t('common.reset')}
+                variant="ghost"
+                disabled={status === null && search === ''}
+                style={styles.sheetAction}
+                onPress={() => {
+                  setStatus(null);
+                  setSearch('');
+                }}
+              />
+              <Button
+                label={t('common.done')}
+                style={styles.sheetAction}
+                onPress={() => setFiltersOpen(false)}
+              />
+            </View>
+          }
         >
           <Input label={t('common.search')} value={search} onChangeText={setSearch} />
           <SelectSheet
@@ -124,6 +143,8 @@ export default function Assignments() {
 }
 
 const styles = StyleSheet.create({
+  sheetActions: { flexDirection: 'row', gap: Spacing.two },
+  sheetAction: { flex: 1 },
   root: { flex: 1 },
   safe: { flex: 1 },
   content: {

@@ -23,6 +23,7 @@ import {
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
+import { workRequestStatusLabel } from '@/lib/assignment-format';
 
 const STATUSES = ['DRAFT', 'OPEN', 'PARTIALLY_FILLED', 'FILLED', 'CANCELLED', 'EXPIRED'] as const;
 
@@ -108,7 +109,12 @@ export default function Requests() {
                 title={row.position}
                 subtitle={row.hotel?.name ?? row.hotel_id}
                 meta={`${row.workers_confirmed}/${row.workers_needed}`}
-                trailing={<Badge label={row.status} tone={row.status === 'OPEN' ? 'primary' : 'neutral'} />}
+                trailing={
+                  <Badge
+                    label={workRequestStatusLabel(row.status, t)}
+                    tone={row.status === 'OPEN' ? 'primary' : 'neutral'}
+                  />
+                }
                 onPress={() => router.push(`/request/${row.id}`)}
               />
             ))
@@ -119,14 +125,38 @@ export default function Requests() {
           visible={filtersOpen}
           onClose={() => setFiltersOpen(false)}
           title={t('common.filter')}
-          footer={<Button label={t('common.done')} onPress={() => setFiltersOpen(false)} />}
+          footer={
+            /*
+              A way BACK to "no filters" (2026-09-23). The sheet only ever
+              offered Done, so clearing two filters meant reopening it and
+              setting each back to "All" by hand -- and an empty list with no
+              obvious way out reads as a broken screen, not as a narrow filter.
+            */
+            <View style={styles.sheetActions}>
+              <Button
+                label={t('common.reset')}
+                variant="ghost"
+                disabled={status === null && kind === 'all'}
+                style={styles.sheetAction}
+                onPress={() => {
+                  setStatus(null);
+                  setKind('all');
+                }}
+              />
+              <Button
+                label={t('common.done')}
+                style={styles.sheetAction}
+                onPress={() => setFiltersOpen(false)}
+              />
+            </View>
+          }
         >
           <SelectSheet
             label={t('fields.status')}
             value={status}
             options={[
               { value: '__any__', label: t('common.all') },
-              ...STATUSES.map((s) => ({ value: s, label: s })),
+              ...STATUSES.map((s) => ({ value: s, label: workRequestStatusLabel(s, t) })),
             ]}
             onChange={(next) => setStatus(next === '__any__' ? null : next)}
           />
@@ -150,6 +180,8 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
   bar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
+  sheetActions: { flexDirection: 'row', gap: Spacing.two },
+  sheetAction: { flex: 1 },
   content: {
     padding: Spacing.three,
     gap: Spacing.two,

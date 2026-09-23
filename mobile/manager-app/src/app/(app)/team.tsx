@@ -147,7 +147,26 @@ export default function Team() {
           visible={filtersOpen}
           onClose={() => setFiltersOpen(false)}
           title={t('common.filter')}
-          footer={<Button label={t('common.done')} onPress={() => setFiltersOpen(false)} />}
+          footer={
+            /* A way BACK to "no filters" -- see requests.tsx's note. */
+            <View style={styles.sheetActions}>
+              <Button
+                label={t('common.reset')}
+                variant="ghost"
+                disabled={role === null && search === ''}
+                style={styles.sheetAction}
+                onPress={() => {
+                  setRole(null);
+                  setSearch('');
+                }}
+              />
+              <Button
+                label={t('common.done')}
+                style={styles.sheetAction}
+                onPress={() => setFiltersOpen(false)}
+              />
+            </View>
+          }
         >
           <Input label={t('common.search')} value={search} onChangeText={setSearch} />
           <SelectSheet
@@ -166,6 +185,8 @@ export default function Team() {
 }
 
 const styles = StyleSheet.create({
+  sheetActions: { flexDirection: 'row', gap: Spacing.two },
+  sheetAction: { flex: 1 },
   root: { flex: 1 },
   safe: { flex: 1 },
   bar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },

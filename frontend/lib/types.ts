@@ -817,10 +817,43 @@ export interface Assignment {
   updated_at: string;
   /** Null until POST /:id/rooms-completed is called for this assignment. */
   rooms_completed: RoomsCompletedEntry | null;
+  /**
+   * Resolved by the read paths (list/getById), and absent from this type
+   * until 2026-09-23 -- so every surface that wanted to name a person fetched
+   * /users/:id per row instead, which is an N+1 and, for a viewer without
+   * users:read, a 403 where a name belongs.
+   */
+  worker_name?: string | null;
+  assigned_by_name?: string | null;
+  shift_start_time?: string | null; // HH:mm
+  shift_end_time?: string | null; // HH:mm
+  /**
+   * Where the shift is. Nested by the server rather than served from
+   * /crm/hotels/:id, which is scoped by the caller's own hotel claim -- a
+   * worker assigned to a hotel gets 403 on that endpoint.
+   */
+  hotel?: AssignmentHotel | null;
+}
+
+/** The hotel fields nested on an assignment: enough to get to the shift, and nothing commercial. */
+export interface AssignmentHotel {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  country: string;
+  timezone: string;
+  latitude: number | null;
+  longitude: number | null;
+  contact_phone: string | null;
+  contact_email: string | null;
 }
 
 /** Query params accepted by `GET /assignments`. */
 export interface ListAssignmentsQuery {
+  /** Both or neither -- the server refuses a half-open range. */
+  from?: string; // YYYY-MM-DD
+  to?: string; // YYYY-MM-DD
   hotel_id?: string;
   work_request_id?: string;
   job_request_id?: string;
@@ -898,6 +931,14 @@ export interface CalendarEntryDto {
   /** Present on list responses, so a cancelled placement renders as cancelled
    *  instead of silently disappearing from the grid. */
   assignment_status?: AssignmentStatus;
+  /**
+   * Nested by the server on list responses (2026-09-23), identity fields
+   * only. The grid resolved every worker id with a per-id fetch and rendered
+   * a raw cuid until it returned; the name now arrives with the row that was
+   * already scoped to produce it. Optional: only the read paths join it.
+   */
+  worker?: { id: string; first_name: string; last_name: string } | null;
+  hotel?: { id: string; name: string; city: string } | null;
   placed_by_id: string;
   created_at: string;
   updated_at: string;

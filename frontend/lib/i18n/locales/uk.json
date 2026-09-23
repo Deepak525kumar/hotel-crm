@@ -87,7 +87,11 @@
     "submit": "Надіслати",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "Щось пішло не так."
+    "unknownError": "Щось пішло не так.",
+    "filters": "Фільтри",
+    "filtersWithCount": "Фільтри ({{count}})",
+    "filtersHint": "Відкриває параметри фільтрування для цього списку",
+    "reset": "Скинути"
   },
   "fields": {
     "name": "Ім'я",
@@ -259,7 +263,11 @@
     "reassigned": "Перепризначено",
     "partial": "Частково",
     "excused": "Виправдано",
-    "expected": "Очікується"
+    "expected": "Очікується",
+    "draft": "Чернетка",
+    "open": "Відкрито",
+    "partiallyFilled": "Частково заповнено",
+    "filled": "Заповнено"
   },
   "assignments": {
     "shiftDetails": "Деталі зміни",

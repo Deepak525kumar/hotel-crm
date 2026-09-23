@@ -87,7 +87,11 @@
     "submit": "Absenden",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "Etwas ist schiefgelaufen."
+    "unknownError": "Etwas ist schiefgelaufen.",
+    "filters": "Filter",
+    "filtersWithCount": "Filter ({{count}})",
+    "filtersHint": "Öffnet die Filteroptionen für diese Liste",
+    "reset": "Zurücksetzen"
   },
   "fields": {
     "name": "Name",
@@ -259,7 +263,11 @@
     "reassigned": "Neu zugewiesen",
     "partial": "Teilweise",
     "excused": "Entschuldigt",
-    "expected": "Erwartet"
+    "expected": "Erwartet",
+    "draft": "Entwurf",
+    "open": "Offen",
+    "partiallyFilled": "Teilweise besetzt",
+    "filled": "Besetzt"
   },
   "assignments": {
     "shiftDetails": "Schichtdetails",

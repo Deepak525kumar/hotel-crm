@@ -89,3 +89,29 @@ export function formatDateTime(iso: string): string {
     d.getHours()
   )}:${pad(d.getMinutes())}`;
 }
+
+/**
+ * Localised label for a WORK REQUEST status.
+ *
+ * Distinct enum from `AssignmentStatus` and deliberately a separate function:
+ * they share CANCELLED and nothing else, and one switch covering both is how
+ * a shift ends up labelled "Partially filled".
+ */
+export function workRequestStatusLabel(status: string, t: (key: string) => string): string {
+  switch (status) {
+    case 'DRAFT':
+      return t('status.draft');
+    case 'OPEN':
+      return t('status.open');
+    case 'PARTIALLY_FILLED':
+      return t('status.partiallyFilled');
+    case 'FILLED':
+      return t('status.filled');
+    case 'CANCELLED':
+      return t('status.cancelled');
+    case 'EXPIRED':
+      return t('status.expired');
+    default:
+      return status;
+  }
+}

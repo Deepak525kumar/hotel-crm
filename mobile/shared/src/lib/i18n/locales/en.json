@@ -87,7 +87,11 @@
     "submit": "Submit",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "Something went wrong."
+    "unknownError": "Something went wrong.",
+    "filters": "Filters",
+    "filtersWithCount": "Filters ({{count}})",
+    "filtersHint": "Opens the filter options for this list",
+    "reset": "Reset"
   },
   "fields": {
     "name": "Name",
@@ -259,7 +263,11 @@
     "reassigned": "Reassigned",
     "partial": "Partial",
     "excused": "Excused",
-    "expected": "Expected"
+    "expected": "Expected",
+    "draft": "Draft",
+    "open": "Open",
+    "partiallyFilled": "Partially filled",
+    "filled": "Filled"
   },
   "assignments": {
     "shiftDetails": "Shift details",

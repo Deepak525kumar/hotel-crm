@@ -87,7 +87,11 @@
     "submit": "Envoyer",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "Une erreur s'est produite."
+    "unknownError": "Une erreur s'est produite.",
+    "filters": "Filtres",
+    "filtersWithCount": "Filtres ({{count}})",
+    "filtersHint": "Ouvre les options de filtre pour cette liste",
+    "reset": "Réinitialiser"
   },
   "fields": {
     "name": "Nom",
@@ -259,7 +263,11 @@
     "reassigned": "Réattribué",
     "partial": "Partiel",
     "excused": "Excusé",
-    "expected": "Attendu"
+    "expected": "Attendu",
+    "draft": "Brouillon",
+    "open": "Ouvert",
+    "partiallyFilled": "Partiellement pourvu",
+    "filled": "Pourvu"
   },
   "assignments": {
     "shiftDetails": "Détails du service",

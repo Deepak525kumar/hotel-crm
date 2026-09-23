@@ -410,3 +410,102 @@ describe('GET /quality/my-inspections authorization', () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ForbiddenError' }));
   });
 });
+
+/**
+ * GET /quality/checks — the MANAGEMENT-facing inspection history (2026-09-23).
+ *
+ * The web's History tab called /my-inspections, which filters on
+ * `verified_by_id = caller`. That is exactly right for a checker and empty
+ * forever for a manager, RM or admin, none of whom record inspections -- so
+ * the tab looked broken rather than inapplicable. This endpoint answers the
+ * different question those roles are actually asking: which checks were
+ * recorded at MY hotels.
+ *
+ * The assertions below are about WHICH ROWS, not about formatting: scope here
+ * is an authorization boundary, and the DTO is already covered above.
+ */
+describe('QualityService.listChecksInScope', () => {
+  let service: QualityService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new QualityService();
+    mockQualityVerification.count.mockResolvedValue(1);
+    mockQualityVerification.findMany.mockResolvedValue([ROW]);
+  });
+
+  const whereOf = () => mockQualityVerification.findMany.mock.calls[0][0].where;
+
+  it('does not filter by verified_by_id -- that is what made the tab empty', async () => {
+    await service.listChecksInScope({ userId: 'admin-1', role: 'admin' } as any);
+    expect(JSON.stringify(whereOf())).not.toContain('verified_by_id');
+  });
+
+  it('narrows a hotel-scoped manager to their own hotel', async () => {
+    await service.listChecksInScope({
+      userId: 'mgr-1',
+      role: 'manager',
+      scope: { type: 'hotel', hotel_id: 'hotel-1' },
+    } as any);
+    expect(whereOf().AND).toContainEqual({ hotel_id: 'hotel-1' });
+  });
+
+  /**
+   * regional_manager, explicitly. Role gates here are exact-match strings and
+   * a check written for `manager` alone omits RM with no error anywhere --
+   * this repository's most repeated bug, at roughly forty sites.
+   */
+  it('narrows a regional manager to their own group', async () => {
+    await service.listChecksInScope({
+      userId: 'rm-1',
+      role: 'regional_manager',
+      scope: { type: 'hotel_group', hotel_group_id: 'group-1' },
+    } as any);
+    expect(whereOf().AND).toContainEqual({ hotel: { hotel_group_id: 'group-1' } });
+  });
+
+  /** An absent scope claim is not "see everything". */
+  it('returns nothing for a scoped manager with no scope claim', async () => {
+    const result = await service.listChecksInScope({
+      userId: 'mgr-1',
+      role: 'manager',
+      scope: null,
+    } as any);
+    expect(result.checks).toEqual([]);
+    expect(result.pagination.total).toBe(0);
+    expect(mockQualityVerification.findMany).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A client-supplied hotel_id NARROWS and can never widen: it is ANDed with
+   * the scope filter, not substituted for it. Asking for someone else's hotel
+   * yields a query matching nothing, not that hotel's checks.
+   */
+  it('ANDs a requested hotel with the scope rather than replacing it', async () => {
+    await service.listChecksInScope(
+      { userId: 'mgr-1', role: 'manager', scope: { type: 'hotel', hotel_id: 'hotel-1' } } as any,
+      { hotelId: 'hotel-999' }
+    );
+    const and = whereOf().AND;
+    expect(and).toContainEqual({ hotel_id: 'hotel-1' });
+    expect(and).toContainEqual({ hotel_id: 'hotel-999' });
+  });
+
+  it('refuses a role that is neither admin nor a scoped manager', async () => {
+    await expect(
+      service.listChecksInScope({ userId: 'w1', role: 'worker' } as any)
+    ).rejects.toMatchObject({ name: 'ForbiddenError' });
+  });
+
+  /**
+   * Against the REAL matrix, never a fabricated token. A tool once required a
+   * permission WORKER does not hold and would have denied every worker in
+   * production while 100+ tests passed, because they invented it.
+   */
+  it('is gated on a token all three management roles actually hold', () => {
+    // Keyed UPPERCASE, as the matrix declares them.
+    for (const role of ['ADMIN', 'MANAGER', 'REGIONAL_MANAGER'] as const) {
+      expect(ROLE_PERMISSIONS[role]).toContain('quality:read');
+    }
+  });
+});

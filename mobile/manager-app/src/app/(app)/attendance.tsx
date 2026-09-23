@@ -114,7 +114,26 @@ export default function AttendanceScreen() {
           visible={filtersOpen}
           onClose={() => setFiltersOpen(false)}
           title={t('common.filter')}
-          footer={<Button label={t('common.done')} onPress={() => setFiltersOpen(false)} />}
+          footer={
+            /* A way BACK to "no filters" -- see requests.tsx's note. */
+            <View style={styles.sheetActions}>
+              <Button
+                label={t('common.reset')}
+                variant="ghost"
+                disabled={status === null && !unverifiedOnly}
+                style={styles.sheetAction}
+                onPress={() => {
+                  setStatus(null);
+                  setUnverifiedOnly(false);
+                }}
+              />
+              <Button
+                label={t('common.done')}
+                style={styles.sheetAction}
+                onPress={() => setFiltersOpen(false)}
+              />
+            </View>
+          }
         >
           <SelectSheet
             label={t('fields.status')}
@@ -140,6 +159,8 @@ export default function AttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
+  sheetActions: { flexDirection: 'row', gap: Spacing.two },
+  sheetAction: { flex: 1 },
   root: { flex: 1 },
   safe: { flex: 1 },
   content: {

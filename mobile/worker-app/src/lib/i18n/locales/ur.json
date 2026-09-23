@@ -88,7 +88,11 @@
     "submit": "جمع کریں",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "کچھ غلط ہو گیا۔"
+    "unknownError": "کچھ غلط ہو گیا۔",
+    "filters": "فلٹرز",
+    "filtersWithCount": "فلٹرز ({{count}})",
+    "filtersHint": "اس فہرست کے فلٹر اختیارات کھولتا ہے",
+    "reset": "ری سیٹ"
   },
   "fields": {
     "name": "نام",
@@ -260,7 +264,11 @@
     "reassigned": "دوبارہ تفویض شدہ",
     "partial": "جزوی",
     "excused": "رخصت منظور",
-    "expected": "متوقع"
+    "expected": "متوقع",
+    "draft": "مسودہ",
+    "open": "کھلا",
+    "partiallyFilled": "جزوی طور پر پُر",
+    "filled": "پُر"
   },
   "assignments": {
     "shiftDetails": "شفٹ کی تفصیلات",
