@@ -88,6 +88,20 @@ export const ListOwnInspectionsQuerySchema = z.object({
 export type ListOwnInspectionsQuery = z.infer<typeof ListOwnInspectionsQuerySchema>;
 
 /**
+ * The management-facing inspection history (2026-09-23): the same page/search
+ * controls, plus an optional hotel to narrow to.
+ *
+ * `hotel_id` NARROWS within the caller's resolved scope and can never widen
+ * it -- the service ANDs it with the scope filter rather than substituting
+ * it. It is a view convenience, not the gate.
+ */
+export const ListScopedInspectionsQuerySchema = ListOwnInspectionsQuerySchema.extend({
+  hotel_id: z.string().optional(),
+});
+
+export type ListScopedInspectionsQuery = z.infer<typeof ListScopedInspectionsQuerySchema>;
+
+/**
  * One inspection, one request (2026-08-29). Everything the checker captured,
  * plus the decision they made about it.
  *

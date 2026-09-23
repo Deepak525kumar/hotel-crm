@@ -410,13 +410,51 @@ export class EmployeeManagementService extends BaseService {
     const [entries, total] = await Promise.all([
       this.prisma.employeeBlocklistEntry.findMany({
         where,
+        // Who is blocked, resolved here (2026-09-23).
+        //
+        // This returned RAW Prisma rows, whose only person reference is
+        // `employment_record_id`. A client cannot render that: it is neither
+        // a name nor a user id nor the human-facing `employee_id`. The
+        // manager app duly rendered blank rows with duplicate React keys,
+        // because it had invented an `employee_id` field that has never
+        // existed on this wire.
+        //
+        // Narrow select, matching the identity-only shape used by
+        // AttendancePersonDto — a blocklist row discloses no more about a
+        // person than the fact that they are blocked here.
+        include: {
+          employment_record: {
+            select: {
+              employee_id: true,
+              user: { select: { id: true, first_name: true, last_name: true } },
+            },
+          },
+        },
         orderBy: { created_at: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
       this.prisma.employeeBlocklistEntry.count({ where }),
     ]);
-    return { data: entries, total };
+
+    return {
+      data: entries.map((entry) => ({
+        id: entry.id,
+        hotel_id: entry.hotel_id,
+        employment_record_id: entry.employment_record_id,
+        // The human-facing id the write path expects, so a client can echo it
+        // back to setBlocklist without a second lookup.
+        employee_id: entry.employment_record?.employee_id ?? null,
+        user_id: entry.employment_record?.user?.id ?? null,
+        worker_name: entry.employment_record?.user
+          ? `${entry.employment_record.user.first_name} ${entry.employment_record.user.last_name}`.trim()
+          : null,
+        reason: entry.reason,
+        created_by_id: entry.created_by_id,
+        created_at: entry.created_at,
+      })),
+      total,
+    };
   }
 
   // IF-EMP-SetBlocklist / v0 (REQ-EMP-005 / RULE-EMP-07): reason is required.

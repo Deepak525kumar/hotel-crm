@@ -733,6 +733,24 @@ export const qualityApi = {
       })}`,
     ),
 
+  /**
+   * The inspection history a MANAGER, RM or admin may see: scoped server-side
+   * to their hotels, not to checks they recorded themselves.
+   *
+   * `/quality/my-inspections` filters on `verified_by_id = caller`, so the
+   * History tab was permanently empty for every role it admitted except
+   * checker -- an admin has never recorded an inspection (2026-09-23).
+   */
+  scopedInspections: (page = 1, perPage = 20, q?: string, hotelId?: string) =>
+    apiFetch<OwnInspectionsPage>(
+      `/quality/checks${toQuery({
+        page: String(page),
+        per_page: String(perPage),
+        ...(q && q.trim() ? { q: q.trim() } : {}),
+        ...(hotelId ? { hotel_id: hotelId } : {}),
+      })}`,
+    ),
+
   leaderboard: () => apiFetch<QualityLeaderboardEntry[]>("/quality/leaderboard"),
 };
 

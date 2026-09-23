@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
@@ -10,7 +10,6 @@ import {
   EmptyState,
   Input,
   MaxContentWidth,
-  Radius,
   ScreenHeader,
   SectionHeader,
   Spacing,
@@ -78,11 +77,11 @@ export default function More() {
                       {index > 0 ? (
                         <View style={[styles.divider, { backgroundColor: theme.border }]} />
                       ) : null}
-                      <View
+                      <Pressable
                         style={styles.rowWrap}
                         accessibilityRole="button"
                         accessibilityLabel={item.label}
-                        onTouchEnd={() => router.push(item.route as never)}
+                        onPress={() => router.push(item.route as never)}
                       >
                         <ThemedText style={styles.glyph}>{item.glyph}</ThemedText>
                         <View style={styles.text}>
@@ -96,7 +95,7 @@ export default function More() {
                           ) : null}
                         </View>
                         <ThemedText themeColor="textSecondary">›</ThemedText>
-                      </View>
+                      </Pressable>
                     </View>
                   ))}
                 </Card>

@@ -89,26 +89,48 @@ As manager and as RM, open an assignment that has been inspected.
 **no** rate control, **no** score input and **no** "assign rework" button on
 any screen.
 
+> **Corrected 2026-09-23.** This step cited
+> `POST /quality/assignments/:id/checks`, which **does not exist** — there is
+> no such route, and it returned `404` for every caller. A step that 404s
+> proves nothing about a capability gate: it would have "passed" for a
+> *checker* too, who is exactly the role that must be allowed. The real write
+> routes are `POST /quality/verifications` and `POST /quality/inspections`.
+> Both are multipart (`photoUpload`), so send a form field, not JSON.
+
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
-  -H "Authorization: Bearer $MANAGER_T" -H 'Content-Type: application/json' \
-  -d '{"score":80}' http://localhost:3001/api/v1/quality/assignments/$ASSIGNMENT/checks
+  -H "Authorization: Bearer $MANAGER_T" -F 'score=80' \
+  http://localhost:3001/api/v1/quality/verifications
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  -H "Authorization: Bearer $MANAGER_T" -F 'score=80' \
+  http://localhost:3001/api/v1/quality/inspections
 ```
 
-**PASS:** `403`. `quality:write` is Checker-only (`ADR-030` C-27).
+**PASS:** `403` from both, as manager **and** as RM. `quality:write` is
+Checker-only (`ADR-030` C-27).
+
+**FAIL:** `404` — you are on the old path and the step is vacuous again.
 
 ## Step 5 — No room-log write exists
 
 **PASS:** the assignment screen offers only the aggregate rooms-completed
 count. There is no per-room add/remove UI.
 
+> **Corrected 2026-09-23.** This step cited `POST /rooms/mine`, which does not
+> exist — `/rooms/mine` is **GET only**, so the POST returned `404` for every
+> caller and asserted nothing. The room-log write is
+> `POST /rooms/assignments/:assignment_id/rooms`.
+
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
   -H "Authorization: Bearer $MANAGER_T" -H 'Content-Type: application/json' \
-  -d '{"room_key":"101"}' http://localhost:3001/api/v1/rooms/mine
+  -d '{"room_number":"101","state":"CLEANED"}' \
+  http://localhost:3001/api/v1/rooms/assignments/$ASSIGNMENT/rooms
 ```
 
-**PASS:** `403` — those routes are `requireRole('worker')`.
+**PASS:** `403` — that route is `requireRole('worker')`.
+
+**FAIL:** `404` — wrong path; the step is proving nothing.
 
 ## Step 6 — Master data is absent for manager and RM, present for admin
 

@@ -88,7 +88,12 @@
     "submit": "جمع کریں",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "کچھ غلط ہو گیا۔"
+    "unknownError": "کچھ غلط ہو گیا۔",
+    "filters": "فلٹرز",
+    "filtersWithCount": "فلٹرز ({{count}})",
+    "filtersHint": "اس فہرست کے فلٹر اختیارات کھولتا ہے",
+    "reset": "ری سیٹ",
+    "share": "شیئر کریں"
   },
   "fields": {
     "name": "نام",
@@ -177,7 +182,8 @@
     "jobTitlePlaceholder": "مثلاً ہاؤس کیپر",
     "targetRole": "شفٹ برائے",
     "targetRoleWorker": "ورکر",
-    "targetRoleChecker": "چیکر"
+    "targetRoleChecker": "چیکر",
+    "peopleWorking": "کام کرنے والے افراد"
   },
   "nav": {
     "history": "تاریخ",
@@ -254,7 +260,16 @@
     "alreadyFilled": "پہلے سے بھرا ہوا",
     "inProgress": "جاری",
     "present": "حاضر",
-    "late": "دیر سے"
+    "late": "دیر سے",
+    "noShow": "حاضر نہیں ہوا",
+    "reassigned": "دوبارہ تفویض شدہ",
+    "partial": "جزوی",
+    "excused": "رخصت منظور",
+    "expected": "متوقع",
+    "draft": "مسودہ",
+    "open": "کھلا",
+    "partiallyFilled": "جزوی طور پر پُر",
+    "filled": "پُر"
   },
   "assignments": {
     "shiftDetails": "شفٹ کی تفصیلات",

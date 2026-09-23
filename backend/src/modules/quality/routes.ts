@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../../middleware/auth.js';
-import { checkHotelAccess, requirePermission } from '../../middleware/permissions.js';
+import { checkHotelAccess, requirePermission, requireRole } from '../../middleware/permissions.js';
 import { qualityController } from './controller.js';
 import {
   ALLOWED_PHOTO_MIME_TYPES,
@@ -116,6 +116,22 @@ router.get('/inspectable-workers', requirePermission('quality:write'), (req, res
 // token would be the wrong shape to copy the next time this file grows.
 router.get('/my-inspections', requirePermission('quality:read'), (req, res, next) =>
   qualityController.listOwnChecks(req, res, next)
+);
+
+// The management-facing inspection history (2026-09-23). Distinct from
+// /my-inspections above, which filters on the caller's OWN verified_by_id:
+// that is right for a checker and empty forever for a manager or admin, who
+// never record inspections. The web's History tab called the self-scoped one
+// and so was permanently blank for the roles it admitted.
+//
+// requireRole with all THREE management strings. `['admin', 'manager']` omits
+// regional_manager silently -- the RM just finds the door locked, with no
+// error anywhere. Scope itself is resolved in the service from req.auth.
+router.get(
+  '/checks',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('quality:read'),
+  (req, res, next) => qualityController.listChecksInScope(req, res, next)
 );
 
 // Every check recorded against one shift. NOT gated on quality:read: the

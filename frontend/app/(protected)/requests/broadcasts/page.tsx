@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useBroadcasts } from "@/hooks/useWorkRequests";
-import { useHotel } from "@/hooks/useHotels";
 import { skillSlotLabel } from "@/lib/skills";
 import { JobDispatchPhase2WriteGate } from "@/components/auth/RoleGate";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
@@ -32,7 +31,6 @@ const COLUMNS = 5;
 
 function BroadcastRow({ broadcast: wr }: { broadcast: WorkRequest }) {
   const { t } = useTranslation();
-  const { data: hotel } = useHotel(wr.hotel_id);
 
   return (
     <TR>
@@ -41,7 +39,7 @@ function BroadcastRow({ broadcast: wr }: { broadcast: WorkRequest }) {
           {wr.shift_date}
         </TextLink>
       </TD>
-      <TD>{hotel?.name ?? "—"}</TD>
+      <TD>{wr.hotel?.name ?? "—"}</TD>
       <TD>
         {wr.shift_start_time}–{wr.shift_end_time}
       </TD>

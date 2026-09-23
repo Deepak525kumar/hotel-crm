@@ -213,6 +213,35 @@ export interface AssignmentHotelDto {
 }
 
 // Epic 9 PR 9.5 (TREQ-001/TRULE-001, MIG-GAP-03).
+/**
+ * Who and where, resolved on the list path.
+ *
+ * Added 2026-09-23. The DTO carried ids only, so BOTH clients rendered raw
+ * cuids where a person's name belongs — the web calendar and the manager
+ * app alike. Each had built its own id→name workaround and each was broken
+ * for its own reason, which is the argument for putting the names on the
+ * wire once instead of twice in two clients.
+ *
+ * Narrow on purpose, mirroring `AttendancePersonDto`/`AttendanceHotelDto`:
+ * identity only. Nothing commercial or managerial leaks, and no row is
+ * disclosed that the caller could not already read — `listCalendarEntries`
+ * decides visibility before this is built.
+ *
+ * Present on LIST responses only; null on create/move, exactly as
+ * `AssignmentDto.worker_name` behaves.
+ */
+export interface CalendarPersonDto {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+export interface CalendarHotelDto {
+  id: string;
+  name: string;
+  city: string;
+}
+
 export interface CalendarEntryDto {
   id: string;
   assignment_id: string;
@@ -223,6 +252,9 @@ export interface CalendarEntryDto {
   // distinctly instead of it silently disappearing (2026-08-13).
   assignment_status?: AssignmentStatus;
   placed_by_id: string;
+  /** List path only — see CalendarPersonDto. */
+  worker?: CalendarPersonDto | null;
+  hotel?: CalendarHotelDto | null;
   created_at: string;
   updated_at: string;
 }

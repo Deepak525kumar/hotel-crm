@@ -4,11 +4,21 @@ import { useTranslation } from 'react-i18next';
 
 import { BottomSheet, Button, Input, Spacing, ThemedText } from '@hotel-crm/mobile-shared';
 
+/**
+ * Four fields, four labels that name them.
+ *
+ * Until 2026-09-23 these read "Daily Shift Summary", "My rooms", "Logged
+ * today" and "Workers placed" -- the sheet's own title, a WORKER-app screen
+ * name, another worker-app screen name, and a different statistic. A manager
+ * was being asked for "My rooms" and typing the hotel's stay-over count into
+ * it. The keys existed and were plausible; nothing checks that a key's TEXT
+ * describes the field it labels, which is why this survived review.
+ */
 const FIELDS = [
-  { key: 'total_rooms', label: 'calendar.dailySummary' },
-  { key: 'stay_over_rooms', label: 'rooms.title' },
-  { key: 'checkout_rooms', label: 'rooms.todayTitle' },
-  { key: 'total_people_working', label: 'calendar.workersPlaced' },
+  { key: 'total_rooms', label: 'fields.totalRooms' },
+  { key: 'stay_over_rooms', label: 'assignments.stayOver' },
+  { key: 'checkout_rooms', label: 'assignments.checkout' },
+  { key: 'total_people_working', label: 'fields.peopleWorking' },
 ] as const;
 
 type FieldKey = (typeof FIELDS)[number]['key'];
@@ -22,6 +32,12 @@ type FieldKey = (typeof FIELDS)[number]['key'];
  * Every field is a whole number and all four are required: the endpoint takes
  * four Ints, so a blank or decimal is a 422 the manager cannot interpret.
  * Validated before sending rather than after.
+ *
+ * `initial` MUST be the day's stored summary when one exists. The save is a
+ * PUT upsert keyed by (hotel, day): opening this sheet blank over an existing
+ * row and saving replaces all four numbers with whatever is typed, silently,
+ * with a success toast. The caller was passing nothing at all until
+ * 2026-09-23, so every second edit of a day destroyed the first.
  */
 export function ShiftSummarySheet({
   visible,

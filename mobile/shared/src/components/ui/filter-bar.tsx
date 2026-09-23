@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '../themed-text';
 import { Radius, Spacing } from '../../constants/theme';
@@ -13,6 +14,11 @@ import { useTheme } from '../../hooks/use-theme';
  * the whole fold before a single row of data appears. One button plus a sheet
  * keeps the list visible, and the count means an empty list is never
  * mysterious -- "0 results" with "Filters (2)" explains itself.
+ *
+ * LOCALISED since 2026-09-23. The label, and the accessibility hint a screen
+ * reader speaks, were hard-coded English in an app shipped in six languages --
+ * two of them right-to-left. A control that every list screen wears at the top
+ * is the last place to leave untranslated.
  */
 export function FilterBar({
   activeCount,
@@ -24,7 +30,9 @@ export function FilterBar({
   children?: ReactNode;
 }) {
   const theme = useTheme();
-  const label = activeCount > 0 ? `Filters (${activeCount})` : 'Filters';
+  const { t } = useTranslation();
+  const label =
+    activeCount > 0 ? t('common.filtersWithCount', { count: activeCount }) : t('common.filters');
 
   return (
     <View style={[styles.bar, { backgroundColor: theme.background }]}>
@@ -32,7 +40,7 @@ export function FilterBar({
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityHint="Opens the filter options for this list"
+        accessibilityHint={t('common.filtersHint')}
         style={({ pressed }) => [
           styles.button,
           {

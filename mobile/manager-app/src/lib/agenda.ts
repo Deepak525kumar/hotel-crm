@@ -30,6 +30,8 @@ export function dayStrip(day: string, before = 3, after = 3): string[] {
 
 export type AgendaGroup = {
   hotelId: string;
+  /** From the nested `hotel` the list DTO now sends; null for a row without it. */
+  hotelName: string | null;
   entries: CalendarEntry[];
 };
 
@@ -50,7 +52,11 @@ export function groupByHotel(entries: readonly CalendarEntry[], day: string): Ag
     if (list) list.push(entry);
     else byHotel.set(entry.hotel_id, [entry]);
   }
-  return [...byHotel.entries()].map(([hotelId, list]) => ({ hotelId, entries: list }));
+  return [...byHotel.entries()].map(([hotelId, list]) => ({
+    hotelId,
+    hotelName: list.find((e) => e.hotel?.name)?.hotel?.name ?? null,
+    entries: list,
+  }));
 }
 
 export function absencesForDay(

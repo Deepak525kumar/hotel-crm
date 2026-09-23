@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Radius, Spacing, ThemedText, useTheme } from '@hotel-crm/mobile-shared';
+import { Radius, ThemedText, useTheme } from '@hotel-crm/mobile-shared';
 
 /**
  * A segmented control.

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
@@ -23,10 +23,13 @@ import {
 } from '@hotel-crm/mobile-shared';
 
 import { BackLink } from '@/components/BackLink';
-import { assignmentTone } from '@/lib/assignment-format';
+import {
+  ASSIGNMENT_STATUSES,
+  assignmentStatusLabel,
+  assignmentTone,
+} from '@/lib/assignment-format';
 import { useDebounced } from '@/lib/use-debounced';
 
-const STATUSES = ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const;
 
 export default function Assignments() {
   const { t } = useTranslation();
@@ -86,7 +89,12 @@ export default function Assignments() {
                     ? `${row.shift_start_time}–${row.shift_end_time ?? ''}`
                     : undefined
                 }
-                trailing={<Badge label={row.status} tone={assignmentTone(row.status)} />}
+                trailing={
+                  <Badge
+                    label={assignmentStatusLabel(row.status, t)}
+                    tone={assignmentTone(row.status)}
+                  />
+                }
                 onPress={() => router.push(`/assignment/${row.id}`)}
               />
             ))
@@ -97,7 +105,26 @@ export default function Assignments() {
           visible={filtersOpen}
           onClose={() => setFiltersOpen(false)}
           title={t('common.filter')}
-          footer={<Button label={t('common.done')} onPress={() => setFiltersOpen(false)} />}
+          footer={
+            /* A way BACK to "no filters" -- see requests.tsx's note. */
+            <View style={styles.sheetActions}>
+              <Button
+                label={t('common.reset')}
+                variant="ghost"
+                disabled={status === null && search === ''}
+                style={styles.sheetAction}
+                onPress={() => {
+                  setStatus(null);
+                  setSearch('');
+                }}
+              />
+              <Button
+                label={t('common.done')}
+                style={styles.sheetAction}
+                onPress={() => setFiltersOpen(false)}
+              />
+            </View>
+          }
         >
           <Input label={t('common.search')} value={search} onChangeText={setSearch} />
           <SelectSheet
@@ -105,7 +132,7 @@ export default function Assignments() {
             value={status}
             options={[
               { value: '__any__', label: t('common.all') },
-              ...STATUSES.map((s) => ({ value: s, label: s })),
+              ...ASSIGNMENT_STATUSES.map((s) => ({ value: s, label: assignmentStatusLabel(s, t) })),
             ]}
             onChange={(next) => setStatus(next === '__any__' ? null : next)}
           />
@@ -116,6 +143,8 @@ export default function Assignments() {
 }
 
 const styles = StyleSheet.create({
+  sheetActions: { flexDirection: 'row', gap: Spacing.two },
+  sheetAction: { flex: 1 },
   root: { flex: 1 },
   safe: { flex: 1 },
   content: {

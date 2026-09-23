@@ -364,7 +364,7 @@ export class AssignmentService extends BaseService {
     workerName?: string | null;
   }> {
     const requestId = assignment.job_request_id ?? assignment.work_request_id;
-    const [hotel, request, assigner] = await Promise.all([
+    const [hotel, request, assigner, worker] = await Promise.all([
       this.prisma.hotel.findUnique({
         where: { id: assignment.hotel_id },
         select: AssignmentService.HOTEL_SELECT,
@@ -379,12 +379,24 @@ export class AssignmentService extends BaseService {
         where: { id: assignment.assigned_by_id },
         select: { first_name: true, last_name: true },
       }),
+      // The worker themself. This lookup did not exist until 2026-09-23:
+      // `workerName` was declared in this function's return type and never
+      // assigned, so `toDto` defaulted it to null and GET /assignments/:id
+      // ALWAYS returned a nameless assignment -- while list() populated it
+      // correctly from its batched map. A detail screen that cannot name the
+      // person whose shift it is was the result, reported as "on that screen
+      // I see no details of the shift".
+      this.prisma.user.findUnique({
+        where: { id: assignment.worker_id },
+        select: { first_name: true, last_name: true },
+      }),
     ]);
     return {
       hotel: hotel ? AssignmentService.toHotelDto(hotel) : null,
       shiftStartTime: request?.shift_start_time ?? null,
       shiftEndTime: request?.shift_end_time ?? null,
       assignedByName: AssignmentService.fullName(assigner),
+      workerName: AssignmentService.fullName(worker),
     };
   }
 
@@ -1144,7 +1156,13 @@ export class AssignmentService extends BaseService {
     return this.toRoomsCompletedDto(updated, enteredByName);
   }
 
-  private toCalendarEntryDto(c: CalendarEntry, assignmentStatus?: AssignmentStatus): CalendarEntryDto {
+  private toCalendarEntryDto(
+    c: CalendarEntry & {
+      worker?: { id: string; first_name: string; last_name: string } | null;
+      hotel?: { id: string; name: string; city: string } | null;
+    },
+    assignmentStatus?: AssignmentStatus
+  ): CalendarEntryDto {
     return {
       ...(assignmentStatus ? { assignment_status: assignmentStatus } : {}),
       id: c.id,
@@ -1153,6 +1171,10 @@ export class AssignmentService extends BaseService {
       hotel_id: c.hotel_id,
       day: c.day.toISOString().slice(0, 10),
       placed_by_id: c.placed_by_id,
+      // Nested by the list path's own include, so this costs no extra query.
+      // Absent on create/move, where the relations are not loaded.
+      worker: c.worker ?? null,
+      hotel: c.hotel ?? null,
       created_at: c.created_at.toISOString(),
       updated_at: c.updated_at.toISOString(),
     };
@@ -1543,7 +1565,13 @@ export class AssignmentService extends BaseService {
     const [records, total] = await Promise.all([
       this.prisma.calendarEntry.findMany({
         where,
-        include: { assignment: { select: { status: true } } },
+        include: {
+          assignment: { select: { status: true } },
+          // One query, not a second round trip: the rows are already being
+          // fetched and the relations are narrow (identity only).
+          worker: { select: { id: true, first_name: true, last_name: true } },
+          hotel: { select: { id: true, name: true, city: true } },
+        },
         skip: (query.page - 1) * query.per_page,
         take: query.per_page,
         orderBy: { day: 'desc' },

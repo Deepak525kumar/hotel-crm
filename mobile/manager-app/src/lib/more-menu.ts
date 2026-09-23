@@ -41,7 +41,6 @@ export function buildMenu(context: {
   // admin and a regional manager both have a null scope_hotel_id, and the
   // role alone has put an RM in the admin branch before.
   const isAdmin = role === 'admin' && scopeKind === 'global';
-  const canSeeOrgChart = scopeKind === 'group' || scopeKind === 'global';
 
   const groups: MenuGroup[] = [
     {
@@ -72,7 +71,8 @@ export function buildMenu(context: {
       key: 'people',
       title: t('nav.users'),
       items: [
-        { route: '/(app)/team', label: t('nav.users'), glyph: '◍', keywords: ['staff', 'worker', 'employee'] },
+        // Users is NOT here: it is a tab in the bar, and listing it twice
+        // makes the menu look like a sitemap rather than a set of choices.
         {
           route: '/payslips',
           label: t('hr.payslipRequests'),
@@ -86,17 +86,17 @@ export function buildMenu(context: {
       key: 'org',
       title: t('nav.hotels'),
       items: [
-        { route: '/hotels', label: t('nav.hotels'), glyph: '⌂', keywords: ['property', 'group', 'site'] },
-        ...(canSeeOrgChart
-          ? [
-              {
-                route: '/hotels',
-                label: t('hotels.orgChart'),
-                glyph: '⑃',
-                keywords: ['structure', 'hierarchy', 'reporting'],
-              },
-            ]
-          : []),
+        // Two DISTINCT routes. Both of these pointed at '/hotels' until
+        // 2026-09-23, which sent the org-chart row to the hotels screen and
+        // made React warn about two children with the same key — the duplicate
+        // route was the key.
+        { route: '/hotels', label: t('nav.hotels'), glyph: '⌂', keywords: ['property', 'site'] },
+        {
+          route: '/hotel-groups',
+          label: t('nav.hotelGroups'),
+          glyph: '⌗',
+          keywords: ['group', 'region', 'portfolio'],
+        },
       ],
     },
     {
@@ -118,13 +118,14 @@ export function buildMenu(context: {
       items: [
         { route: '/notifications', label: t('nav.notifications'), glyph: '◔', keywords: ['alert'] },
         { route: '/assistant', label: t('chatbot.title'), glyph: '✳', keywords: ['zelle', 'ai', 'ask', 'help'] },
-        {
-          route: '/settings',
-          label: t('nav.settings'),
-          glyph: '⚙',
-          keywords: ['language', 'theme', 'export', 'logout'],
-        },
-        { route: '/onboarding', label: t('nav.myOnboarding'), glyph: '◌', keywords: ['my documents'] },
+        // Settings lives on the Profile tab now, and is not duplicated here.
+        //
+        // "My onboarding" is gone too, and not because it was untidy: the
+        // AuthGuard redirects anyone who is NOT gated away from /onboarding,
+        // so for any active manager the row bounced straight back to Home.
+        // Reported as "the my onboarding tab takes me to the home screen, why
+        // is that, it's broken" — it was working exactly as written, and the
+        // entry should never have existed for an active user.
       ],
     },
   ];

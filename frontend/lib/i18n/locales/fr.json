@@ -87,7 +87,12 @@
     "submit": "Envoyer",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "Une erreur s'est produite."
+    "unknownError": "Une erreur s'est produite.",
+    "filters": "Filtres",
+    "filtersWithCount": "Filtres ({{count}})",
+    "filtersHint": "Ouvre les options de filtre pour cette liste",
+    "reset": "Réinitialiser",
+    "share": "Partager"
   },
   "fields": {
     "name": "Nom",
@@ -176,7 +181,8 @@
     "jobTitlePlaceholder": "p. ex. Femme de chambre",
     "targetRole": "Poste pour",
     "targetRoleWorker": "Employé",
-    "targetRoleChecker": "Contrôleur"
+    "targetRoleChecker": "Contrôleur",
+    "peopleWorking": "Personnes au travail"
   },
   "nav": {
     "history": "Historique",
@@ -253,7 +259,16 @@
     "alreadyFilled": "Déjà pourvu",
     "inProgress": "En cours",
     "present": "Présent",
-    "late": "En retard"
+    "late": "En retard",
+    "noShow": "Non présenté",
+    "reassigned": "Réattribué",
+    "partial": "Partiel",
+    "excused": "Excusé",
+    "expected": "Attendu",
+    "draft": "Brouillon",
+    "open": "Ouvert",
+    "partiallyFilled": "Partiellement pourvu",
+    "filled": "Pourvu"
   },
   "assignments": {
     "shiftDetails": "Détails du service",

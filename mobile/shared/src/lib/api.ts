@@ -77,6 +77,19 @@ let _onConsentRequired: (() => void) | null = null;
 // Shared promise to serialize concurrent refresh attempts
 let _refreshPromise: Promise<{ access_token: string; refresh_token: string }> | null = null;
 
+export interface BlocklistEntryDto {
+  id: string;
+  hotel_id: string;
+  employment_record_id: string;
+  /** The human-facing id ("EMP-W-001") the write path is keyed by. */
+  employee_id: string | null;
+  user_id: string | null;
+  worker_name: string | null;
+  reason: string | null;
+  created_by_id: string;
+  created_at: string;
+}
+
 export function setAccessToken(token: string | null): void {
   _accessToken = token;
 }
@@ -552,11 +565,17 @@ export const api = {
       }),
   },
   workRequests: {
-    list: (params?: { status?: string; page?: number; limit?: number; is_broadcast?: boolean }) => {
+    /**
+     * `per_page`, NOT `limit` (2026-09-23). ListWorkRequestsQuerySchema names
+     * the page size `per_page`; zod dropped the unknown `limit` key without
+     * complaint, so every caller silently got the default page size and a
+     * "show me 50" control did nothing at all.
+     */
+    list: (params?: { status?: string; page?: number; per_page?: number; is_broadcast?: boolean }) => {
       const qs = new URLSearchParams();
       if (params?.status) qs.set('status', params.status);
       if (params?.page) qs.set('page', String(params.page));
-      if (params?.limit) qs.set('limit', String(params.limit));
+      if (params?.per_page) qs.set('per_page', String(params.per_page));
       // The backend accepts only the literal strings "true"/"false".
       if (params?.is_broadcast !== undefined) qs.set('is_broadcast', params.is_broadcast ? 'true' : 'false');
       const q = qs.toString();
@@ -656,10 +675,20 @@ export const api = {
       return request<WorkerAssignment[]>(`/assignments${q ? `?${q}` : ''}`);
     },
     get: (id: string) => request<WorkerAssignment>(`/assignments/${id}`),
-    updateStatus: (id: string, status: string) =>
+    /**
+     * `cancellation_reason` is accepted by UpdateAssignmentSchema and stored
+     * on the row. The manager app asked for a reason, made it MANDATORY in
+     * the dialog, and then dropped it on the floor with `void reason`
+     * (2026-09-23) -- so every cancelled shift in production carries a null
+     * reason that someone typed.
+     */
+    updateStatus: (id: string, status: string, cancellationReason?: string) =>
       request<WorkerAssignment>(`/assignments/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          ...(cancellationReason ? { cancellation_reason: cancellationReason } : {}),
+        }),
       }),
 
     /**
@@ -1305,10 +1334,15 @@ export const api = {
         body: JSON.stringify(input),
       }),
 
+    /**
+     * 2026-09-23: this declared `{ employee_id, reason }[]` and the service
+     * returned raw Prisma rows, which carry NEITHER. The manager app rendered
+     * blank rows keyed by `undefined` (duplicate React keys) because both
+     * sides had agreed on a field that has never existed on this wire. The
+     * service now returns a real DTO; this type is that DTO.
+     */
     blocklist: (hotelId: string) =>
-      request<{ employee_id: string; reason?: string | null }[]>(
-        `/employees/hotels/${hotelId}/blocklist`
-      ),
+      request<BlocklistEntryDto[]>(`/employees/hotels/${hotelId}/blocklist`),
 
     /**
      * Block an employee from a hotel. A REASON IS REQUIRED by the schema

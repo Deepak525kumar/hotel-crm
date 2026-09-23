@@ -36,3 +36,16 @@ export function scopeFieldFor(targetRole: string): 'hotel' | 'group' | null {
   if (targetRole === 'regional_manager') return 'group';
   return null;
 }
+
+/**
+ * The catalogue key for a role.
+ *
+ * The API uses snake_case (`regional_manager`); the locale catalogue uses
+ * camelCase (`roles.regionalManager`). A template literal built from the API
+ * value therefore misses for exactly one role, and i18next renders the miss
+ * as the key itself — so the Users list would have shown a section headed
+ * "roles.regional_manager" while every other heading read correctly.
+ */
+export function roleLabelKey(role: string): string {
+  return role === 'regional_manager' ? 'roles.regionalManager' : `roles.${role}`;
+}

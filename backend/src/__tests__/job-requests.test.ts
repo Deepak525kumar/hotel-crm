@@ -499,10 +499,38 @@ describe('WorkRequestService', () => {
 
         const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'a1', role: 'admin' });
 
-        expect(mockWorkRequest.findMany.mock.calls[0][0].include).toEqual({ skill_slots: true });
+        // `objectContaining`, not `toEqual`: this test is about skill_slots.
+        // It pinned the WHOLE include object, so adding the hotel join --
+        // which is what stops every client rendering a blank where the
+        // property name belongs -- failed a test that has no opinion about
+        // hotels (2026-09-23).
+        expect(mockWorkRequest.findMany.mock.calls[0][0].include).toEqual(
+          expect.objectContaining({ skill_slots: true })
+        );
         expect(res.data[0].skill_slots).toEqual([
           { id: 'slot1', skill: 'CLEANER', headcount: 2, confirmed_count: 1 },
         ]);
+      });
+
+      /**
+       * Every client showed a blank where the property name belongs: the row
+       * carries `hotel_id` and nothing else, and the web client's own type
+       * had already declared a `hotel` the server never sent. Fetching it per
+       * row client-side is an N+1 AND a second authorization surface -- the
+       * list is already scoped, so the name travels with the row.
+       */
+      it('nests the hotel on each row so a client need not fetch it', async () => {
+        mockWorkRequest.findMany.mockResolvedValue([
+          makeRow({ hotel: { id: 'h1', name: 'Hotel Adlon', city: 'Berlin' } }),
+        ]);
+        mockWorkRequest.count.mockResolvedValue(1);
+
+        const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'a1', role: 'admin' });
+
+        expect(res.data[0].hotel).toEqual({ id: 'h1', name: 'Hotel Adlon', city: 'Berlin' });
+        expect(mockWorkRequest.findMany.mock.calls[0][0].include).toEqual(
+          expect.objectContaining({ hotel: { select: { id: true, name: true, city: true } } })
+        );
       });
 
       it('omits skill_slots on a marketplace row (no skill slots)', async () => {

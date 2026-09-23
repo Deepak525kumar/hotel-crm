@@ -153,7 +153,7 @@ export default function BroadcastDetailPage() {
               value={
                 <div className="flex flex-col gap-1">
                   <TextLink href={`/hotels/${request.hotel_id}`}>
-                    {hotel?.name ?? "View hotel"}
+                    {hotel?.name ?? request.hotel?.name ?? t("fields.hotel")}
                   </TextLink>
                   {hotel && (
                     <div className="flex items-start justify-between gap-4">
@@ -320,7 +320,15 @@ export default function BroadcastDetailPage() {
               <div className="divide-y divide-gray-100 dark:divide-gray-800">
                 {assignments.map((assignment) => (
                   <div key={assignment.id} className="flex items-center justify-between py-3">
-                    <UserRef userId={assignment.worker_id} />
+                    {/* The name comes WITH the row (`worker_name`, resolved
+                        by list()). UserRef only for a row that predates it:
+                        it fetches /users/:id per person, which is an N+1 and
+                        a second thing that can fail on this panel. */}
+                    {assignment.worker_name ? (
+                      <span className="text-sm font-medium">{assignment.worker_name}</span>
+                    ) : (
+                      <UserRef userId={assignment.worker_id} />
+                    )}
                     <div className="flex items-center gap-4">
                       <AssignmentStatusBadge status={assignment.status} />
                       <TextLink href={`/assignments/${assignment.id}`} className="text-sm">

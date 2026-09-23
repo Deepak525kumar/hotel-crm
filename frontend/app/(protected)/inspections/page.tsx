@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
 import { useMyInspections } from "@/hooks/useMyInspections";
+import { useAuth } from "@/hooks/useAuth";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { formatDateTime } from "@/lib/format";
@@ -39,13 +40,27 @@ import { Camera } from "lucide-react";
  */
 function InspectionHistory() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   // Debounced so typing a worker's name is one request when they stop, not one
   // per keystroke — every one of these is a database query behind a join.
   const q = useDebouncedValue(search, 300);
 
-  const { checks, pagination, isLoading, error } = useMyInspections(page, 20, q);
+  // WHICH history this is depends on the viewer, not on the page.
+  //
+  // A checker's own checks are the point of /my-inspections. A manager, RM or
+  // admin has recorded none, so that endpoint returned an empty list forever
+  // and the tab looked broken rather than inapplicable (reported 2026-09-23).
+  // They read `/quality/checks` instead, scoped server-side to their hotels.
+  //
+  // All THREE management strings: `role !== "checker"` would have done here,
+  // but this codebase's most repeated bug is a role list that omits
+  // regional_manager, and an allow-list is the shape that fails safe.
+  const scoped =
+    user?.role === "admin" || user?.role === "manager" || user?.role === "regional_manager";
+
+  const { checks, pagination, isLoading, error } = useMyInspections(page, 20, q, scoped);
 
   const columns = 6;
   const totalPages = pagination?.total_pages ?? 1;
@@ -202,7 +217,7 @@ export default function InspectionsPage() {
   // still SELF-scoped server-side — an admin sees the checks they recorded, not
   // everyone's.
   return (
-    <RoleGate allow={["checker", "admin"]}>
+    <RoleGate allow={["checker", "admin", "manager", "regional_manager"]}>
       <InspectionHistory />
     </RoleGate>
   );

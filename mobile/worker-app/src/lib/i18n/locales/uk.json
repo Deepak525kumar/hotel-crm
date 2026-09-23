@@ -87,7 +87,12 @@
     "submit": "Надіслати",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "Щось пішло не так."
+    "unknownError": "Щось пішло не так.",
+    "filters": "Фільтри",
+    "filtersWithCount": "Фільтри ({{count}})",
+    "filtersHint": "Відкриває параметри фільтрування для цього списку",
+    "reset": "Скинути",
+    "share": "Поділитися"
   },
   "fields": {
     "name": "Ім'я",
@@ -176,7 +181,8 @@
     "jobTitlePlaceholder": "напр. Покоївка",
     "targetRole": "Зміна для",
     "targetRoleWorker": "Працівник",
-    "targetRoleChecker": "Перевіряючий"
+    "targetRoleChecker": "Перевіряючий",
+    "peopleWorking": "Працівників"
   },
   "nav": {
     "history": "Історія",
@@ -253,7 +259,16 @@
     "alreadyFilled": "Уже заповнено",
     "inProgress": "У процесі",
     "present": "Присутній",
-    "late": "Запізнився"
+    "late": "Запізнився",
+    "noShow": "Не з’явився",
+    "reassigned": "Перепризначено",
+    "partial": "Частково",
+    "excused": "Виправдано",
+    "expected": "Очікується",
+    "draft": "Чернетка",
+    "open": "Відкрито",
+    "partiallyFilled": "Частково заповнено",
+    "filled": "Заповнено"
   },
   "assignments": {
     "shiftDetails": "Деталі зміни",

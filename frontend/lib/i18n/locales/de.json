@@ -87,7 +87,12 @@
     "submit": "Absenden",
     "pass": "Pass",
     "fail": "Fail",
-    "unknownError": "Etwas ist schiefgelaufen."
+    "unknownError": "Etwas ist schiefgelaufen.",
+    "filters": "Filter",
+    "filtersWithCount": "Filter ({{count}})",
+    "filtersHint": "Öffnet die Filteroptionen für diese Liste",
+    "reset": "Zurücksetzen",
+    "share": "Teilen"
   },
   "fields": {
     "name": "Name",
@@ -176,7 +181,8 @@
     "jobTitlePlaceholder": "z. B. Zimmermädchen",
     "targetRole": "Schicht für",
     "targetRoleWorker": "Mitarbeiter",
-    "targetRoleChecker": "Prüfer"
+    "targetRoleChecker": "Prüfer",
+    "peopleWorking": "Arbeitende Personen"
   },
   "nav": {
     "history": "Verlauf",
@@ -253,7 +259,16 @@
     "alreadyFilled": "Bereits besetzt",
     "inProgress": "In Bearbeitung",
     "present": "Anwesend",
-    "late": "Verspätet"
+    "late": "Verspätet",
+    "noShow": "Nicht erschienen",
+    "reassigned": "Neu zugewiesen",
+    "partial": "Teilweise",
+    "excused": "Entschuldigt",
+    "expected": "Erwartet",
+    "draft": "Entwurf",
+    "open": "Offen",
+    "partiallyFilled": "Teilweise besetzt",
+    "filled": "Besetzt"
   },
   "assignments": {
     "shiftDetails": "Schichtdetails",

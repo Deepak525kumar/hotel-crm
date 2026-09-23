@@ -144,18 +144,37 @@ export default function AssistantScreen() {
         // worker cannot see what they are typing.
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
+        {/*
+          TWO ROWS, not one (2026-09-23).
+
+          Back + title + three actions were laid out in a single row, which
+          does not fit 375pt: the title squeezed to nothing and the last
+          action ran off the edge. The title keeps its own line and the
+          actions wrap beneath it, so every control stays reachable on the
+          narrowest phone this app supports -- the same lesson the web learned
+          from the admin dashboard (frontend/CLAUDE.md).
+        */}
         <View style={styles.header}>
           {view === 'chat' ? (
             <BackLink />
           ) : (
             <HeaderAction label={t('chatbot.historyBack', 'Back to chat')} onPress={backToChat} />
           )}
-          <ThemedText type="subtitle" style={styles.title}>
+          <ThemedText type="subtitle" style={styles.title} numberOfLines={1}>
             {t('chatbot.title', 'Zelle')}
           </ThemedText>
+        </View>
+        <View style={styles.headerActions}>
           <HeaderAction label={t('chatbot.history', 'History')} onPress={() => void openHistory()} />
+          {/*
+            "Share", not "Copy". This opens the system share sheet -- which
+            offers Copy alongside WhatsApp and mail, and is the right control
+            for these apps because they carry no clipboard module. Labelling
+            it Copy promised a clipboard write that never happened; the owner
+            reported tapping it and finding a share sheet.
+          */}
           <HeaderAction
-            label={t('chatbot.copy', 'Copy')}
+            label={t('common.share')}
             disabled={shareSource.length === 0}
             onPress={() => void share()}
           />
@@ -479,9 +498,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
   },
-  title: { flex: 1 },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    // Wraps rather than overflowing: six locales, and "Neuer Chat" plus
+    // "Verlauf" plus "Teilen" is wider than an English row.
+    flexWrap: 'wrap',
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.two,
+  },
+  // flexShrink so a long title yields to the back link instead of pushing it
+  // off-screen; minWidth 0 because a flex child will not shrink below its
+  // content without it.
+  title: { flex: 1, flexShrink: 1, minWidth: 0 },
   headerAction: { paddingHorizontal: Spacing.one, paddingVertical: Spacing.one },
   headerActionText: { fontSize: 13, fontWeight: '600' },
   disabled: { opacity: 0.4 },
