@@ -72,8 +72,20 @@ catalogues it is pinned against.
   than that fix will still print the two-app summary**, and its silence about
   manager means nothing either way.
 
-  FCM is configured server-side (`FIREBASE_PROJECT_ID` and
-  `FIREBASE_SERVICE_ACCOUNT_KEY_BASE64` are both set in production), but
-  `google-services.json` is still absent from this app, so it cannot mint an
-  Android token to send to. That one is a client build artifact and a real
-  secret: still an owner action.
+  **Android — DONE (2026-09-23).** `com.fhmhotelservices.managerapp` is now a
+  registered Android app in the `fhm-hotelservice` Firebase project
+  (`1:14495829635:android:bc0c1cec7f926becf095b6`), and
+  `google-services.json` is committed here **exactly as the Firebase API
+  generated it**, with `expo.android.googleServicesFile` pointing at it.
+  `fcm-config.test.ts` pins the package/app-id/project agreement.
+
+  **Never hand-edit that file.** Worker and checker are registered in Firebase
+  under `com.hotelcrm.workerapp` / `com.hotelcrm.checkerapp` — the placeholder
+  namespace that had already caused one APNs outage — while their committed
+  configs claim `com.fhmhotelservices.*`, because commit `3e425c0e` edited the
+  package names in the JSON instead of re-registering the apps. Firebase and
+  the file disagree, and as of 2026-09-23 **not one Android device had ever
+  registered a push token for any of the three apps**. A Firebase app's
+  package name cannot be changed after creation, so fixing those two means
+  registering them afresh and regenerating their configs; nothing is lost,
+  since there are no Android tokens to invalidate.

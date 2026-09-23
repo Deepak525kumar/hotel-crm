@@ -29,6 +29,7 @@
     },
     "android": {
       "package": "com.fhmhotelservices.managerapp",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E8EAF5",
