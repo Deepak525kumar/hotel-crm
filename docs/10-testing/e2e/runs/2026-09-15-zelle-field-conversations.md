@@ -1,5 +1,11 @@
 # E2E Run — 2026-09-15 — Zelle field-report conversations (scenario 21)
 
+> **Naming note (added 2026-10-01).** The assistant was renamed **Zelle -> Orla** on
+> 2026-10-01 after an App Store rejection under guideline 2.3.1(a) (Zelle is the US
+> bank-owned payments network). This run log is a dated record and keeps the name it
+> was written with; only file paths were updated so its links still resolve. Read
+> every "Zelle" below as "Orla".
+
 - **Commit under test:** branch `fix/zelle-field-conversations` (off `main` at `7fe3e400`), uncommitted at run time
 - **Environment:** local dev — PostgreSQL 16 in Docker, all migrations applied; no LLM provider (AWS session expired)
 - **Executed by:** Claude Code (agent), on the owner's field report
@@ -41,7 +47,7 @@ Final data-layer run: **10/10 checks passed.** Automated gates: backend tsc clea
 
 ## Scenario files updated this run
 
-- `scenarios/21-zelle-field-conversations.md` — created (13 verbatim conversations, pass criteria, history table).
+- `scenarios/21-orla-field-conversations.md` — created (13 verbatim conversations, pass criteria, history table).
 - `README.md` — index row 21.
 
 ## Addendum (same day) — the rota tools, and the gaps closed

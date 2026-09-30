@@ -116,11 +116,11 @@ The failure mode that no CI run can reproduce: a development build cut
 
 - [ ] **Camera** prompt appears with the app's own wording, not a bare system
       string.
-- [ ] **Microphone + speech recognition** for Zelle's voice input. The usage
+- [ ] **Microphone + speech recognition** for Orla's voice input. The usage
       strings were added 2026-09-22; nobody has seen the dialog.
 - [ ] Denying each permission leaves a usable screen rather than a dead end.
 
-## 6. Zelle (the assistant)
+## 6. Orla (the assistant)
 
 - [ ] **Renders nothing when `FEATURE_CHATBOT` is off.** `isAvailable()`
       swallows its errors deliberately — a 404 (flag off) and a 403 (not

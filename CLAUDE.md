@@ -101,6 +101,24 @@ These are standing instructions from the repository owner, not preferences:
   nginx config in this repo was never deployed.
 - Times are `Europe/Berlin` (`CALENDAR_TIMEZONE`). A UTC "today" gives a
   night-shift manager yesterday.
+- **The assistant is called Orla, and the name is load-bearing.** It was
+  "Zelle" until 2026-10-01, when Apple rejected FHM Checker under guideline
+  2.3.1(a) — Zelle is the US bank-owned P2P payments network, so a hotel app
+  carrying that name reads as undisclosed financial functionality. App Review
+  never logged in: the name was also in `NSMicrophoneUsageDescription`, which
+  is read straight off the binary. Any rename of a user-facing feature needs a
+  live-trademark check in **every** sector, not just software. German
+  `de.json` contains "Ziel**zelle**" (target cell), so a case-insensitive
+  rename corrupts it.
+- **Any shipped AI feature must appear in the App Store description.** 2.3.1
+  is about *undescribed* features, not just about the name — shipping a
+  working assistant the listing does not mention repeats the violation under
+  a different noun.
+- **`FEATURE_CHATBOT` is ON in production** (`CHATBOT_PROVIDER=mantle`,
+  `eu-central-1`). Verify the flag by probing, never from prose — the
+  in-repo docs claimed the opposite for three weeks:
+  `/api/v1/chatbot/commands` answers 401 when it is on and 404 when it is
+  off.
 
 ## Comments
 

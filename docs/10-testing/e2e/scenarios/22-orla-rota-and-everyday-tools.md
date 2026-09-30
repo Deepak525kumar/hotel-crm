@@ -1,4 +1,4 @@
-# 22 — Zelle: rota and everyday tools (2026-09-15)
+# 22 — Orla: rota and everyday tools (2026-09-15)
 
 **Status:** written 2026-09-15 for the tools built after scenario 21. Executable end to end with
 `backend/scripts/chatbot-e2e-conversations.ts`, which drives this file and scenario 21 through the
@@ -61,7 +61,7 @@ withdrawing a past absence (refused).
 
 ## In a real browser
 
-`frontend/e2e/zelle-live.spec.ts` (skipped unless `ZELLE_LIVE=1`) drives the web app's production
+`frontend/e2e/orla-live.spec.ts` (skipped unless `ORLA_LIVE=1`) drives the web app's production
 build against the real backend and the live model. It logs in, asks "how much work did we do" (L0),
 has the model prepare an account link, presses **Copy** and reads the real clipboard, opens
 **History** and a past conversation from the server, then follows the link and checks the New user

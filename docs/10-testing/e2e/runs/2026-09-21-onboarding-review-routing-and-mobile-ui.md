@@ -1,5 +1,11 @@
 # E2E Run — 2026-09-21 — onboarding review routing, and four mobile/web UI defects
 
+> **Naming note (added 2026-10-01).** The assistant was renamed **Zelle -> Orla** on
+> 2026-10-01 after an App Store rejection under guideline 2.3.1(a) (Zelle is the US
+> bank-owned payments network). This run log is a dated record and keeps the name it
+> was written with; only file paths were updated so its links still resolve. Read
+> every "Zelle" below as "Orla".
+
 - **Commit under test:** branch `feat/app-store-distribution-and-onboarding-fixes`, off `main` at `6cba9f90`.
 - **Environment:** the project owner's own test environment, exercised by hand through the real
   admin UI and the real apps on a physical iPhone. **Findings were then verified against the
