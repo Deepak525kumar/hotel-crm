@@ -1,6 +1,6 @@
-# 21 — Zelle: the field-report conversations (2026-09-15)
+# 21 — Orla: the field-report conversations (2026-09-15)
 
-**Status:** written 2026-09-15 from conversations the owner had with Zelle in real use, every
+**Status:** written 2026-09-15 from conversations the owner had with Orla in real use, every
 one of which failed. **Run live end to end the same day, and passing:**
 - 19/19 through the real app, login, consent gate, live model and database
   (`runs/2026-09-15-zelle-live-end-to-end.md`).
@@ -33,7 +33,7 @@ For every write: **read the row back.** A "Scheduled"/"Cancelled"/"Recorded" rep
 |---|---|---|---|
 | S01 | `Make day task rooms today we have 90 rooms to clean add that work list and 10 blibe` | `calendar.set_day_summary` | Reply states 90 rooms, 10 stay-over for today at the hotel. `DailyShiftSummary` row for (hotel, today) has `total_rooms=90`, `stay_over_rooms=10`; other counts unchanged if the row existed. |
 | S02 | `I want make id more next employe` → `yes create id` | `users.new_account_link` | Reply explains a profile photo is required and carries a link rendered as **"Open the filled-in New user form"**. No `User` row is created by the chat. Never "contact your HR department". |
-| S03 | `make me that chat copy` | Copy button (web) / Share (apps) | Reply points at Copy. Pressing Copy puts `You: … / Zelle: …` on the clipboard. |
+| S03 | `make me that chat copy` | Copy button (web) / Share (apps) | Reply points at Copy. Pressing Copy puts `You: … / Orla: …` on the clipboard. |
 | S04 | New user form: Mukesh kumar, phone `016090744182`, Worker, Premier Inn, Cleaner, photo | `POST /users` | 201. `User.phone = +4916090744182`. If anything is invalid, the form names the FIELD (not "Request body validation failed"). |
 | S05 | `Put several workers on the schedule … Harvir Singh … 2026-09-15/16/17` | `assignments.place_many` | **No confirmation is shown.** One sentence: "Harvir Singh is a manager, not a worker or checker …". No `WorkerAssignment` rows created. |
 | S06 | `manger not worker` | none (or same refusal) | No write. Does not claim a tool is missing; the rule is that managers are not scheduled on the cleaning calendar (owner decision 2026-09-15). |

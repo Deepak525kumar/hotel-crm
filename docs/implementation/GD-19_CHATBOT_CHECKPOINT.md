@@ -158,7 +158,7 @@ later, and does not survive a change to a tool's scope, risk tier or permission.
 
 ### 2026-09-15 (fifth decision) — the field-report tools
 
-Approved on a direct instruction after the commissioning human used Zelle on real work and
+Approved on a direct instruction after the commissioning human used Orla on real work and
 supplied every conversation that failed: "if you need to build more tools build it … you can
 build tools yourself though", with the limit "ask me first before giving or changing
 permissions". Recorded as `APPROVED_2026_09_15_FIELD_REPORT` in `tools/approvals.ts`.

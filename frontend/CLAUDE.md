@@ -39,7 +39,7 @@ scoped**. They never widen what is visible, and must never be the only gate.
 
 ## Mobile layout — the admin dashboard lesson
 
-Reported as two separate bugs (the Zelle launcher invisible on a phone, and
+Reported as two separate bugs (the Orla launcher invisible on a phone, and
 the recent-activity card overflowing to the right). They were one bug.
 
 - A Tailwind `grid` with no explicit column count gets an implicit `auto`

@@ -497,7 +497,7 @@ export const cancelTeamRequest = registerTool<CancelRequestArgs>({
     if ('refused' in found) return found;
     await jobRequestService.update(
       found.row.id,
-      { status: 'CANCELLED', cancellation_reason: args.reason ?? 'Cancelled by a manager through Zelle' } as never,
+      { status: 'CANCELLED', cancellation_reason: args.reason ?? 'Cancelled by a manager through Orla' } as never,
       toServiceActor(actor) as never
     );
     return { request: describeRequest({ ...found.row, status: 'CANCELLED' }, found.hotel) };

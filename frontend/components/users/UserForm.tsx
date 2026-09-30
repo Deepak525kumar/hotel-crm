@@ -57,7 +57,7 @@ export interface UserFormValues {
 }
 
 /**
- * Details handed over by Zelle in the URL fragment (`/users/new#first_name=…`).
+ * Details handed over by Orla in the URL fragment (`/users/new#first_name=…`).
  *
  * Added 2026-09-15. A manager asked the assistant to "create id" for a new
  * employee and was told to contact HR. The account needs a profile photo, so
@@ -173,7 +173,7 @@ export function UserForm({
   // READ AFTER MOUNT, NOT DURING THE FIRST RENDER.
   //
   // This read `window.location.hash` inside the useState initializer, and a
-  // real browser proved it wrong on 2026-09-15: clicking Zelle's link is an
+  // real browser proved it wrong on 2026-09-15: clicking Orla's link is an
   // in-app navigation, and Next's router renders the new page BEFORE it
   // updates the address bar. During that first render the URL was still
   // /assistant, the fragment did not exist yet, and the form opened empty --

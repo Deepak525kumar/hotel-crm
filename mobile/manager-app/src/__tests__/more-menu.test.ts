@@ -3,13 +3,29 @@ import { buildMenu, filterMenu } from '@/lib/more-menu';
 const t = (key: string) => key;
 
 describe('the More menu', () => {
-  const managerMenu = buildMenu({ t, role: 'manager', scopeKind: 'hotel' });
-  const rmMenu = buildMenu({ t, role: 'regional_manager', scopeKind: 'group' });
-  const adminMenu = buildMenu({ t, role: 'admin', scopeKind: 'global' });
+  const managerMenu = buildMenu({ t, role: 'manager', scopeKind: 'hotel', chatbotAvailable: true });
+  const rmMenu = buildMenu({ t, role: 'regional_manager', scopeKind: 'group', chatbotAvailable: true });
+  const adminMenu = buildMenu({ t, role: 'admin', scopeKind: 'global', chatbotAvailable: true });
 
   it('is grouped, not one flat list', () => {
     expect(managerMenu.length).toBeGreaterThan(3);
     expect(managerMenu.every((g) => g.items.length > 0)).toBe(true);
+  });
+
+  /**
+   * The row and the floating launcher must agree.
+   *
+   * `ChatLauncher` has always hidden itself when the probe fails -- the flag
+   * is off, or the feature is not permitted for this user -- while this row
+   * navigated regardless, so a manager could reach an assistant screen
+   * talking to a 404 by a route the app itself said was unavailable.
+   */
+  it('shows the assistant only when the backend is serving it', () => {
+    const hasAssistant = (menu: ReturnType<typeof buildMenu>) =>
+      menu.some((g) => g.items.some((i) => i.route === '/assistant'));
+
+    expect(hasAssistant(buildMenu({ t, role: 'manager', scopeKind: 'hotel', chatbotAvailable: true }))).toBe(true);
+    expect(hasAssistant(buildMenu({ t, role: 'manager', scopeKind: 'hotel', chatbotAvailable: false }))).toBe(false);
   });
 
   // The whole point of the archive entry existing only for an admin: a row
@@ -30,7 +46,7 @@ describe('the More menu', () => {
    * this codebase.
    */
   it('does not treat a role of admin without global scope as an admin', () => {
-    const odd = buildMenu({ t, role: 'admin', scopeKind: 'hotel' });
+    const odd = buildMenu({ t, role: 'admin', scopeKind: 'hotel', chatbotAvailable: true });
     expect(odd.some((g) => g.items.some((i) => i.route === '/admin/archive'))).toBe(false);
   });
 
@@ -87,7 +103,7 @@ describe('the More menu', () => {
 });
 
 describe('menu search', () => {
-  const menu = buildMenu({ t, role: 'admin', scopeKind: 'global' });
+  const menu = buildMenu({ t, role: 'admin', scopeKind: 'global', chatbotAvailable: true });
 
   it('returns everything for an empty query', () => {
     expect(filterMenu(menu, '')).toHaveLength(menu.length);

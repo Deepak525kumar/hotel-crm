@@ -1,5 +1,11 @@
 # E2E Run — 2026-09-15 — Zelle, live end to end (scenarios 21 and 22)
 
+> **Naming note (added 2026-10-01).** The assistant was renamed **Zelle -> Orla** on
+> 2026-10-01 after an App Store rejection under guideline 2.3.1(a) (Zelle is the US
+> bank-owned payments network). This run log is a dated record and keeps the name it
+> was written with; only file paths were updated so its links still resolve. Read
+> every "Zelle" below as "Orla".
+
 - **Commit under test:** branch `fix/zelle-field-conversations` (PR #682), uncommitted fixes at run time
 - **Environment:** local dev. The real app (`createApp()`) listened on a local port, backed by
   PostgreSQL 16 in Docker. Model: Bedrock mantle `qwen.qwen3-235b-a22b-2507` in `eu-central-1`,
@@ -96,8 +102,8 @@ EC2 `i-00a27148d4660cb45`, read only, via SSM:
 
 ## Scenario files updated this run
 
-- `scenarios/22-zelle-rota-and-everyday-tools.md`: created.
-- `scenarios/21-zelle-field-conversations.md`: linked to the executable harness.
+- `scenarios/22-orla-rota-and-everyday-tools.md`: created.
+- `scenarios/21-orla-field-conversations.md`: linked to the executable harness.
 - `README.md`: index row 22, and harness instructions.
 
 ## Addendum — final routing re-check
@@ -129,7 +135,7 @@ Driven by the owner's follow-up: "just fix what the user intends to do. you can 
 | A1 admin "how much work did we do" | PASS | L0, totals across all hotels |
 | A2 admin names the hotel for a day summary | PASS | `DailyShiftSummary` 40 / 5 |
 
-**Real browser** (`frontend/e2e/zelle-live.spec.ts`: production build, live backend, live model): **PASS**.
+**Real browser** (`frontend/e2e/orla-live.spec.ts`: production build, live backend, live model): **PASS**.
 - Login, then the L0 answer.
 - The live model produces the account link.
 - **Copy** reads back from the real clipboard.

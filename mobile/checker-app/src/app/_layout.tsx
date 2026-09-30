@@ -109,7 +109,7 @@ export default function RootLayout() {
                   <ScreenHeader>, and expo-router's bar on top of it is the
                   double-title this app just removed from the tab layout.
 
-                  Reported 2026-09-21: Zelle showed a second heading with a
+                  Reported 2026-09-21: Orla showed a second heading with a
                   back button above its own header, and the worker app did not.
                   The screens are byte-identical -- the difference is this
                   navigator. The worker app sets `headerShown: false` once in

@@ -35,8 +35,19 @@ export function buildMenu(context: {
   t: Translate;
   role: string | null | undefined;
   scopeKind: string;
+  /**
+   * Whether the backend is actually serving the assistant for THIS user.
+   *
+   * Required rather than optional on purpose. This row used to be
+   * unconditional while `ChatLauncher` hid itself on the same signal, so the
+   * two disagreed: with `FEATURE_CHATBOT` off, or for a user the feature is
+   * not permitted for, the floating button correctly vanished and this row
+   * still navigated to a screen talking to a 404. A caller that forgets the
+   * flag should fail to compile, not silently reopen that.
+   */
+  chatbotAvailable: boolean;
 }): MenuGroup[] {
-  const { t, role, scopeKind } = context;
+  const { t, role, scopeKind, chatbotAvailable } = context;
   // An admin is distinguished by GLOBAL SCOPE as well as the role string: an
   // admin and a regional manager both have a null scope_hotel_id, and the
   // role alone has put an RM in the admin branch before.
@@ -125,7 +136,18 @@ export function buildMenu(context: {
       title: t('nav.account'),
       items: [
         { route: '/notifications', label: t('nav.notifications'), glyph: '◔', keywords: ['alert'] },
-        { route: '/assistant', label: t('chatbot.title'), glyph: '✳', keywords: ['zelle', 'ai', 'ask', 'help'] },
+        // Gated on the live probe, exactly as `ChatLauncher` is -- see
+        // `chatbotAvailable` above for the disagreement this closes.
+        ...(chatbotAvailable
+          ? [
+              {
+                route: '/assistant',
+                label: t('chatbot.title'),
+                glyph: '✳',
+                keywords: ['orla', 'ai', 'ask', 'help'],
+              },
+            ]
+          : []),
         // Settings lives on the Profile tab now, and is not duplicated here.
         //
         // "My onboarding" is gone too, and not because it was untidy: the

@@ -206,7 +206,7 @@ export const cancelShift = registerTool<CancelShiftArgs>({
       shift.assignmentId,
       {
         status: AssignmentStatus.CANCELLED,
-        cancellation_reason: args.reason ?? 'Cancelled by a manager through Zelle',
+        cancellation_reason: args.reason ?? 'Cancelled by a manager through Orla',
       } as never,
       actor.userId,
       actor.role,

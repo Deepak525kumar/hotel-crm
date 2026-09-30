@@ -154,7 +154,7 @@ export default function AssistantScreen() {
             <HeaderAction label={t('chatbot.historyBack', 'Back to chat')} onPress={backToChat} />
           )}
           <ThemedText type="subtitle" style={styles.title}>
-            {t('chatbot.title', 'Zelle')}
+            {t('chatbot.title', 'Orla')}
           </ThemedText>
           <HeaderAction label={t('chatbot.history', 'History')} onPress={() => void openHistory()} />
           <HeaderAction

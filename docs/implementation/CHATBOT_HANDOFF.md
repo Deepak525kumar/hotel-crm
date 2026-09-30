@@ -4,10 +4,10 @@
 
 | Field | Value |
 |---|---|
-| Status | Scaffold + L0 command path, behind `FEATURE_CHATBOT` (default **OFF**) |
+| Status | **LIVE in production** — `FEATURE_CHATBOT=true`, `CHATBOT_PROVIDER=mantle`, `eu-central-1` (verified on the host, 2026-10-01) |
 | Module | `backend/src/modules/chatbot/` — see its [`README.md`](../../backend/src/modules/chatbot/README.md) for design detail |
 | Governing decisions | `ADR-013` (AI-execution ownership), `ADR-053` (orchestration layer + tool registry) |
-| Specification | `SPEC-CHATBOT-001@0.2.0` — **`REVIEW`, not `FROZEN`** |
+| Specification | `SPEC-CHATBOT-001@0.3.0` — **`FROZEN`**, G2 granted 2026-09-09 |
 | Completion | ~40% of the backend module. **0% of the AI itself.** |
 | Tests | 232 chatbot tests across 18 suites; full backend suite 3714 passing (2026-09-04) |
 
@@ -88,19 +88,37 @@ Each of these is a deliberate refusal, not an oversight. Re-deciding them is fin
 mechanically rather than by reviewer memory — it was updated deliberately as each decision
 landed, which is the intended workflow, not a bypass.
 
-## 4. Before you enable the flag
+## 4. The flag is already enabled
 
-`SPEC-CHATBOT-001` is `REVIEW`, not `FROZEN`, and `.claude/CLAUDE.md` states no implementation may begin from an unfrozen specification. Three G2 blockers stand (`GD-19_CHATBOT_CHECKPOINT.md` §2):
+**Corrected 2026-10-01.** This section said `SPEC-CHATBOT-001` was `REVIEW`, that three G2
+blockers stood, and that the flag must not be enabled outside development. All three
+statements had been false since 2026-09-09, when the commissioning human granted G2 and froze
+`SPEC-CHATBOT-001@0.3.0` (`GD-19_CHATBOT_CHECKPOINT.md` §2a). The table below already recorded
+two of the three blockers as CLOSED while the paragraph above it said they stood — the
+contradiction sat in one screen of text and was read past repeatedly.
+
+It was not harmless. On 2026-10-01 it produced the conclusion that the assistant was
+unreachable dead code in production, when it was in fact live and reachable in all three
+mobile apps, and that conclusion was briefly used to reason about an App Store rejection.
+
+**`FEATURE_CHATBOT=true` in production**, with `CHATBOT_PROVIDER=mantle` and
+`CHATBOT_BEDROCK_REGION=eu-central-1`, verified on the EC2 host. Do not take the flag's state
+from this file or any other: probe the running API. `/api/v1/chatbot/commands` answers **401**
+when the flag is on and **404** when it is off, because the disabled path falls through to the
+404 handler.
+
+The three former blockers, all closed:
 
 | Blocker | Status |
 |---|---|
 | `OD-CHAT-005` | **CLOSED 2026-09-04** by `ADR-073` (Accepted). The assistant's authority is the user's own authority, never more — a Manager may act on a worker inside their own scope precisely because they can already do so by hand. |
-| `OD-CHAT-006` | **Answered by `ADR-074`, awaiting ratification.** Containment, not detection: a compromised model cannot exceed its user's authority, and irreversible actions need confirmation of the exact call. |
+| `OD-CHAT-006` | **CLOSED 2026-09-08** by `ADR-074` (Accepted), after a live injection battery — 10/10 contained. Containment, not detection: a compromised model cannot exceed its user's authority, and irreversible actions need confirmation of the exact call. |
 | `OD-CHAT-013` | **CLOSED 2026-09-04** — owner is the commissioning human / account owner, assigned directly |
 
 Everything registered today is self-scoped, so the scaffold is correct under **either** resolution of `OD-CHAT-005`. Also note `ADR-053` item 4: it approves the tool-registry *architecture*, not any specific tool — `assignments.list_mine` carries `approvalRef: PENDING` for exactly this reason.
 
-**Do not enable `FEATURE_CHATBOT` outside development until those blockers close.**
+**Fourteen `OD-CHAT-*` items remain open** (`GD-19_CHATBOT_CHECKPOINT.md` §3). None blocked
+G2, and a frozen specification is not a complete one.
 
 ## 5. The invariant that must not be broken
 
@@ -215,7 +233,7 @@ place a worker where nobody asked.
 ## 6a. The field report of 2026-09-15 — what it taught
 
 The owner tried thirteen real requests; all failed. Scenario
-`docs/10-testing/e2e/scenarios/21-zelle-field-conversations.md` keeps them verbatim. The lessons
+`docs/10-testing/e2e/scenarios/21-orla-field-conversations.md` keeps them verbatim. The lessons
 that apply beyond those tools:
 
 **A confirmation precheck must follow the schema's SHAPE, not its top level.**
@@ -312,7 +330,7 @@ After scheduling three shifts, "add that another dates also" proposed the same t
 **Only a real browser showed the New user form opening empty.** The prefill read
 `window.location.hash` during the first render. With in-app navigation, Next renders the new page
 before updating the address bar, so the fragment was not there yet. jsdom sets the URL first,
-so every unit test passed. It now reads after mount. `frontend/e2e/zelle-live.spec.ts` (live
+so every unit test passed. It now reads after mount. `frontend/e2e/orla-live.spec.ts` (live
 backend, live model) is what caught it.
 
 **History does not weaken ADR-074 §5.1.** That control governs what reaches a prompt. A person

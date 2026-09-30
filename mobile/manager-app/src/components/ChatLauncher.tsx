@@ -34,7 +34,7 @@ export function ChatLauncher() {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t('chatbot.title', 'Zelle')}
+      accessibilityLabel={t('chatbot.title', 'Orla')}
       onPress={() => router.push('/assistant')}
       style={[styles.fab, { backgroundColor: theme.primary }]}
     >
@@ -44,18 +44,30 @@ export function ChatLauncher() {
           speech-bubble glyph reads as decoration to someone who has not seen
           the feature -- which was right about the glyph and wrong about the
           word. "Assistant" is a category, and the assistant has a name:
-          Zelle. A name is the one label that needs no translation, so it
+          Orla. A name is the one label that needs no translation, so it
           serves ar/ur/uk exactly as well as en, and it is what someone is
-          told to look for when a colleague says "ask Zelle".
+          told to look for when a colleague says "ask Orla".
 
-          The badge is a circle with a Z, built from a View and Text rather
+          THE NAME WAS "ZELLE" UNTIL 2026-10-01, AND IT COST AN APP STORE
+          REJECTION. Zelle is the US bank-owned P2P payments network, so App
+          Review read a hotel app carrying that name as undisclosed financial
+          functionality and rejected FHM Checker under guideline 2.3.1(a),
+          "hidden features", with an Extended Review warning attached. They
+          never had to log in: the name was also in
+          NSMicrophoneUsageDescription, which is read straight off the
+          binary. Any future name for this assistant must be checked against
+          live trademarks in EVERY sector, not just software -- Orla was
+          picked only after Juna, Neela, Marlo, Talo, Kaja and Tavi all
+          turned out to be taken, two of them by finance products.
+
+          The badge is a circle with an O, built from a View and Text rather
           than an SVG: these apps ship no vector library (no react-native-svg,
           no vector-icons), and adding one to draw a 20px circle would be a
           dependency for a shape the layout engine already draws. */}
       <View style={[styles.badge, { borderColor: '#FFFFFF' }]}>
-        <ThemedText style={styles.badgeLetter}>Z</ThemedText>
+        <ThemedText style={styles.badgeLetter}>O</ThemedText>
       </View>
-      <ThemedText style={styles.label}>{t('chatbot.title', 'Zelle')}</ThemedText>
+      <ThemedText style={styles.label}>{t('chatbot.title', 'Orla')}</ThemedText>
     </Pressable>
   );
 }

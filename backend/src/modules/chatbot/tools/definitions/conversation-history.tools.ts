@@ -41,7 +41,7 @@ const when = (iso: string): string =>
 export const recentConversations = registerTool<NoArgs>({
   name: 'chatbot.recent_conversations',
   description:
-    "Lists the person's OWN earlier conversations with Zelle from the last 30 days: when each " +
+    "Lists the person's OWN earlier conversations with Orla from the last 30 days: when each " +
     'started and the first thing they asked. Use when someone asks for previous chats, old ' +
     'conversations or chat history: "I want previous chats", "what did I ask yesterday", ' +
     '"zeig mir meine alten Chats". Returns up to ten, newest first; the full text of each is in ' +

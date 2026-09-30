@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ import {
   ThemedView,
   scopeOf,
   useAuthStore,
+  useChatbotStore,
   useTheme,
 } from '@hotel-crm/mobile-shared';
 
@@ -46,9 +47,25 @@ export default function More() {
   const scope = scopeOf(user);
   const [query, setQuery] = useState('');
 
+  // The assistant row is gated on the same probe the home screen's launcher
+  // uses. Probing here too because More is reachable without passing through
+  // Home (a deep link, or the tab restored on launch), and an unprobed store
+  // would hide a row the user does have. `probe()` no-ops once resolved.
+  const chatbotAvailable = useChatbotStore((s) => s.available);
+  const probeChatbot = useChatbotStore((s) => s.probe);
+  useEffect(() => {
+    void probeChatbot();
+  }, [probeChatbot]);
+
   const groups = useMemo(
-    () => buildMenu({ t, role: user?.role, scopeKind: scope.kind }),
-    [t, user?.role, scope.kind]
+    () =>
+      buildMenu({
+        t,
+        role: user?.role,
+        scopeKind: scope.kind,
+        chatbotAvailable: chatbotAvailable === true,
+      }),
+    [t, user?.role, scope.kind, chatbotAvailable]
   );
   const visible = useMemo(() => filterMenu(groups, query), [groups, query]);
 

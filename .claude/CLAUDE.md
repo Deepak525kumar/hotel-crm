@@ -61,10 +61,17 @@ for the governance state.
 That handoff records what exists, what is deliberately refused and why, and the traps that have
 already cost time. Three non-negotiables from it:
 
-- **`SPEC-CHATBOT-001` is `REVIEW`, not `FROZEN`,** and three G2 blockers stand
-  (`OD-CHAT-005`, `OD-CHAT-006`, `OD-CHAT-013`). `FEATURE_CHATBOT` must not be enabled outside
-  development until they close. `ADR-053` approves the tool-registry *architecture*, never a
-  specific tool — each tool is its own approval.
+- **`SPEC-CHATBOT-001@0.3.0` is `FROZEN`** (G2 granted 2026-09-09) and `FEATURE_CHATBOT` is
+  **ON in production**. All three former G2 blockers are closed: `OD-CHAT-005` (`ADR-073`,
+  2026-09-04), `OD-CHAT-006` (`ADR-074`, 2026-09-08) and `OD-CHAT-013` (owner assigned,
+  2026-09-04). Fourteen `OD-CHAT-*` items remain open; none blocked G2, and a frozen
+  specification is not a complete one. *Until 2026-10-01 this bullet said the opposite — spec
+  in `REVIEW`, three blockers standing, flag to stay off. It had been wrong since 2026-09-09
+  and produced a wrong conclusion twice in one session, most expensively that a live,
+  reachable assistant was unreachable dead code. Check the flag against the running API
+  rather than against prose: `/api/v1/chatbot/commands` answers 401 when it is on and 404
+  when it is off.* `ADR-053` approves the tool-registry *architecture*, never a specific
+  tool — each tool is its own approval.
 - **The model never produces an authorization input.** Identity, role, scope and permissions are
   re-derived from `req.auth` at execution time, never accepted as tool arguments. This is enforced
   at compile time, at registration, and by a static test; do not weaken any of the three.
