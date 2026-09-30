@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { usePathname } from "next/navigation";
 import { X, Maximize2 } from "lucide-react";
-import { ZelleMark } from "./ZelleMark";
+import { OrlaMark } from "./OrlaMark";
 import Link from "next/link";
 import { useChatbotStore } from "@/stores/chatbot";
 import { ChatPanel } from "./ChatPanel";
@@ -59,7 +59,7 @@ export function ChatWidget() {
           ref={panelRef}
           role="dialog"
           aria-modal="false"
-          aria-label={t("chatbot.title", "Zelle")}
+          aria-label={t("chatbot.title", "Orla")}
           /* MOBILE BROWSERS, and two things they do differently.
              `100vh` on iOS Safari and Android Chrome is the height of the
              viewport WITHOUT the browser's own collapsing toolbars, so a
@@ -77,8 +77,8 @@ export function ChatWidget() {
         >
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
             <p className="flex items-center gap-2 text-sm font-semibold">
-              <ZelleMark className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              {t("chatbot.title", "Zelle")}
+              <OrlaMark className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              {t("chatbot.title", "Orla")}
             </p>
             <div className="flex items-center gap-1">
               <Link
@@ -116,7 +116,7 @@ export function ChatWidget() {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-label={open ? t("chatbot.close", "Close") : t("chatbot.title", "Zelle")}
+        aria-label={open ? t("chatbot.close", "Close") : t("chatbot.title", "Orla")}
         /* THE LAUNCHER, reported invisible on a mobile browser (2026-09-10).
            At `bottom-5` (20px) a 56px button sits directly under the browser
            chrome that iOS Safari and Android Chrome overlay along the bottom
@@ -129,7 +129,7 @@ export function ChatWidget() {
         {open ? (
           <X className="h-6 w-6" aria-hidden="true" />
         ) : (
-          <ZelleMark className="h-6 w-6" />
+          <OrlaMark className="h-6 w-6" />
         )}
       </button>
     </>

@@ -87,7 +87,7 @@ interface ChatbotState {
  */
 export function conversationAsText(
   items: readonly { role: 'user' | 'assistant'; text: string }[],
-  assistantName = 'Zelle',
+  assistantName = 'Orla',
 ): string {
   return items
     .filter((m) => m.text.trim().length > 0)

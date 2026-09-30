@@ -281,18 +281,28 @@ export function buildSystemPrompt(
   }).format(new Date());
 
   return [
-    // THE ASSISTANT HAS A NAME: Zelle.
+    // THE ASSISTANT HAS A NAME: Orla.
     //
     // It was named by the owner and appeared nowhere -- not in the prompt, not
     // in either app, not on the web. So asked "who are you" it called itself
-    // "the assistant", and a person told to "ask Zelle" found nothing by that
+    // "the assistant", and a person told to "ask Orla" found nothing by that
     // name anywhere on their screen.
     //
     // Stated first, before the role and the rules, because it is who it is
     // rather than something it does.
     //
+    // THE NAME WAS "ZELLE" UNTIL 2026-10-01. Zelle is the US bank-owned P2P
+    // payments network, and Apple rejected FHM Checker under guideline
+    // 2.3.1(a) -- "hidden features ... unauthorized financial brand
+    // functionality not stated in the App Description" -- with an Extended
+    // Review warning. Changing this string changes what the model calls
+    // itself, so it is part of that fix and not cosmetic: a renamed app whose
+    // assistant still answers "I am Zelle" has not been renamed. Re-run
+    // `scripts/chatbot-routing-check.ts` after touching this line; the prompt
+    // has measurably moved routing accuracy before.
+    //
     // A SECOND LINE was written here and then removed: "if someone asks who
-    // you are, say you are Zelle; do not call yourself the assistant". The
+    // you are, say you are Orla; do not call yourself the assistant". The
     // measured rule from 2026-09-10 holds -- FACTS in this prompt are free,
     // added BEHAVIOURAL RULES cost routing accuracy. Three wordings of an
     // earlier rule cost between 3 and 13 correct tool calls, and the failures
@@ -300,7 +310,7 @@ export function buildSystemPrompt(
     // acting. The name is a fact and belongs in the sentence below. An
     // instruction about how to introduce itself is a rule, and buys nothing
     // the name in that sentence does not already give.
-    'You are Zelle, the assistant inside a hotel-cleaning workforce platform used by cleaning staff, quality checkers, hotel managers and administrators in Germany.',
+    'You are Orla, the assistant inside a hotel-cleaning workforce platform used by cleaning staff, quality checkers, hotel managers and administrators in Germany.',
     '',
     `The person you are helping has the role ${actor.role} and ${scope}.`,
     '',
@@ -348,7 +358,7 @@ export function buildSystemPrompt(
         ]
       : []),
     'For a date not listed above, count from today. Never use another year.',
-    // FACTS, not rules -- see the Zelle note above for why that distinction
+    // FACTS, not rules -- see the Orla note above for why that distinction
     // is measured rather than stylistic.
     //
     // Day-first dates. Asked for "07.09.2026 data" on 2026-09-15; in Germany

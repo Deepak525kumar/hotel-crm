@@ -225,7 +225,7 @@ const READ_ACTIONS: Record<string, string> = {
 /**
  * A CLAIM OF A CHANGE THAT NOTHING MADE.
  *
- * Live end-to-end run, 2026-09-15. After "manger not worker", Zelle answered in
+ * Live end-to-end run, 2026-09-15. After "manger not worker", Orla answered in
  * prose: "Harvir Singh has been placed on the schedule as a manager for 16, 17
  * and 18 September." No tool ran and nothing was written. A manager reading
  * that would believe the rota was covered.

@@ -106,7 +106,7 @@ describe("Copy -- \"make me that chat copy\"", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
 
     await waitFor(() =>
-      expect(writeText).toHaveBeenCalledWith("You: make me that chat copy\n\nZelle: Use the Copy button above."),
+      expect(writeText).toHaveBeenCalledWith("You: make me that chat copy\n\nOrla: Use the Copy button above."),
     );
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
   });

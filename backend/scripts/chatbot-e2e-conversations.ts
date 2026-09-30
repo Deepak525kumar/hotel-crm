@@ -1,5 +1,5 @@
 /**
- * END-TO-END: Zelle's conversations, through the whole stack.
+ * END-TO-END: Orla's conversations, through the whole stack.
  *
  *   cd backend && RESEND_API_KEY= npx tsx scripts/chatbot-e2e-conversations.ts
  *
@@ -168,7 +168,7 @@ async function main() {
   // SERVE_FOR_BROWSER=<file>: seed, grant today's consent through the real
   // route, write the manager's credentials to <file>, and keep this real
   // backend listening for the web app's /api proxy (run with E2E_PORT=3001).
-  // The Playwright spec frontend/e2e/zelle-live.spec.ts drives a real browser
+  // The Playwright spec frontend/e2e/orla-live.spec.ts drives a real browser
   // against it. No scenario runs here in that mode.
   if (process.env.SERVE_FOR_BROWSER) {
     const { writeFileSync } = await import('node:fs');
@@ -259,7 +259,7 @@ async function main() {
     const t = await c2.say('manger not worker');
     const rows = await prisma.workerAssignment.count({ where: { worker_id: harvir.id } });
     // THE REPLY MUST NOT CLAIM A WRITE. The second live run passed this step
-    // while Zelle said "Harvir Singh has been placed on the schedule" with
+    // while Orla said "Harvir Singh has been placed on the schedule" with
     // zero rows written -- a data check alone scored a false statement as a pass.
     const claims = /(has been|have been|was|were|I have|I've)\s+(placed|scheduled|put|added)/i.test(t.reply);
     return {
@@ -324,7 +324,7 @@ async function main() {
     const before = await prisma.workerAssignment.count({ where: { worker_id: parveen.id } });
     const t = await c3.say('add that another dates also');
     const after = await prisma.workerAssignment.count({ where: { worker_id: parveen.id } });
-    // No confirmation either. Run 5 "passed" this step while Zelle offered to
+    // No confirmation either. Run 5 "passed" this step while Orla offered to
     // re-schedule the three shifts it had just scheduled -- nothing was
     // written only because nobody pressed Confirm.
     return {

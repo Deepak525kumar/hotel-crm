@@ -134,7 +134,7 @@ export async function runTurn(params: {
  * an assistant reply and no user message at all.
  *
  * Verified in production that day: of 20 stored conversations, the one opened
- * on a chip had `user_msgs = 0, assistant_msgs = 1`, and it rendered in Zelle's
+ * on a chip had `user_msgs = 0, assistant_msgs = 1`, and it rendered in Orla's
  * "Earlier conversations" list as a bare ellipsis, because
  * listRecentConversations() names a conversation after the person's first
  * message and there was none. (The transcripts themselves were fine -- all six

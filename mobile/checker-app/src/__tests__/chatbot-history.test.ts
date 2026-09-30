@@ -44,7 +44,7 @@ describe('conversationAsText', () => {
         { role: 'user', text: 'make me that chat copy ' },
         { role: 'assistant', text: 'Tap Copy at the top.' },
       ]),
-    ).toBe('You: make me that chat copy\n\nZelle: Tap Copy at the top.');
+    ).toBe('You: make me that chat copy\n\nOrla: Tap Copy at the top.');
   });
 });
 

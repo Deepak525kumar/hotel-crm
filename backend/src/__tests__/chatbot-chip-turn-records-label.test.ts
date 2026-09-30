@@ -3,7 +3,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 /**
  * A chip tap is something the person SAID, and must be stored as such.
  *
- * REPORTED 2026-09-21: Zelle's "Earlier conversations" list showed rows with no
+ * REPORTED 2026-09-21: Orla's "Earlier conversations" list showed rows with no
  * name at all, just an ellipsis. Verified against production the same day --
  * of 20 stored conversations, the one begun by tapping a chip held
  * `user_msgs = 0, assistant_msgs = 1`. `listRecentConversations()` names a

@@ -131,7 +131,7 @@ export default function DashboardPage() {
             text. `grid-cols-1` compiles to `minmax(0, 1fr)`, a track that is
             allowed to shrink.
 
-            It also explains a second report: the Zelle launcher is `fixed` at
+            It also explains a second report: the Orla launcher is `fixed` at
             `right: 1rem`, and once the page is wider than the screen that
             edge is off-screen. The launcher was never missing -- it was
             parked beyond the right-hand side of a page that had grown. */}
